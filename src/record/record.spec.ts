@@ -1,8 +1,8 @@
 import { expect, test } from "bun:test";
-import { record, onDidUpdate } from "./record";
+import { $of, onDidUpdate } from "./record";
 
 test("Can define objects", () => {
-  const obj = record({
+  const obj = $of({
     hello: "world",
   });
 
@@ -10,7 +10,7 @@ test("Can define objects", () => {
 });
 
 test("Notifies on object updates", async () => {
-  const obj = record({
+  const obj = $of({
     hello: "world",
   });
 
@@ -19,14 +19,14 @@ test("Notifies on object updates", async () => {
       onDidUpdate(obj, (updated) => resolve(updated));
 
       obj.hello = "new world";
-    }),
+    })
   ).resolves.toEqual({
     hello: "new world",
   });
 });
 
 test("Notifies on object updates even if the listener was set after the change", async () => {
-  const obj = record({
+  const obj = $of({
     hello: "world",
   });
 
@@ -35,14 +35,14 @@ test("Notifies on object updates even if the listener was set after the change",
   await expect(
     new Promise((resolve) => {
       onDidUpdate(obj, (updated) => resolve(updated));
-    }),
+    })
   ).resolves.toEqual({
     hello: "new world",
   });
 });
 
 test("Implies updates immediately", async () => {
-  const obj = record({
+  const obj = $of({
     hello: {
       world: "foo",
     },
@@ -64,7 +64,7 @@ test("Implies updates immediately", async () => {
 });
 
 test("Handles nested object updates", async () => {
-  const obj = record({
+  const obj = $of({
     hello: {
       world: "foo",
     },
@@ -75,7 +75,7 @@ test("Handles nested object updates", async () => {
   await expect(
     new Promise((resolve) => {
       onDidUpdate(obj, (updated) => resolve(updated));
-    }),
+    })
   ).resolves.toEqual({
     hello: {
       world: "new",
@@ -84,7 +84,7 @@ test("Handles nested object updates", async () => {
 });
 
 test("Can unsubscribe from updates", async () => {
-  const obj = record({
+  const obj = $of({
     hello: {
       world: "foo",
     },
@@ -101,7 +101,7 @@ test("Can unsubscribe from updates", async () => {
   await expect(
     new Promise((resolve) => {
       onDidUpdate(obj, (updated) => resolve(updated));
-    }),
+    })
   ).resolves.toEqual({
     hello: {
       world: "new",
@@ -110,7 +110,7 @@ test("Can unsubscribe from updates", async () => {
 });
 
 test("Supports arrays", async () => {
-  const obj = record({
+  const obj = $of({
     hello: {
       world: ["this", "is", "array"],
     },
@@ -121,7 +121,7 @@ test("Supports arrays", async () => {
   await expect(
     new Promise((resolve) => {
       onDidUpdate(obj, (updated) => resolve(JSON.stringify(updated)));
-    }),
+    })
   ).resolves.toEqual('{"hello":{"world":["array","is","this"]}}');
 
   obj.hello.world.push("123");
@@ -129,12 +129,12 @@ test("Supports arrays", async () => {
   await expect(
     new Promise((resolve) => {
       onDidUpdate(obj, (updated) => resolve(JSON.stringify(updated)));
-    }),
+    })
   ).resolves.toEqual('{"hello":{"world":["array","is","this","123"]}}');
 });
 
 test("Supports iterable", async () => {
-  const obj = record(["hello", "world"]);
+  const obj = $of(["hello", "world"]);
 
   function iterate(...args: string[]) {
     const [a, b] = args;

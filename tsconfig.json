@@ -5,6 +5,7 @@
     "module": "ESNext",
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "skipLibCheck": true,
+    "experimentalDecorators": true,
 
     /* Bundler mode */
     "moduleResolution": "bundler",
@@ -14,6 +15,7 @@
     "noEmit": true,
 
     /* Linting */
+    "TS2348": false,
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,

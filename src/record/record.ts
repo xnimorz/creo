@@ -9,16 +9,16 @@
 
 import { isRecordLike } from "../tools/isRecordLike";
 
-type Record<T extends object> = T;
+export type RecordOf<T extends object> = T;
 type Wildcard = any;
-type RecordDidChangeListener<T extends object> = (record: Record<T>) => void;
+type RecordDidChangeListener<T extends object> = (record: RecordOf<T>) => void;
 
 const didUpdateMap: WeakMap<
-  Record<Wildcard>,
+  RecordOf<Wildcard>,
   Set<RecordDidChangeListener<Wildcard>>
 > = new WeakMap();
 
-const scheduledUpdatesNotifiers: Set<Record<Wildcard>> = new Set();
+const scheduledUpdatesNotifiers: Set<RecordOf<Wildcard>> = new Set();
 let shouldScheduleMicrotask = true;
 function queuedNotifier() {
   shouldScheduleMicrotask = true;
@@ -32,16 +32,16 @@ function queuedNotifier() {
     });
   });
 }
-function recordDidUpdate<T extends object>(record: Record<T>) {
+function recordDidUpdate<T extends object>(record: RecordOf<T>) {
   scheduledUpdatesNotifiers.add(record);
   shouldScheduleMicrotask && queueMicrotask(queuedNotifier);
   shouldScheduleMicrotask = false;
 }
 
 function creoRecord<TNode extends object, T extends object>(
-  rootRecord: Record<TNode>,
-  value: T,
-): Record<T> {
+  rootRecord: RecordOf<TNode>,
+  value: T
+): RecordOf<T> {
   return new Proxy(value, {
     // @ts-ignore we override `get` to improve typing
     get<K extends keyof T>(target: T, property: K): T[K] {
@@ -62,7 +62,7 @@ function creoRecord<TNode extends object, T extends object>(
   });
 }
 
-export function record<TNode extends object>(value: TNode): Record<TNode> {
+export function $of<TNode extends object>(value: TNode): RecordOf<TNode> {
   const rootRecord = new Proxy(value, {
     // @ts-ignore we override `get` to improve typing
     get<K extends keyof T>(target: T, property: K): T[K] {
@@ -86,8 +86,8 @@ export function record<TNode extends object>(value: TNode): Record<TNode> {
 }
 
 export function onDidUpdate<T extends object>(
-  record: Record<T>,
-  listener: (record: Record<T>) => void,
+  record: RecordOf<T>,
+  listener: (record: RecordOf<T>) => void
 ): () => void {
   const listeners = didUpdateMap.get(record);
   if (!listeners) {
