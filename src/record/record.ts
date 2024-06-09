@@ -2,6 +2,8 @@
  * Ideas:
  * [x] didUpdate support
  * [x] Proxy proxifies all children as well
+ * [x] Support nested updates + nested listeners (e.g. only part of the object)
+ * [x] Cache records
  * [ ] Keep track on updates, until there are no users on the old state
  * [ ] Support symbol iterator
  * [ ] Add js dispose tracker to automatically close listeners
