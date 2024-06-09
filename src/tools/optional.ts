@@ -1,4 +1,4 @@
-export type None = null;
+export type None = null | undefined;
 export type Just<T> = T;
 export type Optional<T> = Just<T> | None;
 

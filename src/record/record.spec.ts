@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { $of, onDidUpdate } from "./record";
+import { $of, RecordOf, onDidUpdate } from "./record";
 
 test("Can define objects", () => {
   const obj = $of({
@@ -7,6 +7,37 @@ test("Can define objects", () => {
   });
 
   expect(obj).toEqual({ hello: "world" });
+});
+
+test("Refers to the same objects", ()  => {
+
+  const test = $of({
+    foo: {
+      bar: 'baz',
+    }
+  })
+
+  expect(test.foo).toBe(test.foo);
+});
+
+
+test("Updates fields correctly", ()  => {
+
+  const test: RecordOf<any> = $of({
+    foo: {
+      bar: 'baz',
+    }
+  })
+
+  expect(test.foo.bar).toBe('baz');
+
+  test.foo.bar = '123';
+
+  expect(test.foo.bar).toBe('123');
+
+  test.foo = {hello: 'world'};
+  expect(test.foo.bar).toBe(undefined);
+  expect(test.foo.hello).toBe('world');
 });
 
 test("Notifies on object updates", async () => {

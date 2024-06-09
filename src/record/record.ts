@@ -7,9 +7,16 @@
  * [ ] Add js dispose tracker to automatically close listeners
  */
 
-import { isRecordLike } from "../tools/isRecordLike";
+import { Optional } from "../tools/optional";
+import { isRecordLike } from "./isRecordLike";
 
-export type RecordOf<T extends object> = T;
+const ParentRecord = Symbol('parent-record');
+// const example: RecordOf<{foo: 'bar'}> = {
+//   foo: 'bar',
+//   [RecordCache]: {foo: 'bar'}
+//   [ParentRecord]: null // Root record
+// }
+export type RecordOf<T extends object> = T & {[ParentRecord]: Optional<WeakRef<RecordOf<Wildcard>>>};
 type Wildcard = any;
 type RecordDidChangeListener<T extends object> = (record: RecordOf<T>) => void;
 
@@ -21,16 +28,19 @@ const didUpdateMap: WeakMap<
 const scheduledUpdatesNotifiers: Set<RecordOf<Wildcard>> = new Set();
 let shouldScheduleMicrotask = true;
 function queuedNotifier() {
-  shouldScheduleMicrotask = true;
-  scheduledUpdatesNotifiers.forEach((record) => {
+  function iterate(record: RecordOf<Wildcard>) {
     const listeners = didUpdateMap.get(record);
-    if (!listeners) {
-      return;
-    }
-    listeners.forEach((listener) => {
+    console.log("listeners", listeners);    
+    listeners?.forEach((listener) => {
       listener(record);
     });
-  });
+    const maybeParent: Optional<RecordOf<Wildcard>> = record[ParentRecord];
+    if (maybeParent) {
+      iterate(maybeParent);
+    }
+  }
+  shouldScheduleMicrotask = true;
+  scheduledUpdatesNotifiers.forEach(iterate);
 }
 function recordDidUpdate<T extends object>(record: RecordOf<T>) {
   scheduledUpdatesNotifiers.add(record);
@@ -38,51 +48,63 @@ function recordDidUpdate<T extends object>(record: RecordOf<T>) {
   shouldScheduleMicrotask = false;
 }
 
-function creoRecord<TNode extends object, T extends object>(
-  rootRecord: RecordOf<TNode>,
-  value: T
-): RecordOf<T> {
-  return new Proxy(value, {
+type InternalOnly = never;
+
+function creoRecord<TNode extends object, T extends object>(  
+  parent: Optional<RecordOf<TNode>>,
+  value: T,  
+): RecordOf<T> {  
+  const parentWeakRef = parent != null ? new WeakRef(parent) : null;
+  
+  type CacheField<K extends keyof T> = T[K] extends object ? Optional<RecordOf<T[K]>> : never
+  type Cache = { [K in keyof T]: CacheField<K> };
+  const cache: Cache = {} as Cache;  
+  const record: RecordOf<T> = new Proxy(value, {
     // @ts-ignore we override `get` to improve typing
     get<K extends keyof T>(target: T, property: K): T[K] {
       const val = target[property];
-      if (isRecordLike(val)) {
-        // @ts-ignore we proxify all nested objects / arrays to ensure correct behaviour
-        return creoRecord(rootRecord, val);
+
+      if (property === ParentRecord) {
+        // Only for internal use
+        return parentWeakRef?.deref() as InternalOnly;
       }
+      // If the value is cached, return the cached record:      
+      if (cache[property] != null) {        
+        return cache[property] as T[K];
+      }
+      // No cached value:
+      if (isRecordLike(val)) {
+        // Object / Array, etc.
+        // we proxify all nested objects / arrays to ensure correct behaviour
+        const childRecord = creoRecord(record, val);    
+        cache[property] = childRecord as CacheField<K>;
+        return childRecord;
+      }
+
+      // Primitive value:
       return val;
-    },
-    // @ts-ignore
-    set<K, TNewValue>(target: T, property: K, newValue: TNewValue) {
-      // @ts-ignore
-      target[property] = newValue;
-      recordDidUpdate(rootRecord);
+    },    
+    set<K, TNewValue>(target: T, property: K, newValue: TNewValue) {      
+      // property is actually the keyof K, but TS defines Proxy differently:
+      const prop: keyof T = property as keyof T;      
+      const value: T[typeof prop] = newValue as T[typeof prop];
+
+      target[prop] = value;            
+      if (cache[prop] != null) {
+        cache[prop] = null as Cache[keyof Cache];
+      }
+      recordDidUpdate(record);
       return true;
     },
-  });
+  }) as RecordOf<T>;
+
+  return record;
 }
 
 export function $of<TNode extends object>(value: TNode): RecordOf<TNode> {
-  const rootRecord = new Proxy(value, {
-    // @ts-ignore we override `get` to improve typing
-    get<K extends keyof T>(target: T, property: K): T[K] {
-      const val = target[property];
-      if (isRecordLike(val)) {
-        // @ts-ignore we proxify all nested objects / arrays to ensure correct behaviour
-        return creoRecord(rootRecord, val);
-      }
-      return val;
-    },
-    // @ts-ignore
-    set<K, TNewValue>(target: T, property: K, newValue: TNewValue) {
-      // @ts-ignore
-      target[property] = newValue;
-      recordDidUpdate(rootRecord);
-      return true;
-    },
-  });
-  didUpdateMap.set(rootRecord, new Set());
-  return rootRecord;
+  const record: RecordOf<TNode> = creoRecord(null, value);
+  didUpdateMap.set(record, new Set());
+  return record;
 }
 
 export function onDidUpdate<T extends object>(
