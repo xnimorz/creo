@@ -15,7 +15,6 @@ import { isRecordLike } from "./isRecordLike";
 const ParentRecord = Symbol('parent-record');
 // const example: RecordOf<{foo: 'bar'}> = {
 //   foo: 'bar',
-//   [RecordCache]: {foo: 'bar'}
 //   [ParentRecord]: null // Root record
 // }
 export type RecordOf<T extends object> = T & {[ParentRecord]: Optional<WeakRef<RecordOf<Wildcard>>>};
@@ -31,8 +30,7 @@ const scheduledUpdatesNotifiers: Set<RecordOf<Wildcard>> = new Set();
 let shouldScheduleMicrotask = true;
 function queuedNotifier() {
   function iterate(record: RecordOf<Wildcard>) {
-    const listeners = didUpdateMap.get(record);
-    console.log("listeners", listeners);    
+    const listeners = didUpdateMap.get(record);       
     listeners?.forEach((listener) => {
       listener(record);
     });
