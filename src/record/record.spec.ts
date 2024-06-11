@@ -1,8 +1,8 @@
 import { expect, test } from "bun:test";
-import { $of, RecordOf, onDidUpdate } from "./record";
+import { record, RecordOf, onDidUpdate } from "./record";
 
 test("Can define objects", () => {
-  const obj = $of({
+  const obj = record({
     hello: "world",
   });
 
@@ -11,7 +11,7 @@ test("Can define objects", () => {
 
 test("Refers to the same objects", ()  => {
 
-  const test = $of({
+  const test = record({
     foo: {
       bar: 'baz',
     }
@@ -23,7 +23,7 @@ test("Refers to the same objects", ()  => {
 
 test("Updates fields correctly", ()  => {
 
-  const test: RecordOf<any> = $of({
+  const test: RecordOf<any> = record({
     foo: {
       bar: 'baz',
     }
@@ -41,7 +41,7 @@ test("Updates fields correctly", ()  => {
 });
 
 test("Notifies on object updates", async () => {
-  const obj = $of({
+  const obj = record({
     hello: "world",
   });
 
@@ -57,7 +57,7 @@ test("Notifies on object updates", async () => {
 });
 
 test("Notifies on object updates even if the listener was set after the change", async () => {
-  const obj = $of({
+  const obj = record({
     hello: "world",
   });
 
@@ -73,7 +73,7 @@ test("Notifies on object updates even if the listener was set after the change",
 });
 
 test("Implies updates immediately", async () => {
-  const obj = $of({
+  const obj = record({
     hello: {
       world: "foo",
     },
@@ -95,7 +95,7 @@ test("Implies updates immediately", async () => {
 });
 
 test("Handles nested object updates", async () => {
-  const obj = $of({
+  const obj = record({
     hello: {
       world: "foo",
     },
@@ -115,7 +115,7 @@ test("Handles nested object updates", async () => {
 });
 
 test("Can unsubscribe from updates", async () => {
-  const obj = $of({
+  const obj = record({
     hello: {
       world: "foo",
     },
@@ -141,7 +141,7 @@ test("Can unsubscribe from updates", async () => {
 });
 
 test("Supports arrays", async () => {
-  const obj = $of({
+  const obj = record({
     hello: {
       world: ["this", "is", "array"],
     },
@@ -165,7 +165,7 @@ test("Supports arrays", async () => {
 });
 
 test("Supports iterable", async () => {
-  const obj = $of(["hello", "world"]);
+  const obj = record(["hello", "world"]);
 
   function iterate(...args: string[]) {
     const [a, b] = args;

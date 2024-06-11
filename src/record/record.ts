@@ -101,7 +101,7 @@ function creoRecord<TNode extends object, T extends object>(
   return record;
 }
 
-export function $of<TNode extends object>(value: TNode): RecordOf<TNode> {
+export function record<TNode extends object>(value: TNode): RecordOf<TNode> {
   const record: RecordOf<TNode> = creoRecord(null, value);
   didUpdateMap.set(record, new Set());
   return record;
