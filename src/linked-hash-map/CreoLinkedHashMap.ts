@@ -3,10 +3,11 @@
  */
 
 import { List } from "../list/CreoList";
+import { Optional } from "../tools/optional";
 
-export class CreoList<K, T> {
+export class LinkedHashMap<K, T> {
   #map: Map<K, {value: T, list: List<K>}> = new Map();
-  #list: List<K> = new List();  
+  #list: Optional<List<K>>;
 
   addToEnd(key: K, value: T) {
     this.#list
