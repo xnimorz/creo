@@ -2,7 +2,7 @@
  * Creo Linked hash map impl
  */
 
-import { List } from "../list/CreoList";
+import { List } from "../list/List";
 import { Optional } from "../tools/optional";
 
 export class LinkedHashMap<K, T> {
