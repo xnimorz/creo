@@ -138,3 +138,15 @@ test("Mutating the last item using ListNode directly keeps List in correct state
   expect(list.at(-1)?.value).toBe('test');
   expect(list.at(-2)?.value).toBe('6');
 });
+
+test('Mutating item in a middle keeps the list correct', () => {
+  const list = List.from(['1','2','3','4','5','6']);  
+
+  list.at(-4)!.next = 'test'
+
+  expect(Array.from(list).join('')).toBe('123test456');
+  expect(list.at(-2)?.value).toBe('5');
+  expect(list.at(-4)?.value).toBe('test');
+  expect(list.at(-5)?.value).toBe('3');
+  expect(list.at(5)?.value).toBe('5');
+})

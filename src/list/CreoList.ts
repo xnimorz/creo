@@ -67,14 +67,6 @@ export class ListNode<T> {
     }
   }
 
-  insertPrev(value: T) {
-
-  }
-
-  insertNext(value: T) {
-
-  }
-
   get value(): T {
     return this.node;
   }
