@@ -6,16 +6,16 @@
  * [] Make prev and next to receive ListNode
  */
 
-import { Optional } from "../tools/optional";
+import { Maybe } from "../tools/Maybe";
 
 
 export class ListNode<T> {
-  #list: Optional<WeakRef<List<T>>>;
-  #next: Optional<ListNode<T>>;
-  #prev: Optional<ListNode<T>>;
+  #list: Maybe<WeakRef<List<T>>>;
+  #next: Maybe<ListNode<T>>;
+  #prev: Maybe<ListNode<T>>;
   public node: T;  
 
-  constructor(node: T, prev: Optional<ListNode<T>> = null, next: Optional<ListNode<T>> = null, list: Optional<WeakRef<List<T>>>) {
+  constructor(node: T, prev: Maybe<ListNode<T>> = null, next: Maybe<ListNode<T>> = null, list: Maybe<WeakRef<List<T>>>) {
     this.#prev = prev;
     this.#next = next;
     this.node = node;
@@ -76,24 +76,24 @@ export class ListNode<T> {
     return this.node;
   }
 
-  get next(): Optional<ListNode<T>> {
+  get next(): Maybe<ListNode<T>> {
     return this.#next;
   }
 
-  get prev(): Optional<ListNode<T>> {
+  get prev(): Maybe<ListNode<T>> {
     return this.#prev;
   }
 }
 
 export class List<T> {
-  #head: Optional<ListNode<T>>;
-  #tail: Optional<ListNode<T>>;
+  #head: Maybe<ListNode<T>>;
+  #tail: Maybe<ListNode<T>>;
 
-  updateHead_UNSAFE(maybeNewHead: Optional<ListNode<T>>) {
+  updateHead_UNSAFE(maybeNewHead: Maybe<ListNode<T>>) {
     this.#head = maybeNewHead;
   }
 
-  updateTail_UNSAFE(maybeNewTail: Optional<ListNode<T>>) {
+  updateTail_UNSAFE(maybeNewTail: Maybe<ListNode<T>>) {
     this.#tail = maybeNewTail;
   }
 
@@ -125,8 +125,8 @@ export class List<T> {
     return true;
   }
 
-  at(n: number): Optional<ListNode<T>> {
-    let current: Optional<ListNode<T>>;
+  at(n: number): Maybe<ListNode<T>> {
+    let current: Maybe<ListNode<T>>;
     if (n >= 0) {
       current = this.#head;
       for (let i = 0; i < n && current != null; i++) {

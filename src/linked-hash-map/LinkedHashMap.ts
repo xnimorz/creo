@@ -3,11 +3,11 @@
  */
 
 import { List } from "../list/List";
-import { Optional } from "../tools/optional";
+import { Maybe } from "../tools/Maybe";
 
 export class LinkedHashMap<K, T> {
   #map: Map<K, {value: T, list: List<K>}> = new Map();
-  #list: Optional<List<K>>;
+  #list: Maybe<List<K>>;
 
   addToEnd(key: K, value: T) {
     this.#list

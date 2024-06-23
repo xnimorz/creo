@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { List, ListNode } from "./CreoList";
+import { List, ListNode } from "./List";
 
 test("addToEnd adds items to the end", () => {
   const list = new List();

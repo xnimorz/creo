@@ -9,15 +9,15 @@
  * [ ] Add js dispose tracker to automatically close listeners
  */
 
-import { Optional } from "../tools/optional";
-import { isRecordLike } from "./isRecordLike";
+import { Maybe } from "../tools/Maybe";
+import { isRecordLike } from "./IsRecordLike";
 
 const ParentRecord = Symbol('parent-record');
 // const example: RecordOf<{foo: 'bar'}> = {
 //   foo: 'bar',
 //   [ParentRecord]: null // Root record
 // }
-export type RecordOf<T extends object> = T & {[ParentRecord]: Optional<WeakRef<RecordOf<Wildcard>>>};
+export type RecordOf<T extends object> = T & {[ParentRecord]: Maybe<WeakRef<RecordOf<Wildcard>>>};
 type Wildcard = any;
 type RecordDidChangeListener<T extends object> = (record: RecordOf<T>) => void;
 
@@ -34,7 +34,7 @@ function queuedNotifier() {
     listeners?.forEach((listener) => {
       listener(record);
     });
-    const maybeParent: Optional<RecordOf<Wildcard>> = record[ParentRecord];
+    const maybeParent: Maybe<RecordOf<Wildcard>> = record[ParentRecord];
     if (maybeParent) {
       iterate(maybeParent);
     }
@@ -51,12 +51,12 @@ function recordDidUpdate<T extends object>(record: RecordOf<T>) {
 type InternalOnly = never;
 
 function creoRecord<TNode extends object, T extends object>(  
-  parent: Optional<RecordOf<TNode>>,
+  parent: Maybe<RecordOf<TNode>>,
   value: T,  
 ): RecordOf<T> {  
   const parentWeakRef = parent != null ? new WeakRef(parent) : null;
   
-  type CacheField<K extends keyof T> = T[K] extends object ? Optional<RecordOf<T[K]>> : never
+  type CacheField<K extends keyof T> = T[K] extends object ? Maybe<RecordOf<T[K]>> : never
   type Cache = { [K in keyof T]: CacheField<K> };
   const cache: Cache = {} as Cache;  
   const record: RecordOf<T> = new Proxy(value, {

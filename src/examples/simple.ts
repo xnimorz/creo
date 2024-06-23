@@ -1,4 +1,4 @@
-import { $of, RecordOf } from "../record/record";
+import { record, RecordOf } from "../record/Record";
 import { Component, creo } from "../ui/Component";
 import { Block } from "../ui/css/Block";
 import { Text } from "../ui/css/Text";
@@ -8,7 +8,7 @@ type Todo = { text: string };
 
 @creo
 class MyComponent extends Component {
-  private todos: RecordOf<Array<Todo>> = $of([]);
+  private todos: RecordOf<Array<Todo>> = record([]);
 
   ui() {
     Text("Hello world");

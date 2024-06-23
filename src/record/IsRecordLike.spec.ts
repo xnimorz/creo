@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { isRecordLike } from "./isRecordLike";
+import { isRecordLike } from "./IsRecordLike";
 
 test("Handles objects", () => {
   expect(isRecordLike({})).toBe(true);

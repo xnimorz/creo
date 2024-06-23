@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { record, RecordOf, onDidUpdate } from "./record";
+import { record, RecordOf, onDidUpdate } from "./Record";
 
 test("Can define objects", () => {
   const obj = record({
