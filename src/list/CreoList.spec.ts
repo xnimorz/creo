@@ -150,3 +150,14 @@ test('Mutating item in a middle keeps the list correct', () => {
   expect(list.at(-5)?.value).toBe('3');
   expect(list.at(5)?.value).toBe('5');
 })
+
+test('First item deletion works correctly', () => {
+  const list = List.from(['1','2','3','4','5','6']);  
+
+  list.at(0)!.delete();
+
+  expect(Array.from(list).join('')).toBe('23456');
+  expect(list.at(0)?.value).toBe('2');
+  expect(list.at(1)?.value).toBe('3');
+
+})

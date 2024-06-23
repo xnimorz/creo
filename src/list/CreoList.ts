@@ -35,18 +35,23 @@ export class ListNode<T> {
       if (!maybeParent) {
         return;
       }
-      maybeParent.nextChanged();
+      maybeParent.updateTail_UNSAFE(this.#next);
     } else {
       oldNext.#prev = this.#next;
     }
   }
 
   delete() {
+    const maybeParent = this.#list?.deref();
     if (this.#prev != null) {
       this.#prev.#next = this.#next;
+    } else {
+      maybeParent?.updateHead_UNSAFE(this.#next);
     }
     if (this.#next != null) {
       this.#next.#prev = this.#prev;
+    } else {
+      maybeParent?.updateTail_UNSAFE(this.#prev);
     }
     this.#next = null;
     this.#prev = null;
@@ -61,7 +66,7 @@ export class ListNode<T> {
       if (!maybeParent) {
         return;
       }
-      maybeParent.prevChanged();
+      maybeParent.updateHead_UNSAFE(this.#prev);
     } else {
       oldPrev.#next = this.#prev;
     }
@@ -84,16 +89,12 @@ export class List<T> {
   #head: Optional<ListNode<T>>;
   #tail: Optional<ListNode<T>>;
 
-  prevChanged() {
-    while (this.#head?.prev != null)  {
-      this.#head = this.#head.prev;
-    }
+  updateHead_UNSAFE(maybeNewHead: Optional<ListNode<T>>) {
+    this.#head = maybeNewHead;
   }
 
-  nextChanged() {
-    while (this.#tail?.next != null)  {
-      this.#tail = this.#tail.next;
-    }
+  updateTail_UNSAFE(maybeNewTail: Optional<ListNode<T>>) {
+    this.#tail = maybeNewTail;
   }
 
   addToStart(value: T) {
