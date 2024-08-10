@@ -1,80 +1,80 @@
 import { expect, test } from "bun:test";
-import { List, ListNode } from "./List";
+import { list, ListNode } from "./List";
 
 test("addToEnd adds items to the end", () => {
-  const list = new List();
-  list.addToEnd('1');
-  list.addToEnd('2');
-  list.addToEnd('3');
-  list.addToEnd('4');
-  list.addToEnd('5');
-  list.addToEnd('6');
+  const listInstance = list();
+  listInstance.addToEnd('1');
+  listInstance.addToEnd('2');
+  listInstance.addToEnd('3');
+  listInstance.addToEnd('4');
+  listInstance.addToEnd('5');
+  listInstance.addToEnd('6');
 
-  expect(list.at(0)?.value).toBe('1');
-  expect(list.at(1)?.value).toBe('2');
-  expect(list.at(3)?.value).toBe('4');
-  expect(list.at(5)?.value).toBe('6');
+  expect(listInstance.at(0)?.value).toBe('1');
+  expect(listInstance.at(1)?.value).toBe('2');
+  expect(listInstance.at(3)?.value).toBe('4');
+  expect(listInstance.at(5)?.value).toBe('6');
 });
 
 test("at works with negative values", () => {
-  const list = new List();
-  list.addToEnd('1');
-  list.addToEnd('2');
-  list.addToEnd('3');
-  list.addToEnd('4');
-  list.addToEnd('5');
-  list.addToEnd('6');
+  const l = list();
+  l.addToEnd('1');
+  l.addToEnd('2');
+  l.addToEnd('3');
+  l.addToEnd('4');
+  l.addToEnd('5');
+  l.addToEnd('6');
 
-  expect(list.at(-1)?.value).toBe('6');
-  expect(list.at(-5)?.value).toBe('2');
+  expect(l.at(-1)?.value).toBe('6');
+  expect(l.at(-5)?.value).toBe('2');
 });
 
 test("if at exceeds the length, null to be returned", () => {
-  const list = new List();
-  list.addToEnd('1');
-  list.addToEnd('2');
-  list.addToEnd('3');
-  list.addToEnd('4');
-  list.addToEnd('5');
-  list.addToEnd('6');
+  const listInstance = list();
+  listInstance.addToEnd('1');
+  listInstance.addToEnd('2');
+  listInstance.addToEnd('3');
+  listInstance.addToEnd('4');
+  listInstance.addToEnd('5');
+  listInstance.addToEnd('6');
 
-  expect(list.at(-10)).toBe(null);
-  expect(list.at(10)).toBe(null);
+  expect(listInstance.at(-10)).toBe(null);
+  expect(listInstance.at(10)).toBe(null);
 });
 
 test("Add to start", () => {
-  const list = new List();
-  list.addToStart('1');
-  list.addToStart('2');
-  list.addToStart('3');
-  list.addToStart('4');
-  list.addToStart('5');
-  list.addToStart('6');
+  const listInstance = list();
+  listInstance.addToStart('1');
+  listInstance.addToStart('2');
+  listInstance.addToStart('3');
+  listInstance.addToStart('4');
+  listInstance.addToStart('5');
+  listInstance.addToStart('6');
 
-  expect(list.at(0)?.value).toBe('6');
-  expect(list.at(1)?.value).toBe('5');
-  expect(list.at(2)?.value).toBe('4');
-  expect(list.at(-3)?.value).toBe('3');
-  expect(list.at(-2)?.value).toBe('2');
-  expect(list.at(-1)?.value).toBe('1');
+  expect(listInstance.at(0)?.value).toBe('6');
+  expect(listInstance.at(1)?.value).toBe('5');
+  expect(listInstance.at(2)?.value).toBe('4');
+  expect(listInstance.at(-3)?.value).toBe('3');
+  expect(listInstance.at(-2)?.value).toBe('2');
+  expect(listInstance.at(-1)?.value).toBe('1');
 });
 
 test("from is a static method which builds a list from an array", () => {
-  const list = List.from(['1','2','3','4','5','6']);  
+  const listInstance = list.from(['1','2','3','4','5','6']);  
 
-  expect(list.at(-1)?.value).toBe('6');
-  expect(list.at(-2)?.value).toBe('5');
-  expect(list.at(-3)?.value).toBe('4');
-  expect(list.at(2)?.value).toBe('3');
-  expect(list.at(1)?.value).toBe('2');
-  expect(list.at(0)?.value).toBe('1');
+  expect(listInstance.at(-1)?.value).toBe('6');
+  expect(listInstance.at(-2)?.value).toBe('5');
+  expect(listInstance.at(-3)?.value).toBe('4');
+  expect(listInstance.at(2)?.value).toBe('3');
+  expect(listInstance.at(1)?.value).toBe('2');
+  expect(listInstance.at(0)?.value).toBe('1');
 });
 
 test("Iterable", () => {
-  const list = List.from(['1','2','3','4','5','6']);  
+  const listInstance = list.from(['1','2','3','4','5','6']);  
 
   let resultString = ''
-  for (const item of list) {
+  for (const item of listInstance) {
     resultString += item;
   }
 
@@ -82,82 +82,82 @@ test("Iterable", () => {
 });
 
 test("Mutating ListNode directly keeps List in correct state", () => {
-  const list = List.from(['1','2','3','4','5','6']);  
+  const listInstance = list.from(['1','2','3','4','5','6']);  
 
-  const listNode: ListNode<string> = list.at(2)!;
+  const listNode: ListNode<string> = listInstance.at(2)!;
 
   expect(listNode.value).toBe('3');
 
   listNode.prev = '10';
 
-  expect(list.at(2)?.value).toBe('10');
-  expect(list.at(3)?.value).toBe('3');
+  expect(listInstance.at(2)?.value).toBe('10');
+  expect(listInstance.at(3)?.value).toBe('3');
 });
 
 test("Mutating ListNode.prev directly keeps List in correct state", () => {
-  const list = List.from(['1','2','3','4','5','6']);  
+  const listInstance = list.from(['1','2','3','4','5','6']);  
 
-  const listNode: ListNode<string> = list.at(2)!;
+  const listNode: ListNode<string> = listInstance.at(2)!;
 
   expect(listNode.value).toBe('3');
 
   listNode.prev = '10';
 
-  expect(Array.from(list).join('')).toBe('12103456');
+  expect(Array.from(listInstance).join('')).toBe('12103456');
 });
 
 test("Mutating ListNode.next directly keeps List in correct state", () => {
-  const list = List.from(['1','2','3','4','5','6']);  
+  const listInstance = list.from(['1','2','3','4','5','6']);  
 
-  const listNode: ListNode<string> = list.at(2)!;
+  const listNode: ListNode<string> = listInstance.at(2)!;
 
   expect(listNode.value).toBe('3');
 
   listNode.next = '10';
 
-  expect(Array.from(list).join('')).toBe('12310456');
-  expect(list.at(-3)?.value).toBe('4');
-  expect(list.at(-4)?.value).toBe('10');
-  expect(list.at(-5)?.value).toBe('3');
+  expect(Array.from(listInstance).join('')).toBe('12310456');
+  expect(listInstance.at(-3)?.value).toBe('4');
+  expect(listInstance.at(-4)?.value).toBe('10');
+  expect(listInstance.at(-5)?.value).toBe('3');
 });
 
 test("Mutating the first item using ListNode directly keeps List in correct state", () => {
-  const list = List.from(['1','2','3','4','5','6']);  
+  const listInstance = list.from(['1','2','3','4','5','6']);  
 
-  list.at(0)!.prev = 'test'
+  listInstance.at(0)!.prev = 'test'
 
-  expect(Array.from(list).join('')).toBe('test123456');
+  expect(Array.from(listInstance).join('')).toBe('test123456');
 });
 
 test("Mutating the last item using ListNode directly keeps List in correct state", () => {
-  const list = List.from(['1','2','3','4','5','6']);  
+  const listInstance = list.from(['1','2','3','4','5','6']);  
 
-  list.at(-1)!.next = 'test'
+  listInstance.at(-1)!.next = 'test'
 
-  expect(Array.from(list).join('')).toBe('123456test');
-  expect(list.at(-1)?.value).toBe('test');
-  expect(list.at(-2)?.value).toBe('6');
+  expect(Array.from(listInstance).join('')).toBe('123456test');
+  expect(listInstance.at(-1)?.value).toBe('test');
+  expect(listInstance.at(-2)?.value).toBe('6');
 });
 
 test('Mutating item in a middle keeps the list correct', () => {
-  const list = List.from(['1','2','3','4','5','6']);  
+  const listInstance = list.from(['1','2','3','4','5','6']);  
 
-  list.at(-4)!.next = 'test'
+  listInstance.at(-4)!.next = 'test'
 
-  expect(Array.from(list).join('')).toBe('123test456');
-  expect(list.at(-2)?.value).toBe('5');
-  expect(list.at(-4)?.value).toBe('test');
-  expect(list.at(-5)?.value).toBe('3');
-  expect(list.at(5)?.value).toBe('5');
+  expect(Array.from(listInstance).join('')).toBe('123test456');
+  expect(listInstance.at(-2)?.value).toBe('5');
+  expect(listInstance.at(-4)?.value).toBe('test');
+  expect(listInstance.at(-5)?.value).toBe('3');
+  expect(listInstance.at(5)?.value).toBe('5');
 })
 
 test('First item deletion works correctly', () => {
-  const list = List.from(['1','2','3','4','5','6']);  
+  const listInstance = list.from(['1','2','3','4','5','6']);  
 
-  list.at(0)!.delete();
+  listInstance.at(0)!.delete();
 
-  expect(Array.from(list).join('')).toBe('23456');
-  expect(list.at(0)?.value).toBe('2');
-  expect(list.at(1)?.value).toBe('3');
+  expect(Array.from(listInstance).join('')).toBe('23456');
+  expect(listInstance.at(0)?.value).toBe('2');
+  expect(listInstance.at(1)?.value).toBe('3');
 
 })

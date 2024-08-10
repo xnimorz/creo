@@ -12,6 +12,7 @@
 import { Maybe } from "../tools/Maybe";
 import { isRecordLike } from "./IsRecordLike";
 
+// #region Record Type
 const ParentRecord = Symbol('parent-record');
 // const example: RecordOf<{foo: 'bar'}> = {
 //   foo: 'bar',
@@ -21,11 +22,13 @@ export type RecordOf<T extends object> = T & {[ParentRecord]: Maybe<WeakRef<Reco
 type Wildcard = any;
 type RecordDidChangeListener<T extends object> = (record: RecordOf<T>) => void;
 
+// #region Weak map for listenets
 const didUpdateMap: WeakMap<
   RecordOf<Wildcard>,
   Set<RecordDidChangeListener<Wildcard>>
 > = new WeakMap();
 
+// #region Update notifier
 const scheduledUpdatesNotifiers: Set<RecordOf<Wildcard>> = new Set();
 let shouldScheduleMicrotask = true;
 function queuedNotifier() {
@@ -50,6 +53,7 @@ function recordDidUpdate<T extends object>(record: RecordOf<T>) {
 
 type InternalOnly = never;
 
+// #region Record creation, fields wrapper
 function creoRecord<TNode extends object, T extends object>(  
   parent: Maybe<RecordOf<TNode>>,
   value: T,  
@@ -101,6 +105,7 @@ function creoRecord<TNode extends object, T extends object>(
   return record;
 }
 
+// #region Public API
 export function record<TNode extends object>(value: TNode): RecordOf<TNode> {
   const record: RecordOf<TNode> = creoRecord(null, value);
   didUpdateMap.set(record, new Set());

@@ -1,14 +1,15 @@
 /**
  * Linked list impl
+ * 
  * ideas:
  * [-] Shall we use Record for list as well? 
  * [x] Support iterator
- * [] Make prev and next to receive ListNode
+ * [-] Make prev and next to receive ListNode
  */
 
 import { Maybe } from "../tools/Maybe";
 
-
+// #region List's Node
 export class ListNode<T> {
   #list: Maybe<WeakRef<List<T>>>;
   #next: Maybe<ListNode<T>>;
@@ -22,25 +23,7 @@ export class ListNode<T> {
     this.#list = list;
   }
 
-  get list() {
-    return this.#list?.deref();
-  }
-  
-  set next(value: T) {
-    const oldNext = this.#next;
-    this.#next = new ListNode(value, this, this.#next, this.#list);    
-  
-    if (oldNext == null) {
-      const maybeParent = this.#list?.deref();
-      if (!maybeParent) {
-        return;
-      }
-      maybeParent.updateTail_UNSAFE(this.#next);
-    } else {
-      oldNext.#prev = this.#next;
-    }
-  }
-
+  // #region Delete Node from LinkedList
   delete() {
     const maybeParent = this.#list?.deref();
     if (this.#prev != null) {
@@ -57,6 +40,22 @@ export class ListNode<T> {
     this.#prev = null;
   }
 
+  // #region Getters/setters
+  set next(value: T) {
+    const oldNext = this.#next;
+    this.#next = new ListNode(value, this, this.#next, this.#list);    
+  
+    if (oldNext == null) {
+      const maybeParent = this.#list?.deref();
+      if (!maybeParent) {
+        return;
+      }
+      maybeParent.updateTail_UNSAFE(this.#next);
+    } else {
+      oldNext.#prev = this.#next;
+    }
+  }
+
   set prev(value: T) {
     const oldPrev = this.#prev;
     this.#prev = new ListNode(value, this.#prev, this, this.#list);      
@@ -71,7 +70,7 @@ export class ListNode<T> {
       oldPrev.#next = this.#prev;
     }
   }
-
+  
   get value(): T {
     return this.node;
   }
@@ -83,12 +82,29 @@ export class ListNode<T> {
   get prev(): Maybe<ListNode<T>> {
     return this.#prev;
   }
+
+  // #region Getter of List
+  get list() {
+    return this.#list?.deref();
+  }
 }
 
-export class List<T> {
+// #region List public API
+interface IList<T> extends Iterable<T> {
+  addToStart(value: T): void;
+  delete(n: number): boolean;
+  at(n: number): Maybe<ListNode<T>>;
+  addToEnd(value: T): void;
+  [Symbol.iterator](): IterableIterator<T>;
+}
+
+
+// #region List class
+class List<T> implements IList<T>{
   #head: Maybe<ListNode<T>>;
   #tail: Maybe<ListNode<T>>;
 
+  // #region internal methods
   updateHead_UNSAFE(maybeNewHead: Maybe<ListNode<T>>) {
     this.#head = maybeNewHead;
   }
@@ -97,6 +113,7 @@ export class List<T> {
     this.#tail = maybeNewTail;
   }
 
+  // #region Public methods
   addToStart(value: T) {
     if (this.#head != null) {
       this.#head.prev = value;      
@@ -167,3 +184,9 @@ export class List<T> {
     return list;
   }
 }
+// #region Exports
+export function list<T>(): IList<T> {
+  return new List<T>();
+}
+
+list.from = List.from;
