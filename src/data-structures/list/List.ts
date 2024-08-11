@@ -5,6 +5,7 @@
  * [-] Shall we use Record for list as well? 
  * [x] Support iterator
  * [-] Make prev and next to receive ListNode
+ * [ ] Size support
  */
 
 import { Maybe } from "../maybe/Maybe";
