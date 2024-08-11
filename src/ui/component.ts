@@ -10,7 +10,7 @@
  * [ ] Use memory
  */
 
-import { RecordOf, onDidUpdate } from "../record/record";
+import { RecordOf, onDidUpdate } from "../data-structures/record/record";
 
 export function creo<T extends { new (...args: any): InstanceType<T> }>(
   ctor: T

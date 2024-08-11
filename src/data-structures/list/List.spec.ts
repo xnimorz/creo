@@ -1,8 +1,8 @@
 import { expect, test } from "bun:test";
-import { list, ListNode } from "./List";
+import { List, ListNode } from "./List";
 
 test("addToEnd adds items to the end", () => {
-  const listInstance = list();
+  const listInstance = List();
   listInstance.addToEnd('1');
   listInstance.addToEnd('2');
   listInstance.addToEnd('3');
@@ -17,7 +17,7 @@ test("addToEnd adds items to the end", () => {
 });
 
 test("at works with negative values", () => {
-  const l = list();
+  const l = List();
   l.addToEnd('1');
   l.addToEnd('2');
   l.addToEnd('3');
@@ -30,7 +30,7 @@ test("at works with negative values", () => {
 });
 
 test("if at exceeds the length, null to be returned", () => {
-  const listInstance = list();
+  const listInstance = List();
   listInstance.addToEnd('1');
   listInstance.addToEnd('2');
   listInstance.addToEnd('3');
@@ -43,7 +43,7 @@ test("if at exceeds the length, null to be returned", () => {
 });
 
 test("Add to start", () => {
-  const listInstance = list();
+  const listInstance = List();
   listInstance.addToStart('1');
   listInstance.addToStart('2');
   listInstance.addToStart('3');
@@ -60,7 +60,7 @@ test("Add to start", () => {
 });
 
 test("from is a static method which builds a list from an array", () => {
-  const listInstance = list.from(['1','2','3','4','5','6']);  
+  const listInstance = List.from(['1','2','3','4','5','6']);  
 
   expect(listInstance.at(-1)?.value).toBe('6');
   expect(listInstance.at(-2)?.value).toBe('5');
@@ -71,7 +71,7 @@ test("from is a static method which builds a list from an array", () => {
 });
 
 test("Iterable", () => {
-  const listInstance = list.from(['1','2','3','4','5','6']);  
+  const listInstance = List.from(['1','2','3','4','5','6']);  
 
   let resultString = ''
   for (const item of listInstance) {
@@ -82,7 +82,7 @@ test("Iterable", () => {
 });
 
 test("Mutating ListNode directly keeps List in correct state", () => {
-  const listInstance = list.from(['1','2','3','4','5','6']);  
+  const listInstance = List.from(['1','2','3','4','5','6']);  
 
   const listNode: ListNode<string> = listInstance.at(2)!;
 
@@ -95,7 +95,7 @@ test("Mutating ListNode directly keeps List in correct state", () => {
 });
 
 test("Mutating ListNode.prev directly keeps List in correct state", () => {
-  const listInstance = list.from(['1','2','3','4','5','6']);  
+  const listInstance = List.from(['1','2','3','4','5','6']);  
 
   const listNode: ListNode<string> = listInstance.at(2)!;
 
@@ -107,7 +107,7 @@ test("Mutating ListNode.prev directly keeps List in correct state", () => {
 });
 
 test("Mutating ListNode.next directly keeps List in correct state", () => {
-  const listInstance = list.from(['1','2','3','4','5','6']);  
+  const listInstance = List.from(['1','2','3','4','5','6']);  
 
   const listNode: ListNode<string> = listInstance.at(2)!;
 
@@ -122,7 +122,7 @@ test("Mutating ListNode.next directly keeps List in correct state", () => {
 });
 
 test("Mutating the first item using ListNode directly keeps List in correct state", () => {
-  const listInstance = list.from(['1','2','3','4','5','6']);  
+  const listInstance = List.from(['1','2','3','4','5','6']);  
 
   listInstance.at(0)!.prev = 'test'
 
@@ -130,7 +130,7 @@ test("Mutating the first item using ListNode directly keeps List in correct stat
 });
 
 test("Mutating the last item using ListNode directly keeps List in correct state", () => {
-  const listInstance = list.from(['1','2','3','4','5','6']);  
+  const listInstance: List<string> = List.from(['1','2','3','4','5','6']);  
 
   listInstance.at(-1)!.next = 'test'
 
@@ -140,7 +140,7 @@ test("Mutating the last item using ListNode directly keeps List in correct state
 });
 
 test('Mutating item in a middle keeps the list correct', () => {
-  const listInstance = list.from(['1','2','3','4','5','6']);  
+  const listInstance = List.from(['1','2','3','4','5','6']);  
 
   listInstance.at(-4)!.next = 'test'
 
@@ -152,7 +152,7 @@ test('Mutating item in a middle keeps the list correct', () => {
 })
 
 test('First item deletion works correctly', () => {
-  const listInstance = list.from(['1','2','3','4','5','6']);  
+  const listInstance = List.from(['1','2','3','4','5','6']);  
 
   listInstance.at(0)!.delete();
 
@@ -160,4 +160,11 @@ test('First item deletion works correctly', () => {
   expect(listInstance.at(0)?.value).toBe('2');
   expect(listInstance.at(1)?.value).toBe('3');
 
+})
+
+test('addTo returns node', () => {
+  const listInstance = List.from(['1','2','3','4','5','6']);  
+
+  expect(listInstance.addToEnd('test')).toBe(listInstance.at(-1));
+  expect(listInstance.addToStart('test2')).toBe(listInstance.at(0));
 })

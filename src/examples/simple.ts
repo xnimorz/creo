@@ -1,4 +1,4 @@
-import { record, RecordOf } from "../record/Record";
+import { record, RecordOf } from "../data-structures/record/Record";
 import { Component, creo } from "../ui/Component";
 import { Block } from "../ui/css/Block";
 import { Text } from "../ui/css/Text";

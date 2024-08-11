@@ -7,16 +7,16 @@
  * [-] Make prev and next to receive ListNode
  */
 
-import { Maybe } from "../tools/Maybe";
+import { Maybe } from "../maybe/Maybe";
 
 // #region List's Node
 export class ListNode<T> {
-  #list: Maybe<WeakRef<List<T>>>;
+  #list: Maybe<WeakRef<ListClass<T>>>;
   #next: Maybe<ListNode<T>>;
   #prev: Maybe<ListNode<T>>;
   public node: T;  
 
-  constructor(node: T, prev: Maybe<ListNode<T>> = null, next: Maybe<ListNode<T>> = null, list: Maybe<WeakRef<List<T>>>) {
+  constructor(node: T, prev: Maybe<ListNode<T>> = null, next: Maybe<ListNode<T>> = null, list: Maybe<WeakRef<ListClass<T>>>) {
     this.#prev = prev;
     this.#next = next;
     this.node = node;
@@ -89,18 +89,18 @@ export class ListNode<T> {
   }
 }
 
-// #region List public API
-interface IList<T> extends Iterable<T> {
-  addToStart(value: T): void;
+// #region IList public interface
+export interface List<T> extends Iterable<T> {
+  addToStart(value: T): ListNode<T>;
   delete(n: number): boolean;
   at(n: number): Maybe<ListNode<T>>;
-  addToEnd(value: T): void;
+  addToEnd(value: T): ListNode<T>;
   [Symbol.iterator](): IterableIterator<T>;
 }
 
 
 // #region List class
-class List<T> implements IList<T>{
+class ListClass<T> implements List<T>{
   #head: Maybe<ListNode<T>>;
   #tail: Maybe<ListNode<T>>;
 
@@ -122,6 +122,7 @@ class List<T> implements IList<T>{
       this.#head = node;
       this.#tail = node;
     }
+    return this.#head
   }
 
   delete(n: number): boolean {
@@ -166,6 +167,7 @@ class List<T> implements IList<T>{
       this.#head = node;
       this.#tail = node;
     }
+    return this.#tail;
   }
 
   *[Symbol.iterator]() {
@@ -177,7 +179,7 @@ class List<T> implements IList<T>{
   }
 
   static from<T>(arrayLike: Iterable<T>): List<T> {
-    const list = new List<T>;
+    const list = new ListClass<T>;
     for (const item of arrayLike) {
       list.addToEnd(item);
     }
@@ -185,8 +187,8 @@ class List<T> implements IList<T>{
   }
 }
 // #region Exports
-export function list<T>(): IList<T> {
-  return new List<T>();
+export function List<T>(): List<T> {
+  return new ListClass<T>();
 }
 
-list.from = List.from;
+List.from = ListClass.from;

@@ -9,7 +9,7 @@
  * [ ] Add js dispose tracker to automatically close listeners
  */
 
-import { Maybe } from "../tools/Maybe";
+import { Maybe } from "../maybe/Maybe";
 import { isRecordLike } from "./IsRecordLike";
 
 // #region Record Type
