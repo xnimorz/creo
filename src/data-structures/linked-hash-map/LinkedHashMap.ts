@@ -106,9 +106,9 @@ class LinkedHashMapClass<K, T> implements LinkedHashMap<K, T> {
 
   at(n: number): Maybe<T> {
     const item = this.#list.at(n);
-    if (!item) {
+    if (item == null) {
       return;
-    }
+    }    
     return this.#map.get(item.value)?.value;
   }
 
