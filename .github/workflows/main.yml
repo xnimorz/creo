@@ -1,0 +1,24 @@
+name: CI
+on:
+  pull_request:
+    branches:
+      - master
+  push:
+    branches:
+      - master
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use bun
+        uses: oven-sh/setup-bun@v2
+        
+      - name: install and tests
+        run: |
+          bun install
+          bun test
+        env:
+          CI: true
