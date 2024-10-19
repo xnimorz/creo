@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { List, ListNode } from "./List";
+import { assertJust } from "../assert/assert";
 
 test("addToEnd adds items to the end", () => {
   const listInstance = List();
@@ -167,4 +168,14 @@ test('addTo returns node', () => {
 
   expect(listInstance.addToEnd('test')).toBe(listInstance.at(-1));
   expect(listInstance.addToStart('test2')).toBe(listInstance.at(0));
+})
+
+test('Adding item in the middle of the list', () => {
+  const listInstance = List.from(['1','2','3','4','5','6']);  
+  const node = listInstance.at(2);
+  assertJust(node);
+  expect(node.value).toBe('3');
+  node.next = '123';
+
+  expect([...listInstance]).toEqual(['1','2','3', '123','4','5','6'])
 })
