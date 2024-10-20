@@ -8,7 +8,7 @@ type Todo = { text: string };
 
 @creo
 class MyComponent extends Component {
-  private todos: RecordOf<Array<Todo>> = record([]);
+  private todos: RecordOf<Array<Todo>> = this.tracked([]);
 
   ui() {
     Text("Hello world");

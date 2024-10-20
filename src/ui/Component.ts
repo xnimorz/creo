@@ -10,7 +10,7 @@
  * [ ] Use memory
  */
 
-import { onDidUpdate, RecordOf } from "../data-structures/record/Record";
+import { onDidUpdate, record, RecordOf } from "../data-structures/record/Record";
 
 export function creo<T extends { new (...args: any): InstanceType<T> }>(
   ctor: T
@@ -58,10 +58,19 @@ export abstract class Component {
   abstract ui(): void;
 
   // Cannot be changed
-  protected track<T extends object>(tracked: RecordOf<T>) {
+  protected track<T extends object>(tracked: RecordOf<T>): RecordOf<T> {
     onDidUpdate(tracked, () => {
       // this.#creo.markDirty(this);
     });
+    return tracked;
+  }
+
+  protected tracked<T extends object>(t: T): RecordOf<T> {
+    const rec = record(t);
+    onDidUpdate(rec, () => {
+      // this.#creo.markDirty(this);
+    });
+    return rec;
   }
 
   // Can be overwritten
@@ -73,6 +82,6 @@ export abstract class Component {
 export abstract class StyledComponent extends Component {
   constructor() {
     super();
-  }
+  }  
   abstract with(slot: () => void): void;
 }
