@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { Component, creo } from "./component";
+import { Component, creo } from "./Component";
 
 test("Creo component can be constructed without `new` keyword", () => {
   @creo
