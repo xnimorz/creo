@@ -12,5 +12,8 @@
     "vite": "^5.2.0",
     "bun-types": "latest"
   },
-  "module": "index.ts"
+  "module": "index.ts",
+  "dependencies": {
+    "csstype": "^3.1.3"
+  }
 }
