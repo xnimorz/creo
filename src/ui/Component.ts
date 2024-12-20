@@ -27,11 +27,11 @@ export function creo<T extends { new (...args: any): InstanceType<T> }>(
       return true;
     },
     apply(Ctor, _self, args: ConstructorParameters<T>) {
-      construct(Ctor, args);
+      return construct(Ctor, args);
     },
     // @ts-ignore
     construct(Ctor, argArray: ConstructorParameters<T>, _newTarget) {
-      construct(Ctor, argArray);
+      return construct(Ctor, argArray);
     },
   });
 
