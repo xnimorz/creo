@@ -10,7 +10,11 @@
  * [ ] Use memory
  */
 
+import { LinkedHashMap } from "../data-structures/linked-hash-map/LinkedHashMap";
 import { onDidUpdate, record, RecordOf } from "../data-structures/record/Record";
+import type * as CSS from 'csstype';
+import { getLayoutEngine, LayoutEngine } from "../layout-engine/layoutEngine";
+import { isNone } from "../data-structures/maybe/Maybe";
 
 export function creo<T extends { new (...args: any): InstanceType<T> }>(
   ctor: T
@@ -49,18 +53,34 @@ export function creo<T extends { new (...args: any): InstanceType<T> }>(
   }
 }
 
-export abstract class Component {
-  // private #creo: CreoTree<Component>;
+type Wildcard = any;
 
-  constructor() {}
+export abstract class Component<P = void> {
+  private c_parent: Component<Wildcard>;
+  private c_items: LinkedHashMap<Component<Wildcard>>;
+  private c_engine: LayoutEngine;
+  protected props: P;
 
+  constructor(props: P | null = null) {
+    // @ts-ignore
+    this.props = props;
+    const maybeEngine = getLayoutEngine();
+    if (isNone(maybeEngine)) {
+      throw new Error('Cannot initialise component with no layout engine defined');
+    }
+    this.c_engine = maybeEngine;
+  }
+
+  private c_ui() {
+
+  }
   // Rendering method
   abstract ui(): void;
 
   // Cannot be changed
   protected track<T extends object>(tracked: RecordOf<T>): RecordOf<T> {
     onDidUpdate(tracked, () => {
-      // this.#creo.markDirty(this);
+      this.c_markDirty();
     });
     return tracked;
   }
@@ -68,7 +88,7 @@ export abstract class Component {
   protected tracked<T extends object>(t: T): RecordOf<T> {
     const rec = record(t);
     onDidUpdate(rec, () => {
-      // this.#creo.markDirty(this);
+      this.c_markDirty();
     });
     return rec;
   }
@@ -77,11 +97,16 @@ export abstract class Component {
   public didMount() {}
   // Can be overwritten
   public didUpdate() {}
+
+  private c_markDirty() {
+
+  }
 }
 
-export abstract class StyledComponent extends Component {
-  constructor() {
-    super();
-  }  
-  abstract with(slot: () => void): void;
+export abstract class StyledComponent<Props = void> extends Component<Props> {
+   constructor(props: Props | null = null) {
+    super(props);
+  }
+  abstract with(slot: () => void): this;
+  abstract style(styles: CSS.Properties | (() => CSS.Properties)): this;
 }

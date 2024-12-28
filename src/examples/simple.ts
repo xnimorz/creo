@@ -17,6 +17,9 @@ class MyComponent extends Component {
       VStack().with(() => {
         this.todos.map((todo) => Text(`Entity: ${todo.text}`));
       });
+    }).style({
+      display: 'flex',
+      flex: 'content',
     });
   }
 }

@@ -1,3 +1,11 @@
+/**
+ * HTML layout for creo
+ *
+ *
+ * Ideas:
+ * [ ] Re-uses existing HTML&CSS
+ */
+
 import { LayoutEngine } from "./layoutEngine";
 
 export class HtmlLayout extends LayoutEngine {
