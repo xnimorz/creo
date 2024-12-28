@@ -6,11 +6,10 @@
  * [ ] Re-uses existing HTML&CSS
  */
 
-import { LinkedHashMap } from "../data-structures/linked-hash-map/LinkedHashMap";
+import { LinkedHashMap, LinkedMap } from "../data-structures/linked-hash-map/LinkedHashMap";
 import { LayoutEngine } from "./layoutEngine";
+import { Component } from '../ui/Component';
 
-export class CreoTree {
-  root: CreoTree;
-
-  map: LinkedHashMap<> 
+export class CreoTree<T: Component> {
+  public map: LinkedHashMap<string, T> = LinkedMap();
 }
