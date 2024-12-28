@@ -1,12 +1,12 @@
 import { expect, test } from "bun:test";
 import { Component, creo } from "./Component";
-import { HtmlLayout } from "../layout-engine/htmlLayout";
 import { resetLayoutEngine, setLayoutEngine } from "../layout-engine/layoutEngine";
+import { StringLayout } from "../layout-engine/stringLayout";
 
 test("Creo component can be constructed without `new` keyword", () => {
 
-  const htmlLayout = new HtmlLayout();
-  setLayoutEngine(htmlLayout);
+  const stringLayout = new StringLayout();
+  setLayoutEngine(stringLayout);
 
   @creo
   class MyComponent extends Component {
@@ -24,8 +24,8 @@ test("Creo component can be constructed without `new` keyword", () => {
 
 test("Creo component supports new keyword", () => {
 
-  const htmlLayout = new HtmlLayout(document.createElement('div'));
-  setLayoutEngine(htmlLayout);
+  const stringLayout = new StringLayout();
+  setLayoutEngine(stringLayout);
 
   @creo
   class MyComponent extends Component {
