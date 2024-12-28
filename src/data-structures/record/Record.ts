@@ -22,6 +22,10 @@ export type RecordOf<T extends object> = T & {[ParentRecord]: Maybe<WeakRef<Reco
 type Wildcard = any;
 type RecordDidChangeListener<T extends object> = (record: RecordOf<T>) => void;
 
+export function isRecord<T extends object>(value: T): value is RecordOf<T> {
+  return ParentRecord in value;
+}
+
 // #region Weak map for listenets
 const didUpdateMap: WeakMap<
   RecordOf<Wildcard>,
@@ -64,6 +68,13 @@ function creoRecord<TNode extends object, T extends object>(
   type Cache = { [K in keyof T]: CacheField<K> };
   const cache: Cache = {} as Cache;  
   const record: RecordOf<T> = new Proxy(value, {
+    // @ts-ignore we override `has` to improve typing
+    has<K extends keyof T>(target: T, property: K): boolean {
+      if (property === ParentRecord) {
+        return true;
+      }
+      return property in target;
+    },
     // @ts-ignore we override `get` to improve typing
     get<K extends keyof T>(target: T, property: K): T[K] {
       const val = target[property];

@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { record, RecordOf, onDidUpdate } from "./Record";
+import { record, RecordOf, onDidUpdate, isRecord } from "./Record";
 
 test("Can define objects", () => {
   const obj = record({
@@ -174,4 +174,23 @@ test("Supports iterable", async () => {
   }
 
   iterate(...obj);
+});
+
+test("has works with records", async () => {
+  const originalObject = {
+    foo: 'bar',
+    baz: 'test',
+    nested: {
+      support: 'exist'
+    }
+  }
+  const wrapped = record(originalObject);
+
+  expect(isRecord(originalObject)).toBe(false);
+  expect(isRecord(wrapped)).toBe(true);
+  expect('foo' in wrapped).toBe(true);
+  expect('test' in wrapped).toBe(false);
+  expect('support' in wrapped.nested).toBe(true);
+  expect('foo' in wrapped.nested).toBe(false);
+  
 });
