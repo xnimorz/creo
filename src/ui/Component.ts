@@ -13,7 +13,7 @@
 import { LinkedHashMap } from "../data-structures/linked-hash-map/LinkedHashMap";
 import { isRecord, onDidUpdate, record, RecordOf } from "../data-structures/record/Record";
 import type * as CSS from 'csstype';
-import { ComponentMeta, getLayoutEngine, LayoutEngine } from "../layout-engine/layoutEngine";
+import { ComponentMeta, createComponentMeta, getLayoutEngine, LayoutEngine } from "../layout-engine/layoutEngine";
 import { isJust, isNone, Maybe } from "../data-structures/maybe/Maybe";
 import { assertJust } from "../data-structures/assert/assert";
 
@@ -42,28 +42,11 @@ export function creo<P extends object = {}, A extends object = {}>(ctor: Compone
     let componentMeta: ComponentMeta;
 
     if (!nextComponent || nextComponent.ctor !== ctor || (isJust(key) &&  isJust(nextComponent.key) && key != nextComponent.key)) {
-        componentMeta = layout.createNewComponent(ctor, key, params);                
+        componentMeta = createComponentMeta(ctor, params, key, layout);
     } else {
       componentMeta = nextComponent;
     }
     return componentMeta.cache;    
-  }
-}
-
-function creoWrapperForComponent<A extends object = {}>(component: Component<A>, meta: ComponentMeta, layout: LayoutEngine): Component<A> {
-  return {
-    ...component,
-    didMount() {
-      component.didMount?.();     
-    },
-    didUpdate() {
-      component.didUpdate?.();
-    },
-    ui() {
-      layout.pushMeta(meta);
-      component.ui();
-      layout.popMeta();
-    }
   }
 }
 
@@ -75,24 +58,6 @@ export type CreoContext = {
   tracked: <T extends {}>(t: T) => RecordOf<T>,  
 }
 
-export function createCreoContext(meta: ComponentMeta): {ctx: CreoContext, destroy: () => void} {
-  const subscribers: Array<() => void> = []
-  return {
-    ctx: {
-      tracked: <T extends {}>(t: T): RecordOf<T> => {
-        const rec = record(t);
-        subscribers.push(onDidUpdate(rec, () => meta.markDirty()));
-        return rec;
-      }
-    }, 
-    destroy: () => {
-      for (const subscriber of subscribers) {
-        subscriber();
-      }
-    }
-  }
-}
-
 export type CreoComponent<P = void, A extends object = {}> = (p: P) => Component<A>;
 
 export type Component<A extends object = {}> = {
@@ -102,11 +67,3 @@ export type Component<A extends object = {}> = {
 } & A;
 
 export type ComponentBuilder<P = void, A extends object = {}> = (p: P, c: CreoContext) => Component<A>;
-
-// export abstract class StyledComponent<Props = void> extends Component<Props> {
-//    constructor(props: Props | null = null) {
-//     super(props);
-//   }
-//   abstract with(slot: () => void): this;
-//   abstract style(styles: CSS.Properties | (() => CSS.Properties)): this;
-// }
