@@ -1,6 +1,5 @@
 import { expect, test } from "bun:test";
 import { Component, creo } from "./Component";
-import { resetLayoutEngine, setLayoutEngine } from "../layout-engine/layoutEngine";
 import { StringLayout } from "../layout-engine/stringLayout";
 
 test("Creo component can be constructed without `new` keyword", () => {

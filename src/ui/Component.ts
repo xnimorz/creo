@@ -11,102 +11,102 @@
  */
 
 import { LinkedHashMap } from "../data-structures/linked-hash-map/LinkedHashMap";
-import { onDidUpdate, record, RecordOf } from "../data-structures/record/Record";
+import { isRecord, onDidUpdate, record, RecordOf } from "../data-structures/record/Record";
 import type * as CSS from 'csstype';
-import { getLayoutEngine, LayoutEngine } from "../layout-engine/layoutEngine";
-import { isNone } from "../data-structures/maybe/Maybe";
+import { ComponentMeta, getLayoutEngine, LayoutEngine } from "../layout-engine/layoutEngine";
+import { isJust, isNone, Maybe } from "../data-structures/maybe/Maybe";
+import { assertJust } from "../data-structures/assert/assert";
 
-export function creo<T extends { new (...args: any): InstanceType<T> }>(
-  ctor: T
-) {
-  // @ts-ignore
-  return new Proxy(ctor, {
-    get(target, prop, _receiver) {
-      // @ts-ignore
-      return target[prop];
-    },
-    set(target, prop, newValue, _receiver) {
-      // @ts-ignore
-      target[prop] = newValue;
-      return true;
-    },
-    apply(Ctor, _self, args: ConstructorParameters<T>) {
-      return construct(Ctor, args);
-    },
-    // @ts-ignore
-    construct(Ctor, argArray: ConstructorParameters<T>, _newTarget) {
-      return construct(Ctor, argArray);
-    },
-  });
 
-  function construct(Ctor: T, params: ConstructorParameters<T>) {
+export function creo<P extends object = {}, A extends object = {}>(ctor: ComponentBuilder<P, A>): CreoComponent<P, A> {
+  return (params: P) => {        
     // 1. Get rendering context
+    const maybeLayout = getLayoutEngine();
+    assertJust(maybeLayout, 'Component can be initialised only inside creo rendering cycle');        
+    const layout: LayoutEngine = maybeLayout;
+    
     // 2. Check if there is an existing component
-    // 3. Update existing component if any
-    // 4. Creo component if there are none
-    const instance = new Ctor(...params);
-    // 5. Mark component dirty if:
-    // 5.1. Props are changed
-    // 5.2. Tracked properties are changed
+    let key: Maybe<Key>;
+    // If key is provided separately, use provided key:
+    // @ts-ignore
+    if (typeof params === 'object' && params.key != null) {
+      // @ts-ignore
+      key = params.key;
+    }
+    
+    const parentMeta = layout.peekMeta();
 
-    return instance;
+    // TODO use findByKey,if the key is defined
+    const nextComponent = parentMeta.nextChild();
+  
+    let componentMeta: ComponentMeta;
+
+    if (!nextComponent || nextComponent.ctor !== ctor || (isJust(key) &&  isJust(nextComponent.key) && key != nextComponent.key)) {
+        componentMeta = layout.createNewComponent(ctor, key, params);                
+    } else {
+      componentMeta = nextComponent;
+    }
+    return componentMeta.cache;    
   }
 }
+
+function creoWrapperForComponent<A extends object = {}>(component: Component<A>, meta: ComponentMeta, layout: LayoutEngine): Component<A> {
+  return {
+    ...component,
+    didMount() {
+      component.didMount?.();     
+    },
+    didUpdate() {
+      component.didUpdate?.();
+    },
+    ui() {
+      layout.pushMeta(meta);
+      component.ui();
+      layout.popMeta();
+    }
+  }
+}
+
+export type Key = number | string;
 
 type Wildcard = any;
 
-export abstract class Component<P = void> {
-  private c_parent: Component<Wildcard>;
-  private c_items: LinkedHashMap<Component<Wildcard>>;
-  private c_engine: LayoutEngine;
-  protected props: P;
+export type CreoContext = {
+  tracked: <T extends {}>(t: T) => RecordOf<T>,  
+}
 
-  constructor(props: P | null = null) {
-    // @ts-ignore
-    this.props = props;
-    const maybeEngine = getLayoutEngine();
-    if (isNone(maybeEngine)) {
-      throw new Error('Cannot initialise component with no layout engine defined');
+export function createCreoContext(meta: ComponentMeta): {ctx: CreoContext, destroy: () => void} {
+  const subscribers: Array<() => void> = []
+  return {
+    ctx: {
+      tracked: <T extends {}>(t: T): RecordOf<T> => {
+        const rec = record(t);
+        subscribers.push(onDidUpdate(rec, () => meta.markDirty()));
+        return rec;
+      }
+    }, 
+    destroy: () => {
+      for (const subscriber of subscribers) {
+        subscriber();
+      }
     }
-    this.c_engine = maybeEngine;
-  }
-
-  private c_ui() {
-
-  }
-  // Rendering method
-  abstract ui(): void;
-
-  // Cannot be changed
-  protected track<T extends object>(tracked: RecordOf<T>): RecordOf<T> {
-    onDidUpdate(tracked, () => {
-      this.c_markDirty();
-    });
-    return tracked;
-  }
-
-  protected tracked<T extends object>(t: T): RecordOf<T> {
-    const rec = record(t);
-    onDidUpdate(rec, () => {
-      this.c_markDirty();
-    });
-    return rec;
-  }
-
-  // Can be overwritten
-  public didMount() {}
-  // Can be overwritten
-  public didUpdate() {}
-
-  private c_markDirty() {
-
   }
 }
 
-export abstract class StyledComponent<Props = void> extends Component<Props> {
-   constructor(props: Props | null = null) {
-    super(props);
-  }
-  abstract with(slot: () => void): this;
-  abstract style(styles: CSS.Properties | (() => CSS.Properties)): this;
-}
+export type CreoComponent<P = void, A extends object = {}> = (p: P) => Component<A>;
+
+export type Component<A extends object = {}> = {
+  ui(): void,
+  didMount?(): void,
+  didUpdate?(): void,  
+} & A;
+
+export type ComponentBuilder<P = void, A extends object = {}> = (p: P, c: CreoContext) => Component<A>;
+
+// export abstract class StyledComponent<Props = void> extends Component<Props> {
+//    constructor(props: Props | null = null) {
+//     super(props);
+//   }
+//   abstract with(slot: () => void): this;
+//   abstract style(styles: CSS.Properties | (() => CSS.Properties)): this;
+// }

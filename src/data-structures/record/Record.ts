@@ -118,6 +118,9 @@ function creoRecord<TNode extends object, T extends object>(
 
 // #region Public API
 export function record<TNode extends object>(value: TNode): RecordOf<TNode> {
+  if (isRecord(value)) {
+    return value;
+  }
   const record: RecordOf<TNode> = creoRecord(null, value);
   didUpdateMap.set(record, new Set());
   return record;
