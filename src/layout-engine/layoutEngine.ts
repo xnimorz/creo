@@ -13,93 +13,10 @@
 
 import { isJust, Maybe } from "../data-structures/maybe/Maybe";
 import type * as CSS from 'csstype';
-import { Component, ComponentBuilder, CreoContext, Key } from "../ui/Component";
+import { Component, ComponentBuilder, ComponentMeta, CreoContext, Key } from "../ui/Component";
 import { LinkedHashMap, LinkedMap } from "../data-structures/linked-hash-map/LinkedHashMap";
 import { onDidUpdate, record, RecordOf } from "../data-structures/record/Record";
 
-export type ComponentMeta = {
-  key: Key
-  ctor: ComponentBuilder<any, any>
-  cache: Component<any>
-  ctx: CreoContext,
-  children: LinkedHashMap<Key, ComponentMeta>
-  parent: ComponentMeta
-  mountedParent: any // currently any, but should be an item, to which data can be mounted in reality
-  mountedChildren: Array<any> /// list of items which rendered that component in real UI
-  beforeItem: any // real rendered item before which this component places its own data
-  status: ComponentStatus  
-  nextChild: () => Maybe<ComponentMeta>
-  findByKey: (key: Key) => Maybe<ComponentMeta>
-  markDirty: () => void
-  destroy: () => void
-}
-
-export function createComponentMeta<P extends object = {}, A extends object = {}>(ctor: ComponentBuilder<P, A>, params: P, maybeKey: Maybe<Key>, layout: LayoutEngine): ComponentMeta {
-  const parent = layout.peekMeta();
-  const key: Key = maybeKey ?? `creo-${parent.children.size}`;  
-  const subscribers: Array<() => void> = []
-  const meta: ComponentMeta = {
-    key,
-    ctor,
-    children: LinkedMap(),
-    parent,
-    mountedParent: null,
-    mountedChildren: [],
-    beforeItem: null,
-    status: ComponentStatus.updating,
-    nextChild() {
-      return null;
-    },
-    findByKey(key: Key) {
-      return this.children.get(key);
-    },
-    destroy() {
-      for (const subscriber of subscribers) {
-        subscriber();
-      }
-    },
-    markDirty() {
-      this.status = ComponentStatus.dirty;
-      layout.markDirty(this as ComponentMeta);
-    },
-    ctx: {
-      tracked: <T extends {}>(t: T): RecordOf<T> => {
-        const rec = record(t);
-        subscribers.push(onDidUpdate(rec, () => meta.markDirty()));
-        return rec;
-      }
-    },
-    cache: null,
-  };
-  meta.cache = creoWrapperForComponent(ctor(params, meta.ctx), meta, layout);
-  
-  return meta;
-}
-
-function creoWrapperForComponent<A extends object = {}>(component: Component<A>, meta: ComponentMeta, layout: LayoutEngine): Component<A> {
-  return {
-    ...component,
-    didMount() {
-      component.didMount?.();     
-    },
-    didUpdate() {
-      component.didUpdate?.();
-    },
-    ui() {
-      layout.pushMeta(meta);
-      component.ui();
-      layout.popMeta();
-    }
-  }
-}
-
-
-enum ComponentStatus {
-  dirty,
-  parentUpdating,
-  updating,
-  clear
-}
 
 export const BasePrimitives = new Set(['block', 'vstack', 'grid', 'input', 'hstack', 'list', 'text', 'checkbox', 'button']);
 
