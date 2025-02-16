@@ -7,6 +7,7 @@
  * [ ] Keep track on updates, until there are no users on the old state
  * [ ] Support symbol iterator
  * [ ] Add js dispose tracker to automatically close listeners
+ * [ ] Allow to "stop propagate" changes if needed (or allow catching changes only on top level)
  */
 
 import { Maybe } from "../maybe/Maybe";
@@ -112,7 +113,7 @@ function creoRecord<TNode extends object, T extends object>(
       return true;
     },
   }) as RecordOf<T>;
-
+  didUpdateMap.set(record, new Set());
   return record;
 }
 
@@ -121,9 +122,7 @@ export function record<TNode extends object>(value: TNode): RecordOf<TNode> {
   if (isRecord(value)) {
     return value;
   }
-  const record: RecordOf<TNode> = creoRecord(null, value);
-  didUpdateMap.set(record, new Set());
-  return record;
+  return creoRecord(null, value);  
 }
 
 export function onDidUpdate<T extends object>(

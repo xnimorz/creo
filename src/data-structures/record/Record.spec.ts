@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { expect, test, mock } from "bun:test";
 import { record, RecordOf, onDidUpdate, isRecord } from "./Record";
 
 test("Can define objects", () => {
@@ -176,7 +176,7 @@ test("Supports iterable", async () => {
   iterate(...obj);
 });
 
-test("has works with records", async () => {
+test("`has` works with records", async () => {
   const originalObject = {
     foo: 'bar',
     baz: 'test',
@@ -193,4 +193,48 @@ test("has works with records", async () => {
   expect('support' in wrapped.nested).toBe(true);
   expect('foo' in wrapped.nested).toBe(false);
   
+});
+
+test("Double tracked on nested object works correctly", async () => {
+  const originalObject = {
+    foo: 'bar',
+    baz: 'test',
+    nested: {
+      support: 'exist'
+    }
+  }
+  
+  // This object is not tracked under the same parent, but might be considered in future to allow better objects and record composition. 
+  // It would require objects to have multiple parents (so essentially many<=>many concept.)
+  const additionalObject = {
+    nested: originalObject.nested,
+    foo: '123',
+    hello: '234',
+  };
+
+  const originalWrappped = record(originalObject);
+
+  const additionalWrapped = record(additionalObject);
+
+  const recordedNested = record(originalWrappped.nested);
+
+  const mockFn = mock();
+
+  onDidUpdate(originalWrappped, () => {
+    mockFn();    
+    expect(originalObject.nested).toEqual(originalWrappped.nested);
+  });
+  onDidUpdate(additionalWrapped, () => {
+    // We should never hit that path
+    expect(1).toBe(0);
+    mockFn();
+  })
+  onDidUpdate(recordedNested, () => {    
+    mockFn();
+    expect(recordedNested).toEqual({support: 'updated'});
+  })
+  originalWrappped.nested.support = 'updated';
+  // Updates are propagated in microtick queue, so we wait single tick
+  await Promise.resolve();
+  expect(mockFn).toHaveBeenCalledTimes(2);
 });
