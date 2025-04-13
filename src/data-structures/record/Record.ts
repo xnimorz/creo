@@ -14,13 +14,14 @@ import { Maybe } from "../maybe/Maybe";
 import { isRecordLike } from "./IsRecordLike";
 
 // #region Record Type
-const ParentRecord = Symbol('parent-record');
+const ParentRecord = Symbol("parent-record");
 // const example: RecordOf<{foo: 'bar'}> = {
 //   foo: 'bar',
 //   [ParentRecord]: null // Root record
 // }
-export type RecordOf<T extends object> = T & {[ParentRecord]: Maybe<WeakRef<RecordOf<Wildcard>>>};
-type Wildcard = any;
+export type RecordOf<T extends object> = T & {
+  [ParentRecord]: Maybe<WeakRef<RecordOf<Wildcard>>>;
+};
 type RecordDidChangeListener<T extends object> = (record: RecordOf<T>) => void;
 
 export function isRecord<T extends object>(value: T): value is RecordOf<T> {
@@ -38,7 +39,7 @@ const scheduledUpdatesNotifiers: Set<RecordOf<Wildcard>> = new Set();
 let shouldScheduleMicrotask = true;
 function queuedNotifier() {
   function iterate(record: RecordOf<Wildcard>) {
-    const listeners = didUpdateMap.get(record);       
+    const listeners = didUpdateMap.get(record);
     listeners?.forEach((listener) => {
       listener(record);
     });
@@ -59,15 +60,17 @@ function recordDidUpdate<T extends object>(record: RecordOf<T>) {
 type InternalOnly = never;
 
 // #region Record creation, fields wrapper
-function creoRecord<TNode extends object, T extends object>(  
+function creoRecord<TNode extends object, T extends object>(
   parent: Maybe<RecordOf<TNode>>,
-  value: T,  
-): RecordOf<T> {  
+  value: T,
+): RecordOf<T> {
   const parentWeakRef = parent != null ? new WeakRef(parent) : null;
-  
-  type CacheField<K extends keyof T> = T[K] extends object ? Maybe<RecordOf<T[K]>> : never
+
+  type CacheField<K extends keyof T> = T[K] extends object
+    ? Maybe<RecordOf<T[K]>>
+    : never;
   type Cache = { [K in keyof T]: CacheField<K> };
-  const cache: Cache = {} as Cache;  
+  const cache: Cache = {} as Cache;
   const record: RecordOf<T> = new Proxy(value, {
     // @ts-ignore we override `has` to improve typing
     has<K extends keyof T>(target: T, property: K): boolean {
@@ -84,28 +87,28 @@ function creoRecord<TNode extends object, T extends object>(
         // Only for internal use
         return parentWeakRef?.deref() as InternalOnly;
       }
-      // If the value is cached, return the cached record:      
-      if (cache[property] != null) {        
+      // If the value is cached, return the cached record:
+      if (cache[property] != null) {
         return cache[property] as T[K];
       }
       // No cached value:
       if (isRecordLike(val)) {
         // Object / Array, etc.
         // we proxify all nested objects / arrays to ensure correct behaviour
-        const childRecord = creoRecord(record, val);    
+        const childRecord = creoRecord(record, val);
         cache[property] = childRecord as CacheField<K>;
         return childRecord;
       }
 
       // Primitive value:
       return val;
-    },    
-    set<K, TNewValue>(target: T, property: K, newValue: TNewValue) {      
+    },
+    set<K, TNewValue>(target: T, property: K, newValue: TNewValue) {
       // property is actually the keyof K, but TS defines Proxy differently:
-      const prop: keyof T = property as keyof T;      
+      const prop: keyof T = property as keyof T;
       const value: T[typeof prop] = newValue as T[typeof prop];
 
-      target[prop] = value;            
+      target[prop] = value;
       if (cache[prop] != null) {
         cache[prop] = null as Cache[keyof Cache];
       }
@@ -122,12 +125,12 @@ export function record<TNode extends object>(value: TNode): RecordOf<TNode> {
   if (isRecord(value)) {
     return value;
   }
-  return creoRecord(null, value);  
+  return creoRecord(null, value);
 }
 
 export function onDidUpdate<T extends object>(
   record: RecordOf<T>,
-  listener: (record: RecordOf<T>) => void
+  listener: (record: RecordOf<T>) => void,
 ): () => void {
   const listeners = didUpdateMap.get(record);
   if (!listeners) {

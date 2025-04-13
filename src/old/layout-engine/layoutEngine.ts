@@ -12,52 +12,88 @@
  */
 
 import { isJust, Maybe } from "../data-structures/maybe/Maybe";
-import type * as CSS from 'csstype';
-import { Component, ComponentBuilder, ComponentMeta, CreoContext, Key } from "../ui/Component";
-import { LinkedHashMap, LinkedMap } from "../data-structures/linked-hash-map/LinkedHashMap";
-import { onDidUpdate, record, RecordOf } from "../data-structures/record/Record";
+import type * as CSS from "csstype";
+import {
+  Component,
+  ComponentBuilder,
+  ComponentMeta,
+  CreoContext,
+  Key,
+} from "../ui/Component";
+import {
+  LinkedHashMap,
+  LinkedMap,
+} from "../data-structures/linked-hash-map/LinkedHashMap";
+import {
+  onDidUpdate,
+  record,
+  RecordOf,
+} from "../data-structures/record/Record";
 
-
-export const BasePrimitives = new Set(['block', 'vstack', 'grid', 'input', 'hstack', 'list', 'text', 'checkbox', 'button']);
+export const BasePrimitives = new Set([
+  "block",
+  "vstack",
+  "grid",
+  "input",
+  "hstack",
+  "list",
+  "text",
+  "checkbox",
+  "button",
+]);
 
 export abstract class LayoutEngine {
+  /**
+   *
+   * ????
+   * @param ui
+   */
   abstract create(ui: () => void): void;
-  abstract refresh(): void;  
+  /**
+   * Marks the whole tree as dirty and re-renders it
+   */
+  abstract refresh(): void;
   // Cursor operations:
   /**
    * Puts ComponentMeta to stack
-   * 
+   *
    * @param meta Meta of the component where the cursor should be placed
    */
   abstract pushMeta(meta: ComponentMeta): void;
   /**
-   * 
-   * Cretes new component & new ComponentMeta context for it
-   * 
+   *
+   * Creates new component & new ComponentMeta context for it
+   *
    */
-  abstract createNewComponent(ctor: ComponentBuilder<any, any>, key: Maybe<Key>): ComponentMeta;
+  abstract createNewComponent(
+    ctor: ComponentBuilder<any, any>,
+    key: Maybe<Key>,
+  ): ComponentMeta;
   /**
-   * 
+   *
    * Peeks the top componentMeta from stack
-   * 
+   *
    */
   abstract peekMeta(): ComponentMeta;
   /**
-   * 
+   *
    * Removes top component from the stack
-   * 
+   *
    */
   abstract popMeta(): ComponentMeta;
 
-  abstract lowLevel(type: string, props: {
-    css?: CSS.Properties,
-    attr: object
-  }): void;  
+  abstract lowLevel(
+    type: string,
+    props: {
+      css?: CSS.Properties;
+      attr: object;
+    },
+  ): void;
   /**
-   * 
+   *
    * Marks the provided component as dirty, to schedule the update
-   * 
-   * @param meta 
+   *
+   * @param meta
    */
   abstract markDirty(meta: ComponentMeta): void;
 }

@@ -1,6 +1,6 @@
 /**
  * Creo Linked hash map impl
- * 
+ *
  * [ ] Need null & undefined proper support for LinkedHashMap values
  * [ ] LinkedHashMap Node? so that you can iterate next/prev ??
  */
@@ -15,13 +15,14 @@ export interface LinkedHashMap<K, T> extends Iterable<[K, T]> {
   addAfter(after: K, key: K, value: T): void;
   delete(key: K): void;
   get(key: K): Maybe<T>;
+  getNextKey(key: K): Maybe<K>;
   at(n: number): Maybe<T>;
   size(): number;
   [Symbol.iterator](): IterableIterator<[K, T]>;
 }
 
 class LinkedHashMapClass<K, T> implements LinkedHashMap<K, T> {
-  #map: Map<K, {value: T, node: ListNode<K>}> = new Map();
+  #map: Map<K, { value: T; node: ListNode<K> }> = new Map();
   #list: List<K> = List();
 
   addToEnd(key: K, value: T) {
@@ -31,10 +32,10 @@ class LinkedHashMapClass<K, T> implements LinkedHashMap<K, T> {
       this.#map.delete(key);
       item.node.delete();
     }
-    
+
     // Save new entity in the end
     const node = this.#list.addToEnd(key);
-    this.#map.set(key, {value, node});
+    this.#map.set(key, { value, node });
   }
 
   addToStart(key: K, value: T) {
@@ -44,10 +45,10 @@ class LinkedHashMapClass<K, T> implements LinkedHashMap<K, T> {
       this.#map.delete(key);
       item.node.delete();
     }
-    
+
     // Save new entity in the start
     const node = this.#list.addToStart(key);
-    this.#map.set(key, {value, node});
+    this.#map.set(key, { value, node });
   }
 
   addBefore(before: K, key: K, value: T) {
@@ -67,9 +68,9 @@ class LinkedHashMapClass<K, T> implements LinkedHashMap<K, T> {
     position.node.prev = key;
     const node = position.node.prev;
     if (!node) {
-      throw new Error('Safeguard. Node was not inserted properly')
+      throw new Error("Safeguard. Node was not inserted properly");
     }
-    this.#map.set(key, {value, node});
+    this.#map.set(key, { value, node });
   }
 
   addAfter(after: K, key: K, value: T) {
@@ -89,15 +90,19 @@ class LinkedHashMapClass<K, T> implements LinkedHashMap<K, T> {
     position.node.next = key;
     const node = position.node.next;
     if (!node) {
-      throw new Error('Safeguard. Node was not inserted properly')
+      throw new Error("Safeguard. Node was not inserted properly");
     }
-    this.#map.set(key, {value, node});
+    this.#map.set(key, { value, node });
   }
 
   delete(key: K) {
     const item = this.#map.get(key);
     this.#map.delete(key);
     item?.node.delete();
+  }
+
+  getNextKey(key: K): Maybe<T> {
+    return this.#map.get(key)?.node.next?.value;
   }
 
   get(key: K): Maybe<T> {
@@ -108,7 +113,7 @@ class LinkedHashMapClass<K, T> implements LinkedHashMap<K, T> {
     const item = this.#list.at(n);
     if (item == null) {
       return;
-    }    
+    }
     return this.#map.get(item.value)?.value;
   }
 
@@ -116,13 +121,13 @@ class LinkedHashMapClass<K, T> implements LinkedHashMap<K, T> {
     return this.#map.size;
   }
 
-  *[Symbol.iterator](): Generator<[K, T], void, unknown> {    
+  *[Symbol.iterator](): Generator<[K, T], void, unknown> {
     for (let key of this.#list) {
       const node = this.#map.get(key);
       if (node == null) {
         continue;
       }
-      yield [key, node.value]
+      yield [key, node.value];
     }
   }
 }

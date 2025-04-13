@@ -9,35 +9,32 @@ test("Can define objects", () => {
   expect(obj).toEqual({ hello: "world" });
 });
 
-test("Refers to the same objects", ()  => {
-
+test("Refers to the same objects", () => {
   const test = record({
     foo: {
-      bar: 'baz',
-    }
-  })
+      bar: "baz",
+    },
+  });
 
   expect(test.foo).toBe(test.foo);
 });
 
-
-test("Updates fields correctly", ()  => {
-
+test("Updates fields correctly", () => {
   const test: RecordOf<any> = record({
     foo: {
-      bar: 'baz',
-    }
-  })
+      bar: "baz",
+    },
+  });
 
-  expect(test.foo.bar).toBe('baz');
+  expect(test.foo.bar).toBe("baz");
 
-  test.foo.bar = '123';
+  test.foo.bar = "123";
 
-  expect(test.foo.bar).toBe('123');
+  expect(test.foo.bar).toBe("123");
 
-  test.foo = {hello: 'world'};
+  test.foo = { hello: "world" };
   expect(test.foo.bar).toBe(undefined);
-  expect(test.foo.hello).toBe('world');
+  expect(test.foo.hello).toBe("world");
 });
 
 test("Notifies on object updates", async () => {
@@ -50,7 +47,7 @@ test("Notifies on object updates", async () => {
       onDidUpdate(obj, (updated) => resolve(updated));
 
       obj.hello = "new world";
-    })
+    }),
   ).resolves.toEqual({
     hello: "new world",
   });
@@ -66,7 +63,7 @@ test("Notifies on object updates even if the listener was set after the change",
   await expect(
     new Promise((resolve) => {
       onDidUpdate(obj, (updated) => resolve(updated));
-    })
+    }),
   ).resolves.toEqual({
     hello: "new world",
   });
@@ -106,7 +103,7 @@ test("Handles nested object updates", async () => {
   await expect(
     new Promise((resolve) => {
       onDidUpdate(obj, (updated) => resolve(updated));
-    })
+    }),
   ).resolves.toEqual({
     hello: {
       world: "new",
@@ -132,7 +129,7 @@ test("Can unsubscribe from updates", async () => {
   await expect(
     new Promise((resolve) => {
       onDidUpdate(obj, (updated) => resolve(updated));
-    })
+    }),
   ).resolves.toEqual({
     hello: {
       world: "new",
@@ -152,7 +149,7 @@ test("Supports arrays", async () => {
   await expect(
     new Promise((resolve) => {
       onDidUpdate(obj, (updated) => resolve(JSON.stringify(updated)));
-    })
+    }),
   ).resolves.toEqual('{"hello":{"world":["array","is","this"]}}');
 
   obj.hello.world.push("123");
@@ -160,7 +157,7 @@ test("Supports arrays", async () => {
   await expect(
     new Promise((resolve) => {
       onDidUpdate(obj, (updated) => resolve(JSON.stringify(updated)));
-    })
+    }),
   ).resolves.toEqual('{"hello":{"world":["array","is","this","123"]}}');
 });
 
@@ -178,38 +175,37 @@ test("Supports iterable", async () => {
 
 test("`has` works with records", async () => {
   const originalObject = {
-    foo: 'bar',
-    baz: 'test',
+    foo: "bar",
+    baz: "test",
     nested: {
-      support: 'exist'
-    }
-  }
+      support: "exist",
+    },
+  };
   const wrapped = record(originalObject);
 
   expect(isRecord(originalObject)).toBe(false);
   expect(isRecord(wrapped)).toBe(true);
-  expect('foo' in wrapped).toBe(true);
-  expect('test' in wrapped).toBe(false);
-  expect('support' in wrapped.nested).toBe(true);
-  expect('foo' in wrapped.nested).toBe(false);
-  
+  expect("foo" in wrapped).toBe(true);
+  expect("test" in wrapped).toBe(false);
+  expect("support" in wrapped.nested).toBe(true);
+  expect("foo" in wrapped.nested).toBe(false);
 });
 
 test("Double tracked on nested object works correctly", async () => {
   const originalObject = {
-    foo: 'bar',
-    baz: 'test',
+    foo: "bar",
+    baz: "test",
     nested: {
-      support: 'exist'
-    }
-  }
-  
-  // This object is not tracked under the same parent, but might be considered in future to allow better objects and record composition. 
+      support: "exist",
+    },
+  };
+
+  // This object is not tracked under the same parent, but might be considered in future to allow better objects and record composition.
   // It would require objects to have multiple parents (so essentially many<=>many concept.)
   const additionalObject = {
     nested: originalObject.nested,
-    foo: '123',
-    hello: '234',
+    foo: "123",
+    hello: "234",
   };
 
   const originalWrappped = record(originalObject);
@@ -221,19 +217,19 @@ test("Double tracked on nested object works correctly", async () => {
   const mockFn = mock();
 
   onDidUpdate(originalWrappped, () => {
-    mockFn();    
+    mockFn();
     expect(originalObject.nested).toEqual(originalWrappped.nested);
   });
   onDidUpdate(additionalWrapped, () => {
     // We should never hit that path
     expect(1).toBe(0);
     mockFn();
-  })
-  onDidUpdate(recordedNested, () => {    
+  });
+  onDidUpdate(recordedNested, () => {
     mockFn();
-    expect(recordedNested).toEqual({support: 'updated'});
-  })
-  originalWrappped.nested.support = 'updated';
+    expect(recordedNested).toEqual({ support: "updated" });
+  });
+  originalWrappped.nested.support = "updated";
   // Updates are propagated in microtick queue, so we wait single tick
   await Promise.resolve();
   expect(mockFn).toHaveBeenCalledTimes(2);
