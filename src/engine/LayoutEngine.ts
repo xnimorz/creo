@@ -12,39 +12,50 @@
  */
 
 import { assertJust } from "../data-structures/assert/assert";
-import { Maybe } from "../data-structures/maybe/Maybe";
+import {
+  LinkedHashMap,
+  LinkedMap,
+} from "../data-structures/linked-hash-map/LinkedHashMap";
+import { List } from "../data-structures/list/List";
+import { isJust, Maybe } from "../data-structures/maybe/Maybe";
 import { InternalComponent } from "./InternalComponent";
 import { Key } from "./Key";
-import { Registry, RegistryNode } from "./Registry";
 
 export abstract class LayoutEngine {
-  registry: Registry = new Registry();
+  // Queue of currently rendering items
+  renderingQueue: List<InternalComponent> = List();
 
-  generateKey(): Key {
-    const registryNode: Maybe<RegistryNode> =
-      this.registry.renderingQueue.at(-1)?.registry;
-    assertJust(
-      registryNode,
-      "Cannot generate unique key for top-level component",
-    );
-    return registryNode.generateKey();
+  dirtyComponents: LinkedHashMap<Key, InternalComponent> = LinkedMap();
+  setDirtyComponent(component: InternalComponent, isDirty: boolean) {
+    if (isDirty) {
+      if (!this.dirtyComponents.get(component.key)) {
+        this.dirtyComponents.addToEnd(component.key, component);
+      }
+    } else {
+      this.dirtyComponents.delete(component.key);
+    }
+  }
+  isComponentDirty(component: InternalComponent) {
+    return isJust(this.dirtyComponents.get(component.key));
   }
 
-  peekRenderingComponent(): Maybe<InternalComponent> {
-    return this.registry.renderingQueue.at(-1);
+  peekComponentRender(): Maybe<InternalComponent> {
+    return this.renderingQueue.at(-1)?.value;
   }
 
   startComponentRender(component: InternalComponent) {
-    this.registry.renderingQueue.addToEnd(component.key, component);
+    this.renderingQueue.addToEnd(component);
   }
 
   endComponentRender(component: InternalComponent) {
-    const maybeComponent = this.registry.renderingQueue.at(-1);
+    const maybeComponent = this.renderingQueue.at(-1)?.node;
     if (maybeComponent !== component) {
       throw new Error(
         "Cannot close component rendering due to component mismatch",
       );
     }
-    this.registry.renderingQueue.delete(component.key);
+    this.renderingQueue.delete(-1);
   }
+
+  lowLevel<P extends object>(tag: string, params?: P) {}
 }

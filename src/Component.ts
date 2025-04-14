@@ -1,70 +1,70 @@
-import { assertJust } from "./data-structures/assert/assert";
-import { Maybe } from "./data-structures/maybe/Maybe";
+import { ComponentBuilder } from "./creo";
 import { Context } from "./engine/Context";
-import { getActiveLayoutEngine } from "./engine/GlobalContext";
-import { Key } from "./engine/Key";
-import { LayoutEngine } from "./engine/LayoutEngine";
 
-export type ComponentBuilder<P = void, A extends object = {}> = (
-  p: P,
-  c: Context,
-) => ComponentMethods<A>;
-
-type ComponentBuilderFn<P = void, A extends object = {}> = (
-  p: P,
-) => Component<A>;
-
-export function creo<P = void, A extends object = {}>(
-  ctor: ComponentBuilder<P, A>,
-): ComponentBuilderFn<P, A> {
-  return (params: P) => {
-    // Get Potential pre-existing instance of the component:
-    const maybeLayout = getActiveLayoutEngine();
-    assertJust(
-      maybeLayout,
-      "Component can be initialised only inside creo rendering cycle",
-    );
-    const layout: LayoutEngine = maybeLayout;
-
-    // 2. Check if there is an existing component
-    let key: Maybe<Key>;
-
-    // If key is provided separately, use provided key:
-    if (
-      params != null &&
-      typeof params === "object" &&
-      "key" in params &&
-      params.key != null &&
-      (typeof params.key === "string" || typeof params.key === "number")
-    ) {
-      key = params.key;
-    }
-
-    layout.registry.
-
-      if (isNone(key)) {
-        this.key = this.layout.generateUniqueKey();
-      } else {
-        this.key = key;
-      }
-
-    return new PublicComponent();
-  };
-}
-
-export type ComponentMethods<A extends object = {}> = {
+export type ComponentMethods<P = void, A = void> = {
   render(): void;
   didMount?(): void;
   didUpdate?(): void;
   dispose?(): void;
-  // with?(...slots: Array<() => void>): void; /?? (we can re-use & A for that)
-} & A;
+  // Return true if the component should get updated with new params
+  shouldUpdate?(pendingParams: P): boolean;
+  extension?: A extends void ? undefined : A;
+  with?(slot: () => void): ComponentMethods<P, A>;
+};
 
-export class PublicComponent<P = void, A extends object = {}>
-  implements Component<A> {
+export class PublicComponent<P, A extends object = {}>
+  implements Component<P, A>
+{
   ctor: ComponentBuilder<P, A>;
+  componentMethods: ComponentMethods<P, A>;
+  c: Context<P>;
 
+  constructor(ctor: ComponentBuilder<P, A>, c: Context<P>) {
+    this.ctor = ctor;
+    this.c = c;
+    this.componentMethods = ctor(c);
+  }
+
+  get extension(): A extends void ? undefined : A {
+    return this.componentMethods.extension;
+  }
+
+  didMount(): void {
+    this.componentMethods.didMount?.();
+  }
+
+  didUpdate(): void {
+    this.componentMethods.didUpdate?.();
+  }
+
+  shouldUpdate(pendingParams: P): boolean {
+    if (this.componentMethods.shouldUpdate != null) {
+      return this.componentMethods.shouldUpdate(pendingParams);
+    }
+    return this.c.p !== pendingParams;
+  }
+
+  dispose(): void {
+    this.componentMethods.dispose?.();
+  }
+
+  with(slot: () => void): ComponentMethods<P, A> {
+    this.c.setSlot(slot);
+    return this;
+  }
+
+  render() {
+    this.componentMethods.render();
+  }
 }
 
 // @ts-ignore
-export interface Component<A extends object = {}> extends A {}
+export interface Component<P, A = void> {
+  shouldUpdate(pendingParams: P): boolean;
+  render(): void;
+  didMount(): void;
+  didUpdate(): void;
+  dispose(): void;
+  extension: A extends void ? undefined : A;
+  with(slot: () => void): ComponentMethods<P, A>;
+}

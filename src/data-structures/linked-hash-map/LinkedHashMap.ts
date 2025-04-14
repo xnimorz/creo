@@ -133,5 +133,6 @@ class LinkedHashMapClass<K, T> implements LinkedHashMap<K, T> {
 }
 
 export function LinkedMap<K, T>(): LinkedHashMap<K, T> {
+  // @ts-ignore
   return new LinkedHashMapClass();
 }

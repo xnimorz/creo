@@ -11,6 +11,7 @@
  */
 
 import { Maybe } from "../maybe/Maybe";
+import { Wildcard } from "../wildcard/wildcard";
 import { isRecordLike } from "./IsRecordLike";
 
 // #region Record Type
