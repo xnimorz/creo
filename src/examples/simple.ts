@@ -1,7 +1,8 @@
 import { creo } from "../creo";
-import { Block } from "../old/ui/css/Block";
-import { Text } from "../old/ui/css/Text";
-import { VStack } from "../old/ui/css/VStack";
+import { Block } from "../ui/html/Block";
+import { Inline } from "../ui/html/Inline";
+import { Text } from "../ui/html/Text";
+import { VStack } from "../ui/html/VStack";
 
 type Todo = { text: string };
 
@@ -10,7 +11,9 @@ const MyTodoList = creo<{ text: string }>((c) => {
 
   return {
     render() {
-      Text(c.p.text);
+      Inline().with(() => {
+        Text(c.p.text);
+      });
       Block().with(() => {
         Text("Hello inside container");
         VStack().with(() => {

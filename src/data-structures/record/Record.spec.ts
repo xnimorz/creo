@@ -6,6 +6,7 @@ test("Can define objects", () => {
     hello: "world",
   });
 
+  // @ts-ignore
   expect(obj).toEqual({ hello: "world" });
 });
 
@@ -76,6 +77,7 @@ test("Implies updates immediately", async () => {
     },
   });
 
+  // @ts-ignore
   expect(obj).toEqual({
     hello: {
       world: "foo",
@@ -84,6 +86,7 @@ test("Implies updates immediately", async () => {
 
   obj.hello.world = "new";
 
+  // @ts-ignore
   expect(obj).toEqual({
     hello: {
       world: "new",
@@ -227,6 +230,7 @@ test("Double tracked on nested object works correctly", async () => {
   });
   onDidUpdate(recordedNested, () => {
     mockFn();
+    // @ts-ignore
     expect(recordedNested).toEqual({ support: "updated" });
   });
   originalWrappped.nested.support = "updated";

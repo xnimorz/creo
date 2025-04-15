@@ -1,4 +1,5 @@
 import { ComponentBuilder } from "./creo";
+import { shallowEqual } from "./data-structures/shalllowEqual/shallowEqual";
 import { Context } from "./engine/Context";
 
 export type ComponentMethods<P = void, A = void> = {
@@ -26,7 +27,7 @@ export class PublicComponent<P, A extends object = {}>
   }
 
   get extension(): A extends void ? undefined : A {
-    return this.componentMethods.extension;
+    return this.componentMethods.extension as A extends void ? undefined : A;
   }
 
   didMount(): void {
@@ -41,16 +42,11 @@ export class PublicComponent<P, A extends object = {}>
     if (this.componentMethods.shouldUpdate != null) {
       return this.componentMethods.shouldUpdate(pendingParams);
     }
-    return this.c.p !== pendingParams;
+    return !shallowEqual(this.c.p, pendingParams);
   }
 
   dispose(): void {
     this.componentMethods.dispose?.();
-  }
-
-  with(slot: () => void): ComponentMethods<P, A> {
-    this.c.setSlot(slot);
-    return this;
   }
 
   render() {
@@ -66,5 +62,4 @@ export interface Component<P, A = void> {
   didUpdate(): void;
   dispose(): void;
   extension: A extends void ? undefined : A;
-  with(slot: () => void): ComponentMethods<P, A>;
 }

@@ -10,7 +10,8 @@ import { generateNextKey } from "../data-structures/simpleKey/simpleKey";
 import { Wildcard } from "../data-structures/wildcard/wildcard";
 import { CreoContext } from "./Context";
 import { Key } from "./Key";
-import { LayoutEngine } from "./LayoutEngine";
+import { LayoutEngine, nodeCtor } from "./LayoutEngine";
+import { Node } from "./Node";
 
 export enum UpdateDirectiveEnum {
   // Change element position
@@ -43,6 +44,14 @@ export class InternalComponent {
   private renderCursor: Maybe<Key>;
   // How deep the component is placed
   depth: number = 0;
+  // the link to the parent cursor (e.g. DOM element) of this internal component
+  // It allows to mount entity to the correct place
+  parentNode: Node;
+  // if the component represents a low-level component,
+  // they would have layoutCursor defined (as they are the entity represented for user)
+  node: Maybe<Node>;
+  // If the internal component goes to UI rendering part, the type of tag is placed here
+  tag: Maybe<string>;
 
   setDirty(dirty: boolean) {
     this.layout.setDirtyComponent(this, dirty);
@@ -68,6 +77,7 @@ export class InternalComponent {
   generateUpdateDirective(
     key: Maybe<Key>,
     ctor: ComponentBuilder<Wildcard, Wildcard>,
+    tag: Maybe<string>,
   ): UpdateDirectiveType {
     const expectedChild: Maybe<InternalComponent> =
       this.renderCursor != null ? this.children.get(this.renderCursor) : null;
@@ -76,6 +86,7 @@ export class InternalComponent {
     if (
       isJust(expectedChild) &&
       expectedChild.publicComponent.ctor === ctor &&
+      expectedChild.tag === tag &&
       // TODO: We should respect & identify artificially generated keys too
       (isNone(key) || key === expectedChild.key)
     ) {
@@ -108,7 +119,10 @@ export class InternalComponent {
       // We have matched key, but their constructors are different
       // In theory that process is REPLACE, but for external usages, it works exactly the same way as NEW
       // The difference is purely internal
-      if (maybeKeyedMatchedChildren.publicComponent.ctor !== ctor) {
+      if (
+        maybeKeyedMatchedChildren.publicComponent.ctor !== ctor ||
+        maybeKeyedMatchedChildren.tag !== tag
+      ) {
         return {
           updateDirective: UpdateDirectiveEnum.REPLACE,
           component: maybeKeyedMatchedChildren,
@@ -135,7 +149,9 @@ export class InternalComponent {
   createNewInternalComponent<P>(
     key: Maybe<Key>,
     ctor: ComponentBuilder<P, Wildcard>,
-    initialParams: P,
+    initialParams: Maybe<P>,
+    slot: Maybe<() => void>,
+    tag: Maybe<string>,
   ): InternalComponent {
     const ic = new InternalComponent(
       key != null ? key : this.generateKey(),
@@ -144,6 +160,9 @@ export class InternalComponent {
       this,
       this.depth + 1,
       initialParams,
+      this.node ?? this.parentNode,
+      slot,
+      tag,
     );
 
     return ic;
@@ -152,11 +171,14 @@ export class InternalComponent {
   reconsileChild<P = void>(
     key: Maybe<Key>,
     ctor: ComponentBuilder<P, Wildcard>,
-    params: P,
+    params: Maybe<P>,
+    slot: Maybe<() => void>,
+    tag: Maybe<string>,
   ): InternalComponent {
-    const updateDirective = this.generateUpdateDirective(key, ctor);
+    const updateDirective = this.generateUpdateDirective(key, ctor, tag);
     switch (updateDirective.updateDirective) {
       case UpdateDirectiveEnum.REUSE: {
+        // TODO: MAYBE update SLOT
         assertJust(updateDirective.component, "Cannot re-use null component");
         this.pendingChildren.addToEnd(
           updateDirective.component.key,
@@ -172,7 +194,7 @@ export class InternalComponent {
         // TODO: move all DOM children which are connected to the top-level
       }
       case UpdateDirectiveEnum.NEW: {
-        return this.createNewInternalComponent(key, ctor, params);
+        return this.createNewInternalComponent(key, ctor, params, slot, tag);
       }
       case UpdateDirectiveEnum.REPLACE: {
         assertJust(updateDirective.component, "Cannot replace null component");
@@ -181,7 +203,7 @@ export class InternalComponent {
         this.children.delete(component.key);
         // Cleanup the component:
         component.dispose();
-        return this.createNewInternalComponent(key, ctor, params);
+        return this.createNewInternalComponent(key, ctor, params, slot, tag);
       }
     }
   }
@@ -222,14 +244,24 @@ export class InternalComponent {
     parent: Maybe<InternalComponent>,
     depth: number,
     initialParams: Wildcard,
+    parentNode: Node,
+    slot: Maybe<() => void>,
+    tag: Maybe<string>,
+    // Mounting information: to mount any subsequent component we should understand:
+    // 1. It's top mount position
+    // 2. It's left mount position
+    //parentMount: LayoutEngineCursor,
+    //leftMount: LayoutEngineCursor,
   ) {
     this.layout = layout;
     this.key = key;
     this.parent = parent;
     this.depth = depth;
-    this.c = new CreoContext(this, initialParams);
+    this.c = new CreoContext(this, initialParams, slot);
     this.publicComponent = new PublicComponent(ctor, this.c);
     this.setDirty(true);
+    this.parentNode = parentNode;
+    this.tag = tag;
   }
 
   // Updates existing component
@@ -240,6 +272,11 @@ export class InternalComponent {
     this.layout.startComponentRender(this);
     this.setDirty(false);
 
+    // we put UI visible entities in UI extension, so that we can distinguish them easily
+    // TODO simplify it and make it obvious to avoid potential collisions
+    if (this.publicComponent.ctor === nodeCtor) {
+      this.node = this.layout.node(this);
+    }
     // #region Component Render in progress
     this.publicComponent.render();
 

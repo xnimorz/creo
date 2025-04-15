@@ -101,7 +101,7 @@ class LinkedHashMapClass<K, T> implements LinkedHashMap<K, T> {
     item?.node.delete();
   }
 
-  getNextKey(key: K): Maybe<T> {
+  getNextKey(key: K): Maybe<K> {
     return this.#map.get(key)?.node.next?.value;
   }
 

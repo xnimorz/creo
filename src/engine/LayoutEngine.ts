@@ -11,6 +11,7 @@
  * [ ] Layout engines should work with CreoTree
  */
 
+import { creoNode } from "../creo";
 import { assertJust } from "../data-structures/assert/assert";
 import {
   LinkedHashMap,
@@ -18,8 +19,10 @@ import {
 } from "../data-structures/linked-hash-map/LinkedHashMap";
 import { List } from "../data-structures/list/List";
 import { isJust, Maybe } from "../data-structures/maybe/Maybe";
+import { Context } from "./Context";
 import { InternalComponent } from "./InternalComponent";
 import { Key } from "./Key";
+import { Node } from "./Node";
 
 export abstract class LayoutEngine {
   // Queue of currently rendering items
@@ -57,5 +60,13 @@ export abstract class LayoutEngine {
     this.renderingQueue.delete(-1);
   }
 
-  lowLevel<P extends object>(tag: string, params?: P) {}
+  abstract node(ic: InternalComponent): Node;
 }
+
+export const nodeCtor = <P>(c: Context<P>) => ({
+  render() {
+    c.slot?.();
+  },
+});
+
+export const n = creoNode(nodeCtor);
