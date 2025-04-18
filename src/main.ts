@@ -1,4 +1,13 @@
+import { SimpleStringEngine } from "./engine/SimpleStringEngine";
+import { SimpleTodoList } from "./examples/SimpleTodoList/SimpleTodoList";
 import "./style.css";
+
+const engine = new SimpleStringEngine();
+console.log(
+  engine.render(() => {
+    SimpleTodoList({ text: "Hello world" });
+  }),
+);
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
   <div>

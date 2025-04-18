@@ -1,11 +1,10 @@
-import { creo } from "../../creo";
-import { n } from "../../engine/LayoutEngine";
+import { creo, ui } from "../../creo";
 
 export const Block = creo<{
   // TODO replace with nice UI params
   [key: string]: string;
 }>((c) => ({
   render() {
-    n("div", c.p, c.slot);
+    ui("div", c.p, c.slot);
   },
 }));

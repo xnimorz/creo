@@ -1,11 +1,10 @@
-import { creo } from "../../creo";
-import { n } from "../../engine/LayoutEngine";
+import { creo, ui } from "../../creo";
 
 export const Button = creo<{
   // TODO replace with nice UI params
   [key: string]: string;
 }>((c) => ({
   render() {
-    n("button", c.p, c.slot);
+    ui("button", c.p, c.slot);
   },
 }));

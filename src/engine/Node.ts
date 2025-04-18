@@ -387,7 +387,7 @@ export class InternalUINode extends InternalNode {
   render() {
     this.willRender();
     this.layoutNode = this.layout.renderNode(this);
-    this.render();
+    this.lifecycle.render();
     this.didRender();
   }
 }

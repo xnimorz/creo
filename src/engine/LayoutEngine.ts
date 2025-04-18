@@ -45,6 +45,8 @@ export abstract class LayoutEngine {
 
   // Add params to support data insertion in middle
   abstract renderNode(node: InternalUINode): LayoutNode;
+
+  abstract render(renderFn: () => void): unknown;
 }
 
 export abstract class LayoutNode {}
