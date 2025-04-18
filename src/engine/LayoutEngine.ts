@@ -14,7 +14,6 @@
 import { IndexedMap } from "../data-structures/indexed-map/IndexedMap";
 import { List } from "../data-structures/list/List";
 import { Maybe } from "../data-structures/maybe/Maybe";
-import { Context } from "./Context";
 import { InternalNode, InternalUINode } from "./Node";
 
 export abstract class LayoutEngine {
@@ -44,7 +43,8 @@ export abstract class LayoutEngine {
     this.renderingQueue.delete(-1);
   }
 
-  abstract renderNode(ic: InternalUINode): LayoutNode;
+  // Add params to support data insertion in middle
+  abstract renderNode(node: InternalUINode): LayoutNode;
 }
 
 export abstract class LayoutNode {}

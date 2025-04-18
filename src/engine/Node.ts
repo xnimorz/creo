@@ -343,7 +343,7 @@ export class InternalUINode extends InternalNode {
     ctor: NodeBuilder<Wildcard, Wildcard>,
     parent: InternalNode,
     parentUI: InternalUINode,
-    public tag: Maybe<string>,
+    public tag: string,
   ) {
     super(userKey, internalKey, p, slot, ctor, parent, parentUI);
   }

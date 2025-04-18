@@ -1,50 +1,34 @@
-import { isJust, Maybe } from "../data-structures/maybe/Maybe";
-import { InternalComponent } from "./InternalComponent";
-import { Node } from "./Node";
-import { LayoutEngine } from "./LayoutEngine";
+import { Maybe } from "../data-structures/maybe/Maybe";
+import { InternalUINode } from "./Node";
+import { LayoutEngine, LayoutNode } from "./LayoutEngine";
+import { IndexedMap } from "../data-structures/indexed-map/IndexedMap";
+import { Key } from "./Key";
 
 export class SimpleStringEngine extends LayoutEngine {
-  representaion: Array<StringRecord> = [];
+  children: IndexedMap<StringRecord, "key"> = new IndexedMap("key");
 
-  renderUI<P>(
-    ic: InternalComponent,
-    parentCursor: LayoutCursor,
-    previousLayoutCursor: Maybe<LayoutCursor>,
-    params: P,
-  ): LayoutCursor {
-    const stringParentCursor = parentCursor as StringLayoutCursor;
-    const stringPreviousLayoutCursor =
-      previousLayoutCursor as Maybe<StringLayoutCursor>;
+  renderNode(node: InternalUINode): LayoutNode {
+    const stringRecord = new StringRecord(node.internalKey, node.tag, node.p);
+    const layoutNode = new StringLayoutNode(stringRecord);
+    (node.parentUI.layoutNode as StringLayoutNode).stringRecord.children.put(
+      stringRecord,
+    );
+    return layoutNode;
+  }
+}
 
-    if (isNone(stringPreviousLayoutCursor)) {
-    }
+class StringLayoutNode extends LayoutNode {
+  constructor(public stringRecord: StringRecord) {
+    super();
   }
 }
 
 class StringRecord {
-  tag: string;
-  params: Maybe<{ [key: string]: string }>;
-  depth: number;
+  children: IndexedMap<StringRecord, "key"> = new IndexedMap("key");
 
   constructor(
-    tag: string,
-    params: Maybe<{ [key: string]: string }>,
-    depth: number,
-  ) {
-    this.tag = tag;
-    this.params = params;
-    this.depth = depth;
-  }
-
-  toString(): string {
-    return `${Array.from({ length: this.depth })
-      .map((_) => " ")
-      .join(
-        "",
-      )}${this.tag}: ${isJust(this.params) ? JSON.stringify(this.params) : "<empty>"}`;
-  }
-}
-
-export class StringLayoutCursor extends LayoutCursor {
-  path: Array<number>;
+    public key: Key,
+    public tag: string,
+    public params: Maybe<{ [key: string]: string }>,
+  ) {}
 }
