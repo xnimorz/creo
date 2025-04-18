@@ -155,6 +155,22 @@ export class IndexedMap<T extends object, K extends keyof T>
     return true;
   }
 
+  at(n: number): Maybe<T> {
+    let current: Maybe<LinkNode<T, K>>;
+    if (n >= 0) {
+      current = this.head;
+      for (let i = 0; i < n && current != null; i++) {
+        current = current.next;
+      }
+    } else {
+      current = this.tail;
+      for (let i = n; i < -1 && current != null; i++) {
+        current = current.prev;
+      }
+    }
+    return current?.value;
+  }
+
   get(key: T[K]): Maybe<T> {
     return this.map.get(key)?.value;
   }
@@ -169,13 +185,13 @@ export class IndexedMap<T extends object, K extends keyof T>
   }
 
   // Get next item in insertion order
-  getNext(key: T[K]): T | undefined {
-    return this.map.get(key)?.next?.value;
+  getNext(item: T): Maybe<T> {
+    return this.map.get(item[this.pk])?.next?.value;
   }
 
   // Get previous item in insertion order
-  getPrev(key: T[K]): Maybe<T> {
-    return this.map.get(key)?.prev?.value;
+  getPrev(item: T): Maybe<T> {
+    return this.map.get(item[this.pk])?.prev?.value;
   }
 
   size(): number {

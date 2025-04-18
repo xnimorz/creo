@@ -1,4 +1,4 @@
-import { creo } from "../../creo";
+import { creo, ui } from "../../creo";
 
 export const Inline = creo<{
   // TODO replace with nice UI params
@@ -6,7 +6,7 @@ export const Inline = creo<{
 }>((c) => {
   return {
     render() {
-      c.e("span", c.p, c.slot);
+      ui("span", c.p, c.slot);
     },
   };
 });

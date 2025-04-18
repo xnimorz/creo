@@ -4,33 +4,24 @@ import {
   record,
   RecordOf,
 } from "../data-structures/record/Record";
-import { InternalComponent } from "./InternalComponent";
+import { InternalNode } from "./Node";
 
 export class CreoContext<P> implements Context<P> {
   private subscribers: Array<() => void> = [];
-  private ic: InternalComponent;
+  private node: InternalNode;
   tracked = <T extends {}>(t: T): RecordOf<T> => {
     const rec = record(t);
-    this.subscribers.push(onDidUpdate(rec, () => this.ic.setDirty(true)));
+    this.subscribers.push(onDidUpdate(rec, () => this.node.invalidate()));
     return rec;
   };
   p: P;
   slot: Maybe<() => void>;
 
-  constructor(
-    ic: InternalComponent,
-    initialParams: P,
-    slot: Maybe<() => void>,
-  ) {
-    this.ic = ic;
+  constructor(node: InternalNode, initialParams: P, slot: Maybe<() => void>) {
+    this.node = node;
     this.p = initialParams;
     this.slot = slot;
   }
-
-  newParams(p: P) {
-    this.p = p;
-  }
-
   dispose() {
     this.subscribers.forEach((unsubscribe) => unsubscribe());
   }

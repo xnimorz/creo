@@ -11,48 +11,32 @@
  * [ ] Layout engines should work with CreoTree
  */
 
-import { creoNode } from "../creo";
-import { assertJust } from "../data-structures/assert/assert";
-import {
-  LinkedHashMap,
-  LinkedMap,
-} from "../data-structures/linked-hash-map/LinkedHashMap";
+import { IndexedMap } from "../data-structures/indexed-map/IndexedMap";
 import { List } from "../data-structures/list/List";
-import { isJust, Maybe } from "../data-structures/maybe/Maybe";
+import { Maybe } from "../data-structures/maybe/Maybe";
 import { Context } from "./Context";
-import { InternalComponent } from "./InternalComponent";
-import { Key } from "./Key";
-import { Node } from "./Node";
+import { InternalNode, InternalUINode } from "./Node";
 
 export abstract class LayoutEngine {
   // Queue of currently rendering items
-  renderingQueue: List<InternalComponent> = List();
+  renderingQueue: List<InternalNode> = List();
 
-  dirtyComponents: LinkedHashMap<Key, InternalComponent> = LinkedMap();
-  setDirtyComponent(component: InternalComponent, isDirty: boolean) {
-    if (isDirty) {
-      if (!this.dirtyComponents.get(component.key)) {
-        this.dirtyComponents.addToEnd(component.key, component);
-      }
-    } else {
-      this.dirtyComponents.delete(component.key);
-    }
-  }
-  isComponentDirty(component: InternalComponent) {
-    return isJust(this.dirtyComponents.get(component.key));
-  }
+  registy: IndexedMap<InternalNode, "internalKey"> = new IndexedMap(
+    "internalKey",
+    ["userKey", "status"],
+  );
 
-  peekComponentRender(): Maybe<InternalComponent> {
+  getCurrentlyRenderingNode(): Maybe<InternalNode> {
     return this.renderingQueue.at(-1)?.value;
   }
 
-  startComponentRender(component: InternalComponent) {
-    this.renderingQueue.addToEnd(component);
+  willRender(node: InternalNode) {
+    this.renderingQueue.addToEnd(node);
   }
 
-  endComponentRender(component: InternalComponent) {
-    const maybeComponent = this.renderingQueue.at(-1)?.node;
-    if (maybeComponent !== component) {
+  didRender(node: InternalNode) {
+    const maybeNode = this.renderingQueue.at(-1)?.node;
+    if (maybeNode !== node) {
       throw new Error(
         "Cannot close component rendering due to component mismatch",
       );
@@ -60,13 +44,7 @@ export abstract class LayoutEngine {
     this.renderingQueue.delete(-1);
   }
 
-  abstract node(ic: InternalComponent): Node;
+  abstract renderNode(ic: InternalUINode): LayoutNode;
 }
 
-export const nodeCtor = <P>(c: Context<P>) => ({
-  render() {
-    c.slot?.();
-  },
-});
-
-export const n = creoNode(nodeCtor);
+export abstract class LayoutNode {}

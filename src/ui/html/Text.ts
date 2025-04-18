@@ -1,10 +1,9 @@
-import { creo } from "../../creo";
-import { n } from "../../engine/LayoutEngine";
+import { creo, ui } from "../../creo";
 
 export const Text = creo<string>((c) => {
   return {
     render() {
-      n("text", c.p);
+      ui("text", c.p);
     },
   };
 });
