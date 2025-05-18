@@ -46,7 +46,11 @@ export abstract class LayoutEngine {
   // Add params to support data insertion in middle
   abstract renderNode(node: InternalUINode): LayoutNode;
 
-  abstract render(renderFn: () => void): unknown;
+  abstract render(renderFn: () => void, root: unknown): unknown;
 }
 
-export abstract class LayoutNode {}
+export abstract class LayoutNode {
+  public abstract node: InternalUINode;
+  abstract render(): void;
+  abstract dispose(): void;
+}

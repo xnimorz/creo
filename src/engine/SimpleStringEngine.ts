@@ -24,7 +24,7 @@ export class SimpleStringEngine extends LayoutEngine {
     return layoutNode;
   }
 
-  render(renderFn: () => void): string {
+  render(renderFn: () => void, _root: unknown): string {
     setActiveLayoutEngine(this);
     const rootNode = new InternalUINode(
       "root",

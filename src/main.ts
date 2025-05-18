@@ -6,7 +6,7 @@ const engine = new SimpleStringEngine();
 console.log(
   engine.render(() => {
     SimpleTodoList({ text: "Hello world" });
-  }),
+  }, null),
 );
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
