@@ -2,6 +2,7 @@ import { Maybe } from "../maybe/Maybe";
 
 type LinkNode<T, K> = {
   value: T;
+  cachedIndexValues: Map<keyof T, T[keyof T]>;
   prev: Maybe<LinkNode<T, K>>;
   next: Maybe<LinkNode<T, K>>;
 };
@@ -32,7 +33,12 @@ export class IndexedMap<T extends object, K extends keyof T>
     // Delete previous, if any
     this.delete(key);
 
-    const node: LinkNode<T, K> = { value: item, prev: this.tail, next: null };
+    const node: LinkNode<T, K> = {
+      value: item,
+      cachedIndexValues: new Map(),
+      prev: this.tail,
+      next: null,
+    };
     if (!this.head) {
       this.head = node;
     }
@@ -60,6 +66,7 @@ export class IndexedMap<T extends object, K extends keyof T>
 
     const node: LinkNode<T, K> = {
       value: item,
+      cachedIndexValues: new Map(),
       prev: target.prev,
       next: target,
     };
@@ -75,18 +82,35 @@ export class IndexedMap<T extends object, K extends keyof T>
     this.indexNewNode(node);
   }
 
-  updateIndex<K extends keyof T>(item: T, index: K, prevValue: T[K]) {
+  // TODO: need to make it in background, instead of making eng to call it manually
+  updateIndex(item: T) {
     const node = this.map.get(item[this.pk]);
     if (node == null) {
       return;
     }
-    this.indexes.get(index)?.get(prevValue)?.delete(node);
-    this.indexes.get(index)?.get(item[index])?.add(node);
+    for (const [field, map] of this.indexes) {
+      const newVal = node.value[field];
+      const oldVal = node.cachedIndexValues.get(field);
+      if (oldVal !== newVal) {
+        this.indexes
+          .get(field)
+          // We know for sure, it's okay to index on that value
+          ?.get(oldVal as T[keyof T])
+          ?.delete(node);
+        let set = this.indexes.get(field)?.get(newVal);
+        if (!set) {
+          set = new Set();
+          map.set(newVal, set);
+        }
+        set.add(node);
+      }
+    }
   }
 
   private indexNewNode(node: LinkNode<T, K>) {
     for (const [field, map] of this.indexes) {
       const val = node.value[field];
+      node.cachedIndexValues.set(field, val);
       let set = map.get(val);
       if (!set) {
         set = new Set();
@@ -108,6 +132,7 @@ export class IndexedMap<T extends object, K extends keyof T>
 
     const node: LinkNode<T, K> = {
       value: item,
+      cachedIndexValues: new Map(),
       prev: target,
       next: target.next,
     };

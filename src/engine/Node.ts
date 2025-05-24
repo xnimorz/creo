@@ -79,9 +79,10 @@ export class InternalNode {
     if (this.status !== NodeStatus.CLEAR) {
       return;
     }
+
     // TODO make updateIndex be observable
     this.status = NodeStatus.DIRTY;
-    this.layout.registy.updateIndex(this, "status", NodeStatus.CLEAR);
+    this.layout.registy.updateIndex(this);
   }
 
   moveNode() {
@@ -99,7 +100,7 @@ export class InternalNode {
     this.pendingChildrenState = new IndexedMap("internalKey", ["userKey"]);
     this.renderCursor = this.children.at(0);
     this.status = NodeStatus.UPDATING;
-    this.layout.registy.updateIndex(this, "status", NodeStatus.DIRTY);
+    this.layout.registy.updateIndex(this);
     this.layout.willRender(this);
   }
 
@@ -122,7 +123,7 @@ export class InternalNode {
       }
     }
     this.status = NodeStatus.CLEAR;
-    this.layout.registy.updateIndex(this, "status", NodeStatus.UPDATING);
+    this.layout.registy.updateIndex(this);
 
     this.layout.didRender(this);
   }
