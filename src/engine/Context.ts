@@ -11,7 +11,11 @@ export class CreoContext<P> implements Context<P> {
   private node: InternalNode;
   tracked = <T extends {}>(t: T): RecordOf<T> => {
     const rec = record(t);
-    this.subscribers.push(onDidUpdate(rec, () => this.node.invalidate()));
+    this.subscribers.push(
+      onDidUpdate(rec, () => {
+        this.node.invalidate();
+      }),
+    );
     return rec;
   };
   p: P;

@@ -1,30 +1,43 @@
-import { Maybe } from "../data-structures/maybe/Maybe";
 import { InternalUINode } from "./Node";
 import { LayoutEngine, LayoutNode } from "./LayoutEngine";
 import { IndexedMap } from "../data-structures/indexed-map/IndexedMap";
 import { Key } from "./Key";
 import { Wildcard } from "../data-structures/wildcard/wildcard";
 import { resetLayoutEngine, setActiveLayoutEngine } from "./GlobalContext";
+import { Maybe } from "../data-structures/maybe/Maybe";
 
 export class SimpleStringEngine extends LayoutEngine {
-  children: IndexedMap<StringRecord, "key"> = new IndexedMap("key");
+  children: IndexedMap<StringLayoutNode, "key"> = new IndexedMap("key");
+
+  state: string = "";
+  rootNode: Maybe<InternalUINode>;
 
   renderNode(node: InternalUINode): LayoutNode {
     if (node.tag === "root") {
-      const stringRecord = new StringRecord(node.internalKey, node.tag, node.p);
-      const layoutNode = new StringLayoutNode(stringRecord);
-      this.children.put(stringRecord);
+      const layoutNode = new StringLayoutNode(node);
+      this.children.put(layoutNode);
       return layoutNode;
     }
-    const stringRecord = new StringRecord(node.internalKey, node.tag, node.p);
-    const layoutNode = new StringLayoutNode(stringRecord);
-    (node.parentUI.layoutNode as StringLayoutNode).stringRecord.children.put(
-      stringRecord,
-    );
+    const layoutNode = new StringLayoutNode(node);
+    // (node.parentUI.layoutNode as StringLayoutNode).stringRecord.children.put(
+    //   stringRecord,
+    // );
     return layoutNode;
   }
 
-  render(renderFn: () => void, _root: unknown): string {
+  renderResult(): string {
+    return this.state;
+  }
+  forceRerender(): void {
+    if (!this.rootNode) {
+      return;
+    }
+    setActiveLayoutEngine(this);
+    console.log("forcererender");
+    this.rootNode.render();
+    resetLayoutEngine();
+  }
+  render(renderFn: () => void): void {
     setActiveLayoutEngine(this);
     const rootNode = new InternalUINode(
       "root",
@@ -47,42 +60,40 @@ export class SimpleStringEngine extends LayoutEngine {
       "root",
     );
     rootNode.render();
+    this.rootNode = rootNode;
     const result = [];
     for (const stringRecord of this.children) {
       result.push(stringRecord.render());
     }
     resetLayoutEngine();
-    return JSON.stringify(result, null, "  ");
+    this.state = JSON.stringify(result, null, "  ");
   }
 }
 
 type RenderResult = { tag: string; params: Wildcard; children: RenderResult[] };
 
 class StringLayoutNode extends LayoutNode {
-  constructor(public stringRecord: StringRecord) {
+  public key: Key;
+  constructor(public node: InternalUINode) {
     super();
+    this.key = this.node.internalKey;
   }
-}
-
-class StringRecord {
-  children: IndexedMap<StringRecord, "key"> = new IndexedMap("key");
-
-  constructor(
-    public key: Key,
-    public tag: string,
-    public params: Maybe<{ [key: string]: string }>,
-  ) {}
-
   render(): RenderResult {
     const record: RenderResult = {
-      tag: this.tag,
-      params: this.params,
+      tag: this.node.tag,
+      params: this.node.p,
       children: [],
     };
-    for (const stringRecord of this.children) {
-      record.children.push(stringRecord.render());
+    for (const node of this.node.uiChildren) {
+      if (node.layoutNode) {
+        record.children.push((node.layoutNode as StringLayoutNode).render());
+      }
     }
 
     return record;
+  }
+
+  dispose() {
+    throw new Error("not supported");
   }
 }

@@ -1,32 +1,42 @@
-import { InternalNode, InternalUINode } from "./Node";
+import { InternalUINode } from "./Node";
 import { LayoutEngine, LayoutNode } from "./LayoutEngine";
-import { Wildcard } from "../data-structures/wildcard/wildcard";
 import { resetLayoutEngine, setActiveLayoutEngine } from "./GlobalContext";
 import { Maybe } from "../data-structures/maybe/Maybe";
 
 export class HtmlEngine extends LayoutEngine {
-  public root: HTMLElement;
+  rootNode: Maybe<InternalUINode>;
+  constructor(public root: HTMLElement) {
+    super();
+  }
   renderNode(node: InternalUINode): LayoutNode {
     if (node.layoutNode == null) {
+      let layoutNode;
       if (node.tag === "creo") {
-        const layoutNode = new RootHtmlNode(this.root);
-        return layoutNode;
+        layoutNode = new RootHtmlNode(node, this.root);
+      } else {
+        layoutNode = new HtmlNode(node);
       }
-      const layoutNode = new HtmlNode(node);
-      return layoutNode;
+      node.layoutNode = layoutNode;
     }
-    // re-use & re-render
-    this.renderLayoutNode(node, layoutNode) {
-      LayoutNode.re
-    }
+    node.layoutNode.render();
+    return node.layoutNode;
   }
 
-  renderLayoutNode(node: InternalUINode, layoutNode: HtmlNode) {
-
+  forceRerender() {
+    if (this.rootNode != null) {
+      setActiveLayoutEngine(this);
+      console.log("forcererender");
+      this.rootNode.render();
+      resetLayoutEngine();
+      return;
+    }
   }
-
-  render(renderFn: () => void, htmlNode: HTMLElement): void {
-    this.root = htmlNode;
+  render(renderFn: () => void): void {
+    // Force re-render
+    if (this.rootNode != null) {
+      return this.forceRerender();
+    }
+    // New node
     setActiveLayoutEngine(this);
     const rootNode = new InternalUINode(
       "creo",
@@ -46,10 +56,12 @@ export class HtmlEngine extends LayoutEngine {
         },
       },
       null,
-      "root",
+      "creo",
     );
     rootNode.render();
+    this.rootNode = rootNode;
     resetLayoutEngine();
+    console.log(rootNode);
   }
 }
 
@@ -68,19 +80,42 @@ class HtmlNode extends LayoutNode {
 
   render() {
     if (!this.isMounted) {
-      (this.node.parentUI?.layoutNode as HtmlNode)?.element?.appendChild(this.element)
+      (this.node.parentUI?.layoutNode as HtmlNode)?.element?.appendChild(
+        this.element,
+      );
       this.isMounted = true;
     }
 
+    const params = this.node.p;
+    const element = this.element;
+    if (element instanceof Text && typeof params === "string") {
+      element.textContent = params;
+    }
+    if (element instanceof HTMLElement && typeof params === "object") {
+      for (const key in params) {
+        if (element.getAttribute(key) !== params[key]) {
+          element.setAttribute(key, params[key]);
+        }
+      }
+    }
+    __DEV__ && element?.setAttribute?.("creo-debug", this.node.internalKey);
+  }
+
+  dispose() {
+    this.element.parentNode?.removeChild(this.element);
+    // TODO delete event listeners if any
   }
 }
 
 class RootHtmlNode extends LayoutNode {
-  constructor(public element: HTMLElement) {
+  constructor(
+    public node: InternalUINode,
+    public element: HTMLElement,
+  ) {
     super();
   }
 
-  render() {
+  render() {}
 
-  }
+  dispose() {}
 }

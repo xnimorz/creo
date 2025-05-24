@@ -7,18 +7,32 @@ import { _ } from "../../data-structures/null/null";
 
 type Todo = { text: string };
 
-export const SimpleTodoList = creo<{ text: string }>((c) => {
-  const todos: Array<Todo> = c.tracked([]);
+export const SimpleTodoList = creo<{ text: string; todos: Array<Todo> }>(
+  (c) => {
+    const todos: Array<Todo> = c.tracked(c.p.todos);
+    return {
+      render() {
+        Inline(_, () => {
+          Text(c.p.text);
+        });
+        Block(_, () => {
+          Text("Hello inside container");
+          VStack(_, () => {
+            TodoList({ todos });
+          });
+        });
+      },
+    };
+  },
+);
 
+export const TodoList = creo<{ todos: Array<Todo> }>((c) => {
+  const todos: Array<Todo> = c.tracked(c.p.todos);
   return {
     render() {
-      Inline(_, () => {
-        Text(c.p.text);
-      });
-      Block(_, () => {
-        Text("Hello inside container");
-        VStack(_, () => {
-          todos.map((todo) => Text(`Entity: ${todo.text}`));
+      todos.map((todo) => {
+        Block({ class: "todo" }, () => {
+          Text(`Entity: ${todo.text}`);
         });
       });
     },

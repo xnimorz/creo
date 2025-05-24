@@ -1,22 +1,32 @@
+import { record } from "./data-structures/record/Record";
+import { HtmlEngine } from "./engine/HtmlEngine";
 import { SimpleStringEngine } from "./engine/SimpleStringEngine";
 import { SimpleTodoList } from "./examples/SimpleTodoList/SimpleTodoList";
 import "./style.css";
 
-const engine = new SimpleStringEngine();
-console.log(
-  engine.render(() => {
-    SimpleTodoList({ text: "Hello world" });
-  }, null),
-);
+// const stringEngine = new SimpleStringEngine();
+// stringEngine.render(() => {
+//   SimpleTodoList({ text: "Hello world" });
+// });
+// console.log(stringEngine.renderResult());
 
-document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
-  <div>
-    <h1>Vite + TypeScript</h1>
-    <div class="card">
-      <button id="counter" type="button"></button>
-    </div>
-    <p class="read-the-docs">
-      Click on the Vite and TypeScript logos to learn more
-    </p>
-  </div>
-`;
+const htmlEngine = new HtmlEngine(
+  document.querySelector("#app") as HTMLElement,
+);
+const todoList = record([
+  { text: "First" },
+  { text: "Second" },
+  { text: "Third" },
+]);
+htmlEngine.render(() => {
+  SimpleTodoList({
+    text: "Hello world",
+    todos: todoList,
+  });
+});
+
+todoList.push({ text: "New item" });
+queueMicrotask(() => {
+  htmlEngine.forceRerender();
+  htmlEngine.debugStatus();
+});

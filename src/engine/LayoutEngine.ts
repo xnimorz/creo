@@ -25,6 +25,10 @@ export abstract class LayoutEngine {
     ["userKey", "status"],
   );
 
+  debugStatus() {
+    console.log(this.registy);
+  }
+
   getCurrentlyRenderingNode(): Maybe<InternalNode> {
     return this.renderingQueue.at(-1)?.value;
   }
@@ -46,11 +50,12 @@ export abstract class LayoutEngine {
   // Add params to support data insertion in middle
   abstract renderNode(node: InternalUINode): LayoutNode;
 
-  abstract render(renderFn: () => void, root: unknown): unknown;
+  abstract render(renderFn: () => void): void;
+  abstract forceRerender(): void;
 }
 
 export abstract class LayoutNode {
   public abstract node: InternalUINode;
-  abstract render(): void;
+  abstract render(): unknown;
   abstract dispose(): void;
 }

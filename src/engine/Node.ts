@@ -67,7 +67,7 @@ export class InternalNode {
     this.c = new CreoContext(this, p, slot);
     this.layout = parent.layout;
     this.parentIndex = parent.pendingChildrenState.size();
-    this.depth = parent.depth + 1;
+    this.depth = (parent.depth ?? 0) + 1;
     this.layout.registy.put(this);
     const { extension, ...lifecycle } = this.ctor(this.c);
     this.lifecycle = lifecycle;
@@ -79,6 +79,7 @@ export class InternalNode {
     if (this.status !== NodeStatus.CLEAR) {
       return;
     }
+    // TODO make updateIndex be observable
     this.status = NodeStatus.DIRTY;
     this.layout.registy.updateIndex(this, "status", NodeStatus.CLEAR);
   }
@@ -111,6 +112,7 @@ export class InternalNode {
     }
     // At the end of the cycle, we replace children with pending children (this.renderingChildren)
     this.children = this.pendingChildrenState;
+    this.pendingChildrenState = new IndexedMap("internalKey", ["userKey"]);
 
     // Before completing the render of parent, we want to ensure children are updated
     // TODO child should be rendered immediately, not later
@@ -119,12 +121,15 @@ export class InternalNode {
         node.render();
       }
     }
+    this.status = NodeStatus.CLEAR;
+    this.layout.registy.updateIndex(this, "status", NodeStatus.UPDATING);
 
     this.layout.didRender(this);
   }
 
   render() {
     this.willRender();
+    __DEV__ && console.log("re-render:", this.internalKey);
     this.lifecycle.render();
     this.didRender();
   }
@@ -346,6 +351,10 @@ export class InternalUINode extends InternalNode {
     public tag: string,
   ) {
     super(userKey, internalKey, p, slot, ctor, parent, parentUI);
+    // Root element does not have parentUI
+    if (this.parentUI) {
+      this.parentUI.uiChildren.put(this);
+    }
   }
 
   protected createNewNode(
@@ -386,9 +395,15 @@ export class InternalUINode extends InternalNode {
 
   render() {
     this.willRender();
+    __DEV__ && console.log("UI re-render:", this.internalKey);
     this.layoutNode = this.layout.renderNode(this);
     this.lifecycle.render();
     this.didRender();
+  }
+
+  dispose(): void {
+    super.dispose();
+    this.layoutNode?.dispose();
   }
 }
 
