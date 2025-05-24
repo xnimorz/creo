@@ -58,10 +58,16 @@ export class HtmlEngine extends LayoutEngine {
       null,
       "creo",
     );
-    rootNode.render();
     this.rootNode = rootNode;
+    this.rerender();
     resetLayoutEngine();
-    console.log(rootNode);
+  }
+
+  scheduleRerender() {
+    this.isRerenderingScheduled = true;
+    globalThis.requestAnimationFrame(() => {
+      this.rerender();
+    });
   }
 }
 
@@ -98,7 +104,11 @@ class HtmlNode extends LayoutNode {
         }
       }
     }
-    __DEV__ && element?.setAttribute?.("creo-debug", this.node.internalKey);
+    __DEV__ &&
+      (element as HTMLElement)?.setAttribute?.(
+        "creo-debug",
+        this.node.internalKey as string,
+      );
   }
 
   dispose() {

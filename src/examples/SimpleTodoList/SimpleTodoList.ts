@@ -4,6 +4,7 @@ import { Inline } from "../../ui/html/Inline";
 import { Text } from "../../ui/html/Text";
 import { VStack } from "../../ui/html/VStack";
 import { _ } from "../../data-structures/null/null";
+import { Button } from "../../ui/html/Button";
 
 type Todo = { text: string };
 
@@ -12,6 +13,7 @@ export const SimpleTodoList = creo<{ text: string; todos: Array<Todo> }>(
     const todos: Array<Todo> = c.tracked(c.p.todos);
     return {
       render() {
+        console.log("rendering todo list");
         Inline(_, () => {
           Text(c.p.text);
         });
@@ -21,6 +23,7 @@ export const SimpleTodoList = creo<{ text: string; todos: Array<Todo> }>(
             TodoList({ todos });
           });
         });
+        Button(_, () => Text("Add todo"));
       },
     };
   },
@@ -30,6 +33,7 @@ export const TodoList = creo<{ todos: Array<Todo> }>((c) => {
   const todos: Array<Todo> = c.tracked(c.p.todos);
   return {
     render() {
+      console.log("rendering todos");
       todos.map((todo) => {
         Block({ class: "todo" }, () => {
           Text(`Entity: ${todo.text}`);

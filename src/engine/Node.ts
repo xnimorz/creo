@@ -76,6 +76,7 @@ export class InternalNode {
 
   // sets status to dirty for the node
   invalidate() {
+    console.log("status", this.internalKey, this.status);
     if (this.status !== NodeStatus.CLEAR) {
       return;
     }
@@ -114,14 +115,6 @@ export class InternalNode {
     // At the end of the cycle, we replace children with pending children (this.renderingChildren)
     this.children = this.pendingChildrenState;
     this.pendingChildrenState = new IndexedMap("internalKey", ["userKey"]);
-
-    // Before completing the render of parent, we want to ensure children are updated
-    // TODO child should be rendered immediately, not later
-    for (const node of this.children) {
-      if (node.status === NodeStatus.DIRTY) {
-        node.render();
-      }
-    }
     this.status = NodeStatus.CLEAR;
     this.layout.registy.updateIndex(this);
 

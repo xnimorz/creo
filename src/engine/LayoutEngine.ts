@@ -14,16 +14,26 @@
 import { IndexedMap } from "../data-structures/indexed-map/IndexedMap";
 import { List } from "../data-structures/list/List";
 import { Maybe } from "../data-structures/maybe/Maybe";
-import { InternalNode, InternalUINode } from "./Node";
+import { resetLayoutEngine, setActiveLayoutEngine } from "./GlobalContext";
+import { InternalNode, InternalUINode, NodeStatus } from "./Node";
 
 export abstract class LayoutEngine {
+  protected isRerenderingScheduled = true;
   // Queue of currently rendering items
   renderingQueue: List<InternalNode> = List();
 
   registy: IndexedMap<InternalNode, "internalKey"> = new IndexedMap(
     "internalKey",
-    ["userKey", "status"],
+    ["status"],
   );
+
+  constructor() {
+    this.registy.subscribeToIndexChange("status", (value) => {
+      if (value === NodeStatus.DIRTY && this.isRerenderingScheduled === false) {
+        this.scheduleRerender();
+      }
+    });
+  }
 
   debugStatus() {
     console.log(this.registy);
@@ -45,6 +55,7 @@ export abstract class LayoutEngine {
       );
     }
     this.renderingQueue.delete(-1);
+    this.renderNextPending();
   }
 
   // Add params to support data insertion in middle
@@ -52,6 +63,22 @@ export abstract class LayoutEngine {
 
   abstract render(renderFn: () => void): void;
   abstract forceRerender(): void;
+  abstract scheduleRerender(): void;
+
+  protected renderNextPending() {
+    const next = this.registy.getByIndex("status", NodeStatus.DIRTY)[0];
+    if (next != null) {
+      next.render();
+    }
+  }
+
+  rerender() {
+    setActiveLayoutEngine(this);
+    console.log("rerender");
+    this.renderNextPending();
+    resetLayoutEngine();
+    this.isRerenderingScheduled = false;
+  }
 }
 
 export abstract class LayoutNode {

@@ -13,6 +13,7 @@ export class CreoContext<P> implements Context<P> {
     const rec = record(t);
     this.subscribers.push(
       onDidUpdate(rec, () => {
+        console.log("invalidate", this.node.internalKey);
         this.node.invalidate();
       }),
     );

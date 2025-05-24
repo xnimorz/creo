@@ -4,20 +4,23 @@ import { SimpleStringEngine } from "./engine/SimpleStringEngine";
 import { SimpleTodoList } from "./examples/SimpleTodoList/SimpleTodoList";
 import "./style.css";
 
+const todoList = record([
+  { text: "First" },
+  { text: "Second" },
+  { text: "Third" },
+]);
 // const stringEngine = new SimpleStringEngine();
 // stringEngine.render(() => {
-//   SimpleTodoList({ text: "Hello world" });
+//   SimpleTodoList({
+//     text: "Hello world",
+//     todos: todoList,
+//   });
 // });
 // console.log(stringEngine.renderResult());
 
 const htmlEngine = new HtmlEngine(
   document.querySelector("#app") as HTMLElement,
 );
-const todoList = record([
-  { text: "First" },
-  { text: "Second" },
-  { text: "Third" },
-]);
 htmlEngine.render(() => {
   SimpleTodoList({
     text: "Hello world",
@@ -26,7 +29,4 @@ htmlEngine.render(() => {
 });
 
 todoList.push({ text: "New item" });
-queueMicrotask(() => {
-  htmlEngine.forceRerender();
-  htmlEngine.debugStatus();
-});
+todoList[2].text = "123";

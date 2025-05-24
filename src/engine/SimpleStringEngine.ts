@@ -19,12 +19,12 @@ export class SimpleStringEngine extends LayoutEngine {
       return layoutNode;
     }
     const layoutNode = new StringLayoutNode(node);
-    // (node.parentUI.layoutNode as StringLayoutNode).stringRecord.children.put(
-    //   stringRecord,
-    // );
     return layoutNode;
   }
 
+  scheduleRerender() {
+    this.rerender();
+  }
   renderResult(): string {
     return this.state;
   }

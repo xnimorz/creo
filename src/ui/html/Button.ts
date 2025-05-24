@@ -5,6 +5,7 @@ export const Button = creo<{
   [key: string]: string;
 }>((c) => ({
   render() {
-    ui("button", c.p, c.slot);
+    const value = ui("button", c.p, c.slot);
+    console.log(value);
   },
 }));

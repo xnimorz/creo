@@ -7,6 +7,9 @@ type LinkNode<T, K> = {
   next: Maybe<LinkNode<T, K>>;
 };
 
+// Notifies when item gets added to a particular index
+type IndexAddedSubscriber<T> = (val: T[keyof T]) => void;
+
 export class IndexedMap<T extends object, K extends keyof T>
   implements Iterable<T>
 {
@@ -16,6 +19,8 @@ export class IndexedMap<T extends object, K extends keyof T>
   private pk: K;
   private map = new Map<T[K], LinkNode<T, K>>();
   private indexes: Map<keyof T, Map<T[keyof T], Set<LinkNode<T, K>>>> =
+    new Map();
+  private indexAddedSubscribers: Map<keyof T, Set<IndexAddedSubscriber<T>>> =
     new Map();
 
   constructor(pk: K, indexFields: Array<keyof T> = []) {
@@ -92,17 +97,20 @@ export class IndexedMap<T extends object, K extends keyof T>
       const newVal = node.value[field];
       const oldVal = node.cachedIndexValues.get(field);
       if (oldVal !== newVal) {
-        this.indexes
+        const oldSet = this.indexes
           .get(field)
           // We know for sure, it's okay to index on that value
-          ?.get(oldVal as T[keyof T])
-          ?.delete(node);
+          ?.get(oldVal as T[keyof T]);
+
+        oldSet?.delete(node);
         let set = this.indexes.get(field)?.get(newVal);
         if (!set) {
           set = new Set();
           map.set(newVal, set);
         }
         set.add(node);
+        node.cachedIndexValues.set(field, newVal);
+        this.notifySubscribers(field, newVal);
       }
     }
   }
@@ -117,7 +125,41 @@ export class IndexedMap<T extends object, K extends keyof T>
         map.set(val, set);
       }
       set.add(node);
+      this.notifySubscribers(field, val);
     }
+  }
+
+  private notifySubscribers(field: keyof T, val: T[keyof T] | undefined) {
+    if (val === undefined) {
+      return;
+    }
+    const listeners = this.indexAddedSubscribers.get(field);
+    if (!listeners) {
+      return;
+    }
+    for (const listener of listeners) {
+      listener(val);
+    }
+  }
+
+  subscribeToIndexChange(
+    field: keyof T,
+    listener: IndexAddedSubscriber<T>,
+  ): () => void {
+    if (!this.indexes.has(field)) {
+      throw new Error(
+        `Cannot subscribe to non-indexed field "${String(field)}"`,
+      );
+    }
+    let listeners = this.indexAddedSubscribers.get(field);
+    if (!listeners) {
+      listeners = new Set();
+      this.indexAddedSubscribers.set(field, listeners);
+    }
+    listeners.add(listener);
+    return () => {
+      listeners.delete(listener);
+    };
   }
 
   putAfter(targetKey: T[K], item: T): void {
