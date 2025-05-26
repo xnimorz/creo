@@ -55,6 +55,8 @@ export class InternalNode {
   public renderCursor: Maybe<InternalNode>;
 
   public lifecycle: NodeMethods<Wildcard, Wildcard>;
+
+  public isMounted = false;
   constructor(
     public userKey: Maybe<Key>,
     public internalKey: Key,
@@ -71,7 +73,7 @@ export class InternalNode {
     this.layout.registy.put(this);
     const { extension, ...lifecycle } = this.ctor(this.c);
     this.lifecycle = lifecycle;
-    this.publicNode = new Node(extension);
+    this.publicNode = new Node(extension, this);
   }
 
   // sets status to dirty for the node
@@ -126,9 +128,15 @@ export class InternalNode {
     __DEV__ && console.log("re-render:", this.internalKey);
     this.lifecycle.render();
     this.didRender();
+    if (!this.isMounted) {
+      this.didMount();
+    } else {
+      this.didUpdate();
+    }
   }
 
   didMount(): void {
+    this.isMounted = true;
     this.lifecycle.didMount?.();
   }
 
@@ -393,6 +401,11 @@ export class InternalUINode extends InternalNode {
     this.layoutNode = this.layout.renderNode(this);
     this.lifecycle.render();
     this.didRender();
+    if (!this.isMounted) {
+      this.didMount();
+    } else {
+      this.didUpdate();
+    }
   }
 
   dispose(): void {
@@ -402,5 +415,23 @@ export class InternalUINode extends InternalNode {
 }
 
 export class Node<A> {
-  constructor(public extension: A extends void ? undefined : A) {}
+  protected internalNode: InternalNode;
+  constructor(
+    public extension: A extends void ? undefined : A,
+    internalNode: InternalNode,
+  ) {
+    this.internalNode = internalNode;
+  }
+  /**
+   *
+   * Method passess native UI Node, which would break re-usability of the application with different engines
+   * Can be used to ensure some specific low-level cases
+   *
+   * @returns
+   */
+  getUINode(): unknown {
+    if (this.internalNode instanceof InternalUINode) {
+      return this.internalNode.layoutNode?.element;
+    }
+  }
 }

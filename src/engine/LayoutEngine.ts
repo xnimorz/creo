@@ -83,6 +83,7 @@ export abstract class LayoutEngine {
 
 export abstract class LayoutNode {
   public abstract node: InternalUINode;
+  public element: unknown;
   abstract render(): unknown;
   abstract dispose(): void;
 }
