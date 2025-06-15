@@ -18,4 +18,7 @@ engine.render(() => {
 });
 
 todoList.push({ text: "New item" });
-todoList[2].text = "123";
+
+setTimeout(() => {
+  todoList[2].text = "123";
+}, 1000);

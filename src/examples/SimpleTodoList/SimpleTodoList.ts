@@ -1,20 +1,20 @@
-import { creo } from "../../creo";
-import { Block } from "../../ui/html/Block";
-import { Inline } from "../../ui/html/Inline";
-import { Text } from "../../ui/html/Text";
-import { VStack } from "../../ui/html/VStack";
+import { Block, Button, creo, Inline, Text } from "../../creo";
+import { Maybe } from "../../data-structures/maybe/Maybe";
 import { _ } from "../../data-structures/null/null";
-import { Button } from "../../ui/html/Button";
 
 type Todo = { text: string };
 
-let counter = 0;
 export const SimpleTodoList = creo<{ text: string; todos: Array<Todo> }>(
   (c) => {
     const todos: Array<Todo> = c.tracked(c.p.todos);
+    let button: () => Maybe<HTMLElement>;
     return {
       didMount() {
         console.warn("did mount");
+        console.log(button());
+        button()?.addEventListener("click", () => {
+          todos.push({ text: `Task #${todos.length}` });
+        });
         // button?.extension.getButton().addEventListener("click", () => {
         //   todos.push({ text: `New Todo: ${counter++}` });
         // });
@@ -26,11 +26,11 @@ export const SimpleTodoList = creo<{ text: string; todos: Array<Todo> }>(
         });
         Block(_, () => {
           Text("Hello inside container");
-          VStack(_, () => {
+          Block(_, () => {
             TodoList({ todos });
           });
         });
-        Button(_, () => Text("Add todo"));
+        button = Button(_, () => Text("Add todo"));
       },
     };
   },
@@ -42,7 +42,9 @@ export const TodoList = creo<{ todos: Array<Todo> }>((c) => {
     render() {
       console.log("rendering todos");
       todos.map((todo) => {
+        console.log(todo);
         Block({ class: "todo" }, () => {
+          console.log(`Entity: ${todo.text}`);
           Text(`Entity: ${todo.text}`);
         });
       });

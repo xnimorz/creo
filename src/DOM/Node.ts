@@ -9,8 +9,7 @@
 import { NodeBuilder, NodeMethods } from "../creo";
 import { assertJust } from "../data-structures/assert/assert";
 import { IndexedMap } from "../data-structures/indexed-map/IndexedMap";
-import { Maybe } from "../data-structures/maybe/Maybe";
-import { shallowEqual } from "../data-structures/shalllowEqual/shallowEqual";
+import { Maybe, None } from "../data-structures/maybe/Maybe";
 import { generateNextKey } from "../data-structures/simpleKey/simpleKey";
 import { Wildcard } from "../data-structures/wildcard/wildcard";
 import { Context } from "./Context";
@@ -41,7 +40,9 @@ type UpdateDirective = {
 };
 
 export class Node implements IRenderCycle {
-  public publicApi;
+  public publicApi: {
+    ext: Wildcard;
+  };
   public c: Context<Wildcard>;
 
   public children: IndexedMap<Node, "key"> = new IndexedMap("key");
@@ -53,7 +54,7 @@ export class Node implements IRenderCycle {
   constructor(
     public userKey: Maybe<Key>,
     public key: Key,
-    public p: Wildcard,
+    p: Wildcard,
     public slot: Maybe<() => void>,
     public ctor: NodeBuilder<Wildcard, Wildcard>,
     public parent: Node,
@@ -63,7 +64,9 @@ export class Node implements IRenderCycle {
     this.c = new Context(this, p, slot);
     const { ext, ...lifecycle } = this.ctor(this.c);
     this.lifecycle = lifecycle;
-    this.publicApi = ext; //new Node(extension, this);
+    this.publicApi = {
+      ext,
+    }; //new Node(extension, this);
     this.newNode(this);
   }
 
@@ -123,7 +126,7 @@ export class Node implements IRenderCycle {
     if (this.lifecycle.shouldUpdate != null) {
       return this.lifecycle.shouldUpdate(pendingParams);
     }
-    return !shallowEqual(this.c.p, pendingParams);
+    return true;
   }
 
   generateUpdateDirective(
@@ -200,13 +203,13 @@ export class Node implements IRenderCycle {
     };
   }
 
-  renderChild(
+  renderChild<Tag extends Maybe<string>>(
     userKey: Maybe<Key>,
     ctor: NodeBuilder<Wildcard, Wildcard>,
     params: Maybe<Wildcard>,
     slot: Maybe<() => void>,
-    tag: Maybe<string>,
-  ): Node {
+    tag: Tag,
+  ): Tag extends None ? Node : UINode {
     const directive = this.generateUpdateDirective(userKey, ctor, tag);
 
     let newNode: Node;
@@ -315,6 +318,7 @@ export class UINode extends Node {
   public pendingUIChildrenState!: IndexedMap<UINode, "key">;
   protected domNode: Maybe<HTMLElement>;
   protected domText: Maybe<Text>;
+  public publicNode: () => Maybe<HTMLElement | Text>;
   constructor(
     userKey: Maybe<Key>,
     internalKey: Key,
@@ -327,13 +331,11 @@ export class UINode extends Node {
     public tag: string,
   ) {
     super(userKey, internalKey, p, slot, ctor, parent, parentUI, engine);
+    this.publicNode = () => {
+      return (this.domNode ?? this.domText) as Maybe<HTMLElement | Text>;
+    };
     // Root element does not have parentUI
     this.parentUI?.appendUIChild(this);
-  }
-
-  // @ts-ignore
-  get publicApi() {
-    return this.domNode ?? this.domText;
   }
 
   appendUIChild(node: UINode) {
@@ -380,13 +382,16 @@ export class UINode extends Node {
   renderUI() {
     // rerender
     if (this.domText != null) {
-      const params = this.p;
-      if (typeof params === "string") {
-        this.domText.textContent = params;
+      const params = this.c.p;
+      if (typeof params === "string" && this.domText.textContent != params) {
+        const newItem = document.createTextNode(params);
+        this.parentUI.domNode?.replaceChild(newItem, this.domText);
+        this.domText = newItem;
       }
+      return;
     }
     if (this.domNode != null) {
-      const params = this.p;
+      const params = this.c.p;
       const element = this.domNode;
       if (typeof params === "object") {
         for (const key in params) {
@@ -395,14 +400,16 @@ export class UINode extends Node {
           }
         }
       }
+      return;
     }
     // mount
     if (this.tag === "text") {
-      this.domText = document.createTextNode(this.p);
+      this.domText = document.createTextNode(this.c.p);
       this.parentUI.domNode?.appendChild(this.domText);
+      return;
     } else {
       this.domNode = document.createElement(this.tag);
-      const params = this.p;
+      const params = this.c.p;
       const element = this.domNode;
       if (typeof params === "object") {
         for (const key in params) {

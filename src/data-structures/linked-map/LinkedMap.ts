@@ -20,6 +20,27 @@ export class LinkedMap<T extends object, K extends keyof T>
     this.pk = pk;
   }
 
+  putFirst(item: T): void {
+    const key = item[this.pk];
+    // Delete previous, if any
+    this.delete(key);
+
+    const node: LinkNode<T, K> = {
+      value: item,
+      cachedIndexValues: new Map(),
+      prev: this.tail,
+      next: null,
+    };
+    if (!this.tail) {
+      this.tail = node;
+    }
+    if (this.head) {
+      this.head.prev = node;
+    }
+    this.head = node;
+    this.map.set(key, node);
+    this.mapSize++;
+  }
   // Puts item to the end
   // Removes previous item, if PK is matched
   put(item: T): void {

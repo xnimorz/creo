@@ -4,11 +4,11 @@ import {
   record,
   RecordOf,
 } from "../data-structures/record/Record";
-import { InternalNode } from "./Node";
+import { Node } from "./Node";
 
 export class Context<P> {
   private subscribers: Array<() => void> = [];
-  private node: InternalNode;
+  private node: Node;
   tracked = <T extends {}>(t: T): RecordOf<T> => {
     const rec = record(t);
     this.subscribers.push(
@@ -21,7 +21,7 @@ export class Context<P> {
   p: P;
   slot: Maybe<() => void>;
 
-  constructor(node: InternalNode, initialParams: P, slot: Maybe<() => void>) {
+  constructor(node: Node, initialParams: P, slot: Maybe<() => void>) {
     this.node = node;
     this.p = initialParams;
     this.slot = slot;

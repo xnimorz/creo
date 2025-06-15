@@ -16,7 +16,7 @@ export class Registry implements IRenderCycle {
   }
 
   public willRender(node: Node) {
-    this.needRender.put(node);
+    this.needRender.putFirst(node);
     this.rendering.delete(node.key);
   }
 
@@ -44,7 +44,7 @@ export class Registry implements IRenderCycle {
   }
 
   public getNextToRender(): Maybe<Node> {
-    return this.needRender.at(-1);
+    return this.needRender.at(0);
   }
 
   public getNextRendering(): Maybe<Node> {
