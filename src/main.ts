@@ -1,24 +1,27 @@
 import { record } from "./data-structures/record/Record";
 import { DomEngine } from "./DOM/DomEngine";
-import { SimpleTodoList } from "./examples/SimpleTodoList/SimpleTodoList";
+// import { SimpleTodoList } from "./examples/SimpleTodoList/SimpleTodoList";
 import "./style.css";
+import "./examples/Benchmark/main";
 
-const todoList = record([
-  { text: "First" },
-  { text: "Second" },
-  { text: "Third" },
-]);
+// const todoList = record([
+//   { text: "First" },
+//   { text: "Second" },
+//   { text: "Third" },
+// ]);
 
-const engine = new DomEngine(document.querySelector("#app") as HTMLElement);
-engine.render(() => {
-  SimpleTodoList({
-    text: "Hello world",
-    todos: todoList,
-  });
-});
+// const engine = new DomEngine(document.querySelector("#app") as HTMLElement);
+// engine.render(() => {
+//   SimpleTodoList({
+//     text: "Hello world",
+//     todos: todoList,
+//   });
+// });
 
-todoList.push({ text: "New item" });
+// todoList.push({ text: "New item" });
 
-setTimeout(() => {
-  todoList[2].text = "123";
-}, 1000);
+// setTimeout(() => {
+//   todoList[2].text = "123";
+// }, 1000);
+
+// const engine = new DomEngine(document.querySelector("#app") as HTMLElement);

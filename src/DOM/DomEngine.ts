@@ -62,7 +62,6 @@ export class DomEngine implements IRenderCycle {
     if (this.root == null) {
       return;
     }
-    console.log("forcererender");
     this.willRender(this.root);
     this.rerender();
   }

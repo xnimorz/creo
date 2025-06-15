@@ -79,11 +79,12 @@ export class Node implements IRenderCycle {
     this.willRender();
   }
 
-  applyNewParams(newParams: Wildcard) {
+  applyNewParams(newParams: Wildcard, slot: Maybe<() => void>) {
     if (this.shouldUpdate(newParams)) {
       this.willRender();
     }
     this.c.p = newParams;
+    this.c.slot = slot;
   }
 
   willRender() {
@@ -110,7 +111,6 @@ export class Node implements IRenderCycle {
   }
 
   render() {
-    __DEV__ && console.log("Render:", this.key);
     this.isRendering();
     this.lifecycle.render();
     const { justMounted } = this.didRender();
@@ -226,7 +226,7 @@ export class Node implements IRenderCycle {
             : null;
         this.children.delete(newNode.key);
         // The component can decide on its own if the component needs to get updated
-        directive.node.applyNewParams(params);
+        directive.node.applyNewParams(params, slot);
         break;
       }
       case UpdateDirectiveEnum.MOVE: {
@@ -424,7 +424,6 @@ export class UINode extends Node {
 
   render() {
     this.isRendering();
-    __DEV__ && console.log("UI render:", this.tag, this.key);
     this.renderUI();
     //this.layoutNode = this.layout.renderNode(this);
     this.lifecycle.render();

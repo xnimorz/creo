@@ -1,6 +1,6 @@
 {
   "name": "creo",
-  "version": "0.0.3-dev",
+  "version": "0.0.4-dev",
   "type": "module",
   "scripts": {
     "dev": "vite",
