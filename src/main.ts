@@ -1,6 +1,5 @@
 import { record } from "./data-structures/record/Record";
-import { HtmlEngine } from "./engine/HtmlEngine";
-import { SimpleStringEngine } from "./engine/SimpleStringEngine";
+import { DomEngine } from "./DOM/DomEngine";
 import { SimpleTodoList } from "./examples/SimpleTodoList/SimpleTodoList";
 import "./style.css";
 
@@ -9,19 +8,9 @@ const todoList = record([
   { text: "Second" },
   { text: "Third" },
 ]);
-// const stringEngine = new SimpleStringEngine();
-// stringEngine.render(() => {
-//   SimpleTodoList({
-//     text: "Hello world",
-//     todos: todoList,
-//   });
-// });
-// console.log(stringEngine.renderResult());
 
-const htmlEngine = new HtmlEngine(
-  document.querySelector("#app") as HTMLElement,
-);
-htmlEngine.render(() => {
+const engine = new DomEngine(document.querySelector("#app") as HTMLElement);
+engine.render(() => {
   SimpleTodoList({
     text: "Hello world",
     todos: todoList,

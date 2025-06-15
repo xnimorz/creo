@@ -5,8 +5,6 @@ import { Text } from "../../ui/html/Text";
 import { VStack } from "../../ui/html/VStack";
 import { _ } from "../../data-structures/null/null";
 import { Button } from "../../ui/html/Button";
-import { Maybe } from "../../data-structures/maybe/Maybe";
-import { Node } from "../../engine/Node";
 
 type Todo = { text: string };
 
@@ -14,13 +12,12 @@ let counter = 0;
 export const SimpleTodoList = creo<{ text: string; todos: Array<Todo> }>(
   (c) => {
     const todos: Array<Todo> = c.tracked(c.p.todos);
-    let button: Maybe<Node<{ getButton: () => HTMLButtonElement }>>;
     return {
       didMount() {
         console.warn("did mount");
-        button?.extension.getButton().addEventListener("click", () => {
-          todos.push({ text: `New Todo: ${counter++}` });
-        });
+        // button?.extension.getButton().addEventListener("click", () => {
+        //   todos.push({ text: `New Todo: ${counter++}` });
+        // });
       },
       render() {
         console.log("rendering todo list");
@@ -33,7 +30,7 @@ export const SimpleTodoList = creo<{ text: string; todos: Array<Todo> }>(
             TodoList({ todos });
           });
         });
-        button = Button(_, () => Text("Add todo"));
+        Button(_, () => Text("Add todo"));
       },
     };
   },

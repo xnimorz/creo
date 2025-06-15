@@ -1,10 +1,8 @@
 import { assertJust } from "./data-structures/assert/assert";
 import { Maybe } from "./data-structures/maybe/Maybe";
-import { Context } from "./engine/Context";
-import { getActiveLayoutEngine } from "./engine/GlobalContext";
-import { Key } from "./engine/Key";
-import { LayoutEngine } from "./engine/LayoutEngine";
-import { Node } from "./engine/Node";
+import { Context } from "./DOM/Context";
+import { DomEngine, getActiveEngine } from "./DOM/DomEngine";
+import { Key } from "./DOM/Key";
 
 export type NodeMethods<P = void, A = void> = {
   render(): void;
@@ -13,26 +11,26 @@ export type NodeMethods<P = void, A = void> = {
   dispose?(): void;
   // Return true if the component should get updated with new params
   shouldUpdate?(pendingParams: P): boolean;
-  extension?: A extends void ? undefined : A;
+  ext?: A extends void ? undefined : A;
 };
 
 export type NodeBuilder<P = void, A = void> = (
   c: Context<P>,
 ) => NodeMethods<P, A>;
 
-type NodeBuilderFn<P = void, A = void> = (p?: P, slot?: () => void) => Node<A>;
+type NodeBuilderFn<P = void, A = void> = (p?: P, slot?: () => void) => A;
 
 export function creo<P = void, A = void>(
   ctor: NodeBuilder<P, A>,
 ): NodeBuilderFn<P, A> {
   return (params?: P, slot?: () => void) => {
     // Get Potential pre-existing instance of the component:
-    const maybeLayout = getActiveLayoutEngine();
+    const maybeLayout = getActiveEngine();
     assertJust(
       maybeLayout,
       "Component can be initialised only inside creo rendering cycle",
     );
-    const layout: LayoutEngine = maybeLayout;
+    const engine: DomEngine = maybeLayout;
 
     // 2. Check if there is an existing component
     let userKey: Maybe<Key>;
@@ -48,7 +46,7 @@ export function creo<P = void, A = void>(
     }
 
     // 3. Get component's parent
-    const maybeParent = layout.getCurrentlyRenderingNode();
+    const maybeParent = engine.getParent();
     assertJust(
       maybeParent,
       "There is no rendering context for currently rendering component",
@@ -57,28 +55,26 @@ export function creo<P = void, A = void>(
     const node = parent.renderChild(userKey, ctor, params, slot, null);
 
     // 4. Public component contains all the required methods
-    return node.publicNode;
+    return node.publicApi;
   };
 }
 
 // UI renderers
-type UINodeBuilderFn<P = void, A = void> = (
+type UINodeBuilderFn<P = void> = (
   tag: string,
   p?: P,
   slot?: Maybe<() => void>,
-) => Node<A>;
+) => HTMLElement;
 
-function creoUI<P = void, A = void>(
-  ctor: NodeBuilder<P, A>,
-): UINodeBuilderFn<P, A> {
+function creoUI<P = void>(ctor: NodeBuilder<P, void>): UINodeBuilderFn<P> {
   return (tag: string, params?: P, slot?: Maybe<() => void>) => {
     // Get Potential pre-existing instance of the component:
-    const maybeLayout = getActiveLayoutEngine();
+    const maybeLayout = getActiveEngine();
     assertJust(
       maybeLayout,
       "Component can be initialised only inside creo rendering cycle",
     );
-    const layout: LayoutEngine = maybeLayout;
+    const engine: DomEngine = maybeLayout;
 
     // 2. Check if there is an existing component
     let userKey: Maybe<Key>;
@@ -94,7 +90,7 @@ function creoUI<P = void, A = void>(
     }
 
     // 3. Get component's parent
-    const maybeParent = layout.getCurrentlyRenderingNode();
+    const maybeParent = engine.getParent();
     assertJust(
       maybeParent,
       "There is no rendering context for currently rendering component",
@@ -103,7 +99,7 @@ function creoUI<P = void, A = void>(
     const node = parent.renderChild(userKey, ctor, params, slot, tag);
 
     // 4. Public component contains all the required methods
-    return node.publicNode;
+    return node.publicApi;
   };
 }
 

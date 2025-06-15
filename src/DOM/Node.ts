@@ -13,9 +13,10 @@ import { Maybe } from "../data-structures/maybe/Maybe";
 import { shallowEqual } from "../data-structures/shalllowEqual/shallowEqual";
 import { generateNextKey } from "../data-structures/simpleKey/simpleKey";
 import { Wildcard } from "../data-structures/wildcard/wildcard";
-import { CreoContext } from "./Context";
+import { Context } from "./Context";
+import { DomEngine } from "./DomEngine";
+import { IRenderCycle } from "./IRenderCycle";
 import { Key } from "./Key";
-import { LayoutEngine, LayoutNode } from "./LayoutEngine";
 
 export enum NodeStatus {
   DIRTY,
@@ -36,78 +37,63 @@ export enum UpdateDirectiveEnum {
 
 type UpdateDirective = {
   updateDirective: UpdateDirectiveEnum;
-  node: Maybe<InternalNode>;
+  node: Maybe<Node>;
 };
 
-export class InternalNode {
-  public publicNode: Node<Wildcard>;
-  public c: CreoContext<Wildcard>;
-  public depth: number;
-  public layout: LayoutEngine;
-  public parentIndex: number;
-  public status: NodeStatus = NodeStatus.DIRTY;
-  public children: IndexedMap<InternalNode, "internalKey"> = new IndexedMap(
-    "internalKey",
-    ["userKey"],
-  );
+export class Node implements IRenderCycle {
+  public publicApi;
+  public c: Context<Wildcard>;
 
-  public pendingChildrenState!: IndexedMap<InternalNode, "internalKey">;
-  public renderCursor: Maybe<InternalNode>;
+  public children: IndexedMap<Node, "key"> = new IndexedMap("key");
+  public pendingChildrenState!: IndexedMap<Node, "key">;
+  public renderCursor: Maybe<Node>;
 
   public lifecycle: NodeMethods<Wildcard, Wildcard>;
 
-  public isMounted = false;
   constructor(
     public userKey: Maybe<Key>,
-    public internalKey: Key,
+    public key: Key,
     public p: Wildcard,
     public slot: Maybe<() => void>,
     public ctor: NodeBuilder<Wildcard, Wildcard>,
-    public parent: InternalNode,
-    public parentUI: InternalUINode,
+    public parent: Node,
+    public parentUI: UINode,
+    public engine: DomEngine,
   ) {
-    this.c = new CreoContext(this, p, slot);
-    this.layout = parent.layout;
-    this.parentIndex = parent.pendingChildrenState.size();
-    this.depth = (parent.depth ?? 0) + 1;
-    this.layout.registy.put(this);
-    const { extension, ...lifecycle } = this.ctor(this.c);
+    this.c = new Context(this, p, slot);
+    const { ext, ...lifecycle } = this.ctor(this.c);
     this.lifecycle = lifecycle;
-    this.publicNode = new Node(extension, this);
+    this.publicApi = ext; //new Node(extension, this);
+    this.newNode(this);
+  }
+
+  newNode(_node: Node): void {
+    this.engine.newNode(this);
   }
 
   // sets status to dirty for the node
   invalidate() {
-    console.log("status", this.internalKey, this.status);
-    if (this.status !== NodeStatus.CLEAR) {
-      return;
-    }
-
-    // TODO make updateIndex be observable
-    this.status = NodeStatus.DIRTY;
-    this.layout.registy.updateIndex(this);
-  }
-
-  moveNode() {
-    this.invalidate();
+    this.willRender();
   }
 
   applyNewParams(newParams: Wildcard) {
     if (this.shouldUpdate(newParams)) {
-      this.invalidate();
+      this.willRender();
     }
     this.c.p = newParams;
   }
 
   willRender() {
-    this.pendingChildrenState = new IndexedMap("internalKey", ["userKey"]);
-    this.renderCursor = this.children.at(0);
-    this.status = NodeStatus.UPDATING;
-    this.layout.registy.updateIndex(this);
-    this.layout.willRender(this);
+    this.engine.willRender(this);
   }
 
-  didRender() {
+  isRendering() {
+    this.engine.isRendering(this);
+    this.pendingChildrenState = new IndexedMap("key", ["userKey"]);
+    this.renderCursor = this.children.at(0);
+  }
+
+  didRender(): { justMounted: boolean } {
     // When the rendering cycle ends, all items starting
     // from this.renderingCursor were not used and hence, need to be deleted
     while (this.renderCursor != null) {
@@ -116,32 +102,21 @@ export class InternalNode {
     }
     // At the end of the cycle, we replace children with pending children (this.renderingChildren)
     this.children = this.pendingChildrenState;
-    this.pendingChildrenState = new IndexedMap("internalKey", ["userKey"]);
-    this.status = NodeStatus.CLEAR;
-    this.layout.registy.updateIndex(this);
-
-    this.layout.didRender(this);
+    this.pendingChildrenState = new IndexedMap("key");
+    return this.engine.didRender(this);
   }
 
   render() {
-    this.willRender();
-    __DEV__ && console.log("re-render:", this.internalKey);
+    __DEV__ && console.log("Render:", this.key);
+    this.isRendering();
     this.lifecycle.render();
-    this.didRender();
-    if (!this.isMounted) {
-      this.didMount();
-    } else {
-      this.didUpdate();
+    const { justMounted } = this.didRender();
+    if (justMounted) {
+      this.lifecycle.didMount?.();
     }
-  }
-
-  didMount(): void {
-    this.isMounted = true;
-    this.lifecycle.didMount?.();
-  }
-
-  didUpdate(): void {
-    this.lifecycle.didUpdate?.();
+    {
+      this.lifecycle.didUpdate?.();
+    }
   }
 
   shouldUpdate(pendingParams: Wildcard): boolean {
@@ -156,10 +131,10 @@ export class InternalNode {
     ctor: NodeBuilder<Wildcard, Wildcard>,
     tag: Maybe<string>,
   ): UpdateDirective {
-    const expectedChild: Maybe<InternalNode> = this.renderCursor;
+    const expectedChild: Maybe<Node> = this.renderCursor;
     let expectedTag: Maybe<string> = null;
-    if (expectedChild instanceof InternalUINode) {
-      tag = expectedChild.tag;
+    if (expectedChild instanceof UINode) {
+      expectedTag = expectedChild.tag;
     }
     if (
       expectedChild != null &&
@@ -174,16 +149,14 @@ export class InternalNode {
       };
     }
 
-    // TODO support "unique" indexes + respect nulls
     // Unhappy path exploration.
-    const maybeKeyedMatchedChildren: InternalNode[] =
+    const maybeKeyedMatchedChildren: Node[] =
       userKey != null ? this.children.getByIndex("userKey", userKey) : [];
 
     if (maybeKeyedMatchedChildren.length > 1) {
       throw new Error("Spotted duplicate keys for the node");
     }
-    const maybeKeyedMatchedChild: Maybe<InternalNode> =
-      maybeKeyedMatchedChildren[0];
+    const maybeKeyedMatchedChild: Maybe<Node> = maybeKeyedMatchedChildren[0];
 
     // Case 1: Key, no next component, but matched key: something went wrong
     if (
@@ -233,10 +206,10 @@ export class InternalNode {
     params: Maybe<Wildcard>,
     slot: Maybe<() => void>,
     tag: Maybe<string>,
-  ): InternalNode {
+  ): Node {
     const directive = this.generateUpdateDirective(userKey, ctor, tag);
 
-    let newNode: InternalNode;
+    let newNode: Node;
 
     switch (directive.updateDirective) {
       case UpdateDirectiveEnum.REUSE: {
@@ -248,7 +221,7 @@ export class InternalNode {
           this.renderCursor != null
             ? this.children.getNext(this.renderCursor)
             : null;
-        this.children.delete(newNode.internalKey);
+        this.children.delete(newNode.key);
         // The component can decide on its own if the component needs to get updated
         directive.node.applyNewParams(params);
         break;
@@ -268,14 +241,14 @@ export class InternalNode {
           this.renderCursor = this.children.getNext(this.renderCursor);
         }
         // Delete conflicting element, as they should not exist anymore
-        this.children.delete(toReplace.internalKey);
+        this.children.delete(toReplace.key);
         // Cleanup the component:
         toReplace.dispose();
         newNode = this.createNewNode(userKey, ctor, params, slot, tag);
         break;
       }
     }
-    if (newNode.status === NodeStatus.DIRTY) {
+    if (this.engine.shouldUpdateNode(newNode)) {
       newNode.render();
     }
     return newNode;
@@ -287,38 +260,35 @@ export class InternalNode {
     params: Maybe<Wildcard>,
     slot: Maybe<() => void>,
     tag: Maybe<string>,
-  ): InternalNode {
-    let node: InternalNode;
+  ): Node {
+    let node: Node;
     if (tag == null) {
-      node = new InternalNode(
+      node = new Node(
         userKey,
-        this.generateKey(),
+        generateNextKey(this.pendingChildrenState.size()),
         params,
         slot,
         ctor,
         this,
         this.parentUI,
+        this.engine,
       );
     } else {
-      node = new InternalUINode(
+      node = new UINode(
         userKey,
-        this.generateKey(),
+        generateNextKey(this.pendingChildrenState.size()),
         params,
         slot,
         ctor,
         this,
         this.parentUI,
+        this.engine,
         tag,
       );
     }
 
     this.pendingChildrenState.put(node);
-    this.layout.registy.put(node);
     return node;
-  }
-
-  protected generateKey(): Key {
-    return `c:${generateNextKey()}:${this.children.size()}`;
   }
 
   dispose(): void {
@@ -329,34 +299,45 @@ export class InternalNode {
     this.c.dispose();
 
     // Parent component should alredy not to have children, but we can have sanity check there
+    for (const child of this.children) {
+      child.dispose();
+    }
 
     // Mark component as not dirty, as there is no point in keeping that item anymore
-    this.layout.registy.delete(this.internalKey);
+    this.engine.dispose(this);
   }
 }
 
-export class InternalUINode extends InternalNode {
-  public uiChildren: IndexedMap<InternalUINode, "internalKey"> = new IndexedMap(
-    "internalKey",
-    ["userKey"],
-  );
-  public pendingUIChildrenState!: IndexedMap<InternalUINode, "internalKey">;
-  public layoutNode: Maybe<LayoutNode>;
+export class UINode extends Node {
+  public uiChildren: IndexedMap<UINode, "key"> = new IndexedMap("key", [
+    "userKey",
+  ]);
+  public pendingUIChildrenState!: IndexedMap<UINode, "key">;
+  protected domNode: Maybe<HTMLElement>;
+  protected domText: Maybe<Text>;
   constructor(
     userKey: Maybe<Key>,
     internalKey: Key,
     p: Wildcard,
     slot: Maybe<() => void>,
     ctor: NodeBuilder<Wildcard, Wildcard>,
-    parent: InternalNode,
-    parentUI: InternalUINode,
+    parent: Node,
+    parentUI: UINode,
+    engine: DomEngine,
     public tag: string,
   ) {
-    super(userKey, internalKey, p, slot, ctor, parent, parentUI);
+    super(userKey, internalKey, p, slot, ctor, parent, parentUI, engine);
     // Root element does not have parentUI
-    if (this.parentUI) {
-      this.parentUI.uiChildren.put(this);
-    }
+    this.parentUI?.appendUIChild(this);
+  }
+
+  // @ts-ignore
+  get publicApi() {
+    return this.domNode ?? this.domText;
+  }
+
+  appendUIChild(node: UINode) {
+    this.uiChildren.put(node);
   }
 
   protected createNewNode(
@@ -365,73 +346,120 @@ export class InternalUINode extends InternalNode {
     params: Maybe<Wildcard>,
     slot: Maybe<() => void>,
     tag: Maybe<string>,
-  ): InternalNode {
-    let node: InternalNode;
+  ): Node {
+    let node: Node;
     if (tag == null) {
-      node = new InternalNode(
+      node = new Node(
         userKey,
-        this.generateKey(),
+        generateNextKey(this.pendingChildrenState.size()),
         params,
         slot,
         ctor,
         this,
         this,
+        this.engine,
       );
     } else {
-      node = new InternalUINode(
+      node = new UINode(
         userKey,
-        this.generateKey(),
+        generateNextKey(this.pendingChildrenState.size()),
         params,
         slot,
         ctor,
         this,
         this,
+        this.engine,
         tag,
       );
     }
 
     this.pendingChildrenState.put(node);
-    this.layout.registy.put(node);
     return node;
   }
 
-  render() {
-    this.willRender();
-    __DEV__ && console.log("UI re-render:", this.internalKey);
-    this.layoutNode = this.layout.renderNode(this);
-    this.lifecycle.render();
-    this.didRender();
-    if (!this.isMounted) {
-      this.didMount();
+  renderUI() {
+    // rerender
+    if (this.domText != null) {
+      const params = this.p;
+      if (typeof params === "string") {
+        this.domText.textContent = params;
+      }
+    }
+    if (this.domNode != null) {
+      const params = this.p;
+      const element = this.domNode;
+      if (typeof params === "object") {
+        for (const key in params) {
+          if (element.getAttribute(key) !== params[key]) {
+            element.setAttribute(key, params[key]);
+          }
+        }
+      }
+    }
+    // mount
+    if (this.tag === "text") {
+      this.domText = document.createTextNode(this.p);
+      this.parentUI.domNode?.appendChild(this.domText);
     } else {
-      this.didUpdate();
+      this.domNode = document.createElement(this.tag);
+      const params = this.p;
+      const element = this.domNode;
+      if (typeof params === "object") {
+        for (const key in params) {
+          if (element.getAttribute(key) !== params[key]) {
+            element.setAttribute(key, params[key]);
+          }
+        }
+      }
+      this.parentUI.domNode?.appendChild(this.domNode);
+    }
+  }
+
+  render() {
+    this.isRendering();
+    __DEV__ && console.log("UI render:", this.tag, this.key);
+    this.renderUI();
+    //this.layoutNode = this.layout.renderNode(this);
+    this.lifecycle.render();
+    const { justMounted } = this.didRender();
+    if (justMounted) {
+      this.lifecycle.didMount?.();
+    } else {
+      this.lifecycle.didUpdate?.();
     }
   }
 
   dispose(): void {
     super.dispose();
-    this.layoutNode?.dispose();
+    const toDelete = this.domNode ?? this.domText;
+    if (toDelete != null && this.parentUI != null) {
+      this.parentUI.domNode?.removeChild(toDelete);
+    }
+    this.domNode = null;
+    this.domText = null;
   }
 }
 
-export class Node<A> {
-  protected internalNode: InternalNode;
-  constructor(
-    public extension: A extends void ? undefined : A,
-    internalNode: InternalNode,
-  ) {
-    this.internalNode = internalNode;
+export class RootNode extends UINode {
+  constructor(htmlElement: HTMLElement, slot: () => void, engine: DomEngine) {
+    super(
+      null,
+      "root",
+      null,
+      slot,
+      /* ctor */ (c) => ({
+        render() {
+          c.slot?.();
+        },
+      }),
+      // @ts-ignore
+      /* parent */ null,
+      /* parentUI */ null,
+      engine,
+      /* tag */ null,
+    );
+    this.domNode = htmlElement;
   }
-  /**
-   *
-   * Method passess native UI Node, which would break re-usability of the application with different engines
-   * Can be used to ensure some specific low-level cases
-   *
-   * @returns
-   */
-  getUINode(): unknown {
-    if (this.internalNode instanceof InternalUINode) {
-      return this.internalNode.layoutNode?.element;
-    }
-  }
+
+  renderUI() {}
 }

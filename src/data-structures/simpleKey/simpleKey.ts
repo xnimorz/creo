@@ -1,8 +1,8 @@
 let i = 0;
 
-export function generateNextKey(): number {
+export function generateNextKey(childrenSize: number): string {
   if (i === Number.MAX_SAFE_INTEGER) {
     i = 0;
   }
-  return i++;
+  return `c:${i++}:${childrenSize}`;
 }

@@ -6,14 +6,13 @@ import {
 } from "../data-structures/record/Record";
 import { InternalNode } from "./Node";
 
-export class CreoContext<P> implements Context<P> {
+export class Context<P> {
   private subscribers: Array<() => void> = [];
   private node: InternalNode;
   tracked = <T extends {}>(t: T): RecordOf<T> => {
     const rec = record(t);
     this.subscribers.push(
       onDidUpdate(rec, () => {
-        console.log("invalidate", this.node.internalKey);
         this.node.invalidate();
       }),
     );
@@ -34,10 +33,4 @@ export class CreoContext<P> implements Context<P> {
   setSlot(slot: () => void): void {
     this.slot = slot;
   }
-}
-
-export interface Context<P> {
-  tracked: <T extends {}>(t: T) => RecordOf<T>;
-  p: P;
-  slot: Maybe<() => void>;
 }
