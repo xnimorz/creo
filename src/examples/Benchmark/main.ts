@@ -2,7 +2,6 @@ import { Block, Button, creo, Inline, Text, ui } from "../../creo";
 import { Maybe } from "../../data-structures/maybe/Maybe";
 import { _ } from "../../data-structures/null/null";
 import { record } from "../../data-structures/record/Record";
-import { shallowEqual } from "../../data-structures/shalllowEqual/shallowEqual";
 import { Wildcard } from "../../data-structures/wildcard/wildcard";
 import { DomEngine } from "../../DOM/DomEngine";
 import { Key } from "../../DOM/Key";
@@ -167,7 +166,7 @@ const StyledButton = creo<{ title: string; id: string; cb: () => void }>(
 
 const H1 = ui("h1");
 
-const Panel = creo((c) => {
+const Panel = creo(() => {
   return {
     shouldUpdate() {
       return false;
