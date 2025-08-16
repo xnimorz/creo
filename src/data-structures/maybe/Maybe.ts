@@ -2,11 +2,15 @@ export type None = null | undefined;
 export type Just<T> = T;
 export type Maybe<T> = Just<T> | None;
 
-export function unwrap<T>(v: Maybe<T>): Just<T> {
-  if (v != null) {
-    return v;
+export function nonNull<T>(
+  maybe: Maybe<T>,
+  errorMessage?: string,
+): asserts maybe is Just<T> {
+  if (maybe == null) {
+    throw new TypeError(
+      errorMessage ?? "Expected Just, received None as Maybe",
+    );
   }
-  throw new TypeError("Optional is none");
 }
 
 export function withDefault<T, K>(v: Maybe<T>, alternative: K) {
