@@ -1,147 +1,136 @@
 /**
  * Linked list impl
- * 
+ *
  * ideas:
- * [-] Shall we use Record for list as well? 
- * [x] Support iterator
- * [-] Make prev and next to receive ListNode
  * [ ] Size support
  */
 
 import { Maybe } from "../maybe/Maybe";
+// --- create runtime values that match the types
+const $next: unique symbol = Symbol("next");
+const $prev: unique symbol = Symbol("prev");
+const $list: unique symbol = Symbol("list");
 
+interface IListNode<T> {
+  insertNext(value: T): void;
+  insertPrev(value: T): void;
+  value: T;
+  delete(): void;
+  getNext(): Maybe<IListNode<T>>;
+  getPrev(): Maybe<IListNode<T>>;
+  isFirst(): boolean;
+  isLast(): boolean;
+}
 // #region List's Node
-export class ListNode<T> {
-  #list: Maybe<WeakRef<ListClass<T>>>;
-  #next: Maybe<ListNode<T>>;
-  #prev: Maybe<ListNode<T>>;
-  public node: T;  
+export class ListNode<T> implements IListNode<T> {
+  [$list]: WeakRef<List<T>>;
+  [$next]: Maybe<ListNode<T>>;
+  [$prev]: Maybe<ListNode<T>>;
+  public value: T;
 
-  constructor(node: T, prev: Maybe<ListNode<T>> = null, next: Maybe<ListNode<T>> = null, list: Maybe<WeakRef<ListClass<T>>>) {
-    this.#prev = prev;
-    this.#next = next;
-    this.node = node;
-    this.#list = list;
+  constructor(
+    node: T,
+    prev: Maybe<ListNode<T>> = null,
+    next: Maybe<ListNode<T>> = null,
+    list: WeakRef<List<T>>,
+  ) {
+    this[$prev] = prev;
+    this[$next] = next;
+    this[$list] = list;
+    this.value = node;
+  }
+
+  isFirst(): boolean {
+    return this[$prev] == null;
+  }
+
+  isLast(): boolean {
+    return this[$next] == null;
   }
 
   // #region Delete Node from LinkedList
   delete() {
-    const maybeParent = this.#list?.deref();
-    if (this.#prev != null) {
-      this.#prev.#next = this.#next;
-    } else {
-      maybeParent?.updateHead_UNSAFE(this.#next);
-    }
-    if (this.#next != null) {
-      this.#next.#prev = this.#prev;
-    } else {
-      maybeParent?.updateTail_UNSAFE(this.#prev);
-    }
-    this.#next = null;
-    this.#prev = null;
+    this[$list].deref()?.delete(this);
+    this.clearFields();
+  }
+
+  clearFields() {
+    this[$next] = null;
+    this[$prev] = null;
+    // @ts-ignore should be okay, as our goal is to clear the list item and it is not supposed to be used again
+    this[$list] = null;
   }
 
   // #region Getters/setters
-  set next(value: T) {
-    const oldNext = this.#next;
-    this.#next = new ListNode(value, this, this.#next, this.#list);    
-  
-    if (oldNext == null) {
-      const maybeParent = this.#list?.deref();
-      if (!maybeParent) {
-        return;
-      }
-      maybeParent.updateTail_UNSAFE(this.#next);
-    } else {
-      oldNext.#prev = this.#next;
-    }
+  insertNext(value: T) {
+    this[$list].deref()?.insertNext(this, value);
   }
 
-  set prev(value: T) {
-    const oldPrev = this.#prev;
-    this.#prev = new ListNode(value, this.#prev, this, this.#list);      
-  
-    if (oldPrev == null) {
-      const maybeParent = this.#list?.deref();
-      if (!maybeParent) {
-        return;
-      }
-      maybeParent.updateHead_UNSAFE(this.#prev);
-    } else {
-      oldPrev.#next = this.#prev;
-    }
-  }
-  
-  get value(): T {
-    return this.node;
+  insertPrev(value: T) {
+    this[$list].deref()?.insertPrev(this, value);
   }
 
-  get next(): Maybe<ListNode<T>> {
-    return this.#next;
+  getNext(): Maybe<ListNode<T>> {
+    return this[$next];
   }
 
-  get prev(): Maybe<ListNode<T>> {
-    return this.#prev;
+  getPrev(): Maybe<ListNode<T>> {
+    return this[$prev];
   }
 
   // #region Getter of List
-  get list() {
-    return this.#list?.deref();
+  getList() {
+    return this[$list].deref();
   }
 }
 
 // #region IList public interface
-export interface List<T> extends Iterable<T> {
-  addToStart(value: T): ListNode<T>;
-  delete(n: number): boolean;
+export interface IList<T> extends Iterable<IListNode<T>> {
+  insertStart(value: T): ListNode<T>;
+  delete(node: IListNode<T>): void;
   at(n: number): Maybe<ListNode<T>>;
-  addToEnd(value: T): ListNode<T>;
-  [Symbol.iterator](): IterableIterator<T>;
+  insertEnd(value: T): ListNode<T>;
+  insertNext(ref: IListNode<T>, value: T): void;
+  insertPrev(ref: IListNode<T>, value: T): void;
+  [Symbol.iterator](): IterableIterator<IListNode<T>>;
 }
 
-
 // #region List class
-class ListClass<T> implements List<T>{
+export class List<T> implements IList<T> {
   #head: Maybe<ListNode<T>>;
   #tail: Maybe<ListNode<T>>;
-
-  // #region internal methods
-  updateHead_UNSAFE(maybeNewHead: Maybe<ListNode<T>>) {
-    this.#head = maybeNewHead;
-  }
-
-  updateTail_UNSAFE(maybeNewTail: Maybe<ListNode<T>>) {
-    this.#tail = maybeNewTail;
-  }
+  #selfWeakRef = new WeakRef(this);
 
   // #region Public methods
-  addToStart(value: T) {
+  insertStart(value: T) {
+    const node = new ListNode(value, null, this.#head, this.#selfWeakRef);
     if (this.#head != null) {
-      this.#head.prev = value;      
+      this.#head[$prev] = node;
     } else {
-      const node = new ListNode(value, null, null, new WeakRef(this));
-      this.#head = node;
       this.#tail = node;
     }
-    return this.#head
+    this.#head = node;
+    return this.#head;
   }
 
-  delete(n: number): boolean {
-    const node = this.at(n);    
-    if (node == null) {
-      // Cannot delete non-existed item
-      return false;
-    }
+  delete(node: IListNode<T>): void {
+    const n = node as ListNode<T>;
+    const prev = n[$prev];
+    const next = n[$next];
 
-    // Corner case: delete the first item
+    if (next) {
+      next[$prev] = prev;
+    }
+    if (prev) {
+      prev[$next] = next;
+    }
     if (node === this.#head) {
-      this.#head = this.at(1);
+      this.#head = next;
     }
     if (node === this.#tail) {
-      this.#tail = this.at(-2);
+      this.#tail = prev;
     }
-    node.delete();
-    return true;
+    n.clearFields();
   }
 
   at(n: number): Maybe<ListNode<T>> {
@@ -149,47 +138,73 @@ class ListClass<T> implements List<T>{
     if (n >= 0) {
       current = this.#head;
       for (let i = 0; i < n && current != null; i++) {
-        current = current.next;
+        current = current[$next];
       }
     } else {
-      current = this.#tail;      
+      current = this.#tail;
       for (let i = n; i < -1 && current != null; i++) {
-        current = current.prev;        
+        current = current[$prev];
       }
     }
-    return current;    
+    return current;
   }
 
-  addToEnd(value: T) {
+  insertEnd(value: T): ListNode<T> {
+    const node = new ListNode(value, this.#tail, null, this.#selfWeakRef);
     if (this.#tail != null) {
-      this.#tail.next = value;      
+      this.#tail[$next] = node;
     } else {
-      const node = new ListNode(value, null, null, new WeakRef(this));
       this.#head = node;
+    }
+    this.#tail = node;
+    return this.#tail;
+  }
+
+  insertNext(ref: IListNode<T>, value: T): void {
+    const r = ref as ListNode<T>;
+    if (r[$list].deref() != this) {
+      throw new TypeError(
+        "The reference node does not belong to the current list",
+      );
+    }
+    const node = new ListNode(value, r, r[$next], this.#selfWeakRef);
+    if (r[$next]) {
+      r[$next][$prev] = node;
+    } else {
       this.#tail = node;
     }
-    return this.#tail;
+    r[$next] = node;
+  }
+
+  insertPrev(ref: IListNode<T>, value: T): void {
+    const r = ref as ListNode<T>;
+    if (r[$list].deref() != this) {
+      throw new TypeError(
+        "The reference node does not belong to the current list",
+      );
+    }
+    const node = new ListNode(value, r[$prev], r, this.#selfWeakRef);
+    if (r[$prev]) {
+      r[$prev][$next] = node;
+    } else {
+      this.#head = node;
+    }
+    r[$prev] = node;
   }
 
   *[Symbol.iterator]() {
     let current = this.#head;
     while (current) {
-      yield current.value;
-      current = current.next;
+      yield current;
+      current = current[$next];
     }
   }
 
   static from<T>(arrayLike: Iterable<T>): List<T> {
-    const list = new ListClass<T>;
+    const list = new List<T>();
     for (const item of arrayLike) {
-      list.addToEnd(item);
+      list.insertEnd(item);
     }
     return list;
   }
 }
-// #region Exports
-export function List<T>(): List<T> {
-  return new ListClass<T>();
-}
-
-List.from = ListClass.from;
