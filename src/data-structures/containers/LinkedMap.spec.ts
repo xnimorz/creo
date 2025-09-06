@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { LinkedMap } from "./data-containers";
+import { LinkedMap, linkedMapFromIterable } from "./data-containers";
 
 type Entry = { key: string; value: number };
 
@@ -64,4 +64,21 @@ test("map has access by index", () => {
   expect(map.at(-1)?.v.value).toEqual(94);
   expect(map.at(2)?.v.value).toEqual(13);
   expect(map.at(0)?.v.value).toEqual(1);
+});
+
+test("Map creation from iterable", () => {
+  const map = linkedMapFromIterable(
+    [
+      { key: "foo", value: 1 },
+      { key: "bar", value: 2 },
+      { key: "hey", value: 13 },
+      { key: "baz", value: 94 },
+    ],
+    "key",
+  );
+
+  expect(map.at(-1)?.v.value).toEqual(94);
+  expect(map.at(2)?.v.value).toEqual(13);
+  expect(map.at(0)?.v.value).toEqual(1);
+  expect(map.get("bar")?.v).toEqual({ key: "bar", value: 2 });
 });

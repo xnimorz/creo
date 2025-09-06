@@ -213,7 +213,7 @@ export class List<T> implements IList<T> {
   }
 }
 
-export function initListFromArray<T>(arrayLike: Iterable<T>): List<T> {
+export function listFromIterable<T>(arrayLike: Iterable<T>): List<T> {
   const list = new List<T>();
   for (const item of arrayLike) {
     list.insertEnd(item);
@@ -326,7 +326,7 @@ export class LinkedMap<T extends object, K extends keyof T>
   }
 }
 
-export function initLinkedMapFromArray<T extends object, K extends keyof T>(
+export function linkedMapFromIterable<T extends object, K extends keyof T>(
   arrayLike: Iterable<T>,
   key: K,
 ): LinkedMap<T, K> {
