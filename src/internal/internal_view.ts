@@ -6,29 +6,29 @@ import { State } from "@/public/state";
 import { Store } from "@/public/store";
 import { List } from "@/structures/list";
 import { just, type Maybe } from "@/functional/maybe";
-import { shallow_equal } from "@/functional/shallow_equal";
+import { shallowEqual } from "@/functional/shallow_equal";
 
 export type PendingView = {
-  view_fn: ViewFn<Wildcard, Wildcard, Wildcard>;
+  viewFn: ViewFn<Wildcard, Wildcard, Wildcard>;
   props: Wildcard;
   slot: Wildcard;
-  user_key: Maybe<Key>;
+  userKey: Maybe<Key>;
 };
 
 export class View implements Disposable {
-  virtual_dom: List<View> = new List<View>([]);
-  key_to_view: Map<Key, View> = new Map();
-  view_body: ViewBody<Wildcard, Wildcard, Wildcard>;
+  virtualDom: List<View> = new List<View>([]);
+  keyToView: Map<Key, View> = new Map();
+  viewBody: ViewBody<Wildcard, Wildcard, Wildcard>;
 
   constructor(
-    public view_fn: ViewFn<Wildcard, Wildcard, Wildcard>,
+    public viewFn: ViewFn<Wildcard, Wildcard, Wildcard>,
     public engine: Engine,
     public props: Wildcard,
     public slot: Wildcard,
     public parent: Maybe<View>,
-    public user_key: Maybe<Key>,
+    public userKey: Maybe<Key>,
   ) {
-    this.view_body = this.view_fn({
+    this.viewBody = this.viewFn({
       props,
       state: new State(this),
       store: new Store(this),
@@ -37,110 +37,110 @@ export class View implements Disposable {
     this.engine.register(this);
   }
 
-  next_props(next_props: Wildcard, next_slot: Wildcard) {
-    if (this.should_update(next_props)) {
-      this.engine.mark_need_render(this);
+  nextProps(nextProps: Wildcard, nextSlot: Wildcard) {
+    if (this.shouldUpdate(nextProps)) {
+      this.engine.markNeedRender(this);
     }
 
-    this.props = next_props;
-    this.slot = next_slot;
+    this.props = nextProps;
+    this.slot = nextSlot;
   }
 
   [Symbol.dispose]() {
-    for (const view of this.virtual_dom) {
+    for (const view of this.virtualDom) {
       view[Symbol.dispose]();
     }
-    this.engine.dispose_view(this);
-    this.parent?.on_child_disposed(this);
+    this.engine.disposeView(this);
+    this.parent?.onChildDisposed(this);
   }
 
-  should_update(next_props: Wildcard): boolean {
-    if (this.view_body.update?.should) {
-      return this.view_body.update.should(next_props);
+  shouldUpdate(nextProps: Wildcard): boolean {
+    if (this.viewBody.update?.should) {
+      return this.viewBody.update.should(nextProps);
     }
-    return shallow_equal(this.props, next_props);
+    return shallowEqual(this.props, nextProps);
   }
 
-  mount_before() {
-    this.view_body.mount?.before?.();
+  mountBefore() {
+    this.viewBody.mount?.before?.();
   }
 
-  mount_after() {
-    this.view_body.mount?.after?.();
+  mountAfter() {
+    this.viewBody.mount?.after?.();
   }
 
-  render_before() {
-    this.engine.render_before(this);
-    this.view_body.update?.before?.();
+  renderBefore() {
+    this.engine.renderBefore(this);
+    this.viewBody.update?.before?.();
   }
 
-  render_after() {
-    this.engine.render_after(this);
-    this.view_body.update?.after?.();
+  renderAfter() {
+    this.engine.renderAfter(this);
+    this.viewBody.update?.after?.();
   }
 
-  dispose_children_from(index: number) {
-    for (let i = this.virtual_dom.length - 1; i >= index; i--) {
-      const view = this.virtual_dom.at(i);
+  disposeChildrenFrom(index: number) {
+    for (let i = this.virtualDom.length - 1; i >= index; i--) {
+      const view = this.virtualDom.at(i);
       just(view);
       view[Symbol.dispose]();
     }
   }
 
-  on_child_disposed(child_view: View) {
-    this.virtual_dom.delete(child_view);
-    if (child_view.user_key) {
-      this.key_to_view.delete(child_view.user_key);
+  onChildDisposed(childView: View) {
+    this.virtualDom.delete(childView);
+    if (childView.userKey) {
+      this.keyToView.delete(childView.userKey);
     }
   }
 
-  reconsile_child(pending: PendingView, index: number, new_dom: List<View>) {
-    const existing_view = pending.user_key
-      ? this.key_to_view.get(pending.user_key)
-      : this.virtual_dom.at(index);
+  reconsileChild(pending: PendingView, index: number, newDom: List<View>) {
+    const existingView = pending.userKey
+      ? this.keyToView.get(pending.userKey)
+      : this.virtualDom.at(index);
 
     let view: View;
-    if (existing_view && existing_view.view_fn === pending.view_fn) {
-      const existing_view_index = this.virtual_dom.indexOf(existing_view);
-      if (existing_view_index != index) {
+    if (existingView && existingView.viewFn === pending.viewFn) {
+      const existingViewIndex = this.virtualDom.indexOf(existingView);
+      if (existingViewIndex != index) {
         // TODO Handle shifting, when the view is moved to another position
       }
-      view = existing_view;
-      existing_view.next_props(pending.props, pending.slot);
+      view = existingView;
+      existingView.nextProps(pending.props, pending.slot);
     } else {
       view = new View(
-        pending.view_fn,
+        pending.viewFn,
         this.engine,
         pending.props,
         pending.slot,
         this,
-        pending.user_key,
+        pending.userKey,
       );
-      if (pending.user_key) {
-        this.key_to_view.set(pending.user_key, view);
+      if (pending.userKey) {
+        this.keyToView.set(pending.userKey, view);
       }
-      if (existing_view) {
-        existing_view[Symbol.dispose]();
+      if (existingView) {
+        existingView[Symbol.dispose]();
       }
     }
-    new_dom.push(view);
+    newDom.push(view);
   }
 
-  reconsile_children(pending_args: PendingView[]) {
-    const new_dom = new List<View>([]);
-    for (let i = 0; i < pending_args.length; i++) {
-      const pending = pending_args[i];
+  reconsileChildren(pendingArgs: PendingView[]) {
+    const newDom = new List<View>([]);
+    for (let i = 0; i < pendingArgs.length; i++) {
+      const pending = pendingArgs[i];
       just(pending);
-      this.reconsile_child(pending, i, new_dom);
+      this.reconsileChild(pending, i, newDom);
     }
-    this.dispose_children_from(pending_args.length);
-    this.virtual_dom = new_dom;
+    this.disposeChildrenFrom(pendingArgs.length);
+    this.virtualDom = newDom;
   }
 
   render() {
-    this.render_before();
-    this.view_body.render();
-    this.reconsile_children(this.engine.get_pending_views());
-    this.render_after();
+    this.renderBefore();
+    this.viewBody.render();
+    this.reconsileChildren(this.engine.getPendingViews());
+    this.renderAfter();
   }
 }

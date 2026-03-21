@@ -9,14 +9,14 @@ import type { Engine } from "@/internal/engine";
  *  4. Sets the current orchestrator scope (e.g. if the app has several Creo renderers)
  */
 class Orchestrator {
-  #current_engine: Maybe<Engine>;
+  #currentEngine: Maybe<Engine>;
 
-  set_current_engine(engine: Engine) {
-    this.#current_engine = engine;
+  setCurrentEngine(engine: Engine) {
+    this.#currentEngine = engine;
   }
 
-  public current_engine(): Maybe<Engine> {
-    return this.#current_engine;
+  public currentEngine(): Maybe<Engine> {
+    return this.#currentEngine;
   }
 }
 

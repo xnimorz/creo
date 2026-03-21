@@ -1,6 +1,6 @@
 import type { Wildcard } from "@/internal/wildcard";
 
-export function shallow_equal(a: Wildcard, b: Wildcard): boolean {
+export function shallowEqual(a: Wildcard, b: Wildcard): boolean {
   if (a === b) return true;
 
   if (

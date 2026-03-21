@@ -14,7 +14,7 @@ export type ViewBody<Props, Api, Tag> = Tag extends void
           after?: () => void;
         };
         update?: {
-          should?: (next_props: Props) => boolean;
+          should?: (nextProps: Props) => boolean;
           before?: () => void;
           after?: () => void;
         };
@@ -26,7 +26,7 @@ export type ViewBody<Props, Api, Tag> = Tag extends void
           after?: () => void;
         };
         update?: {
-          should?: (next_props: Props) => boolean;
+          should?: (nextProps: Props) => boolean;
           before?: () => void;
           after?: () => void;
         };
@@ -41,7 +41,7 @@ export type ViewBody<Props, Api, Tag> = Tag extends void
           after?: () => void;
         };
         update?: {
-          should?: (next_props: Props) => boolean;
+          should?: (nextProps: Props) => boolean;
           before?: () => void;
           after?: () => void;
         };
@@ -54,7 +54,7 @@ export type ViewBody<Props, Api, Tag> = Tag extends void
           after?: () => void;
         };
         update?: {
-          should?: (next_props: Props) => boolean;
+          should?: (nextProps: Props) => boolean;
           before?: () => void;
           after?: () => void;
         };
@@ -79,14 +79,14 @@ export function view<Props = void, Api = void, Tag = void>(
   }) => ViewBody<Props, Api, Tag>,
 ) {
   return (props: Props, slot: Slot) => {
-    const user_key: Maybe<Key> = maybeGetUserKey(props);
-    const engine = orchestrator.current_engine();
+    const userKey: Maybe<Key> = maybeGetUserKey(props);
+    const engine = orchestrator.currentEngine();
     just(engine);
-    engine.add_to_pending_views({
-      view_fn: body,
+    engine.addToPendingViews({
+      viewFn: body,
       props,
       slot,
-      user_key,
+      userKey: userKey,
     });
   };
 }
