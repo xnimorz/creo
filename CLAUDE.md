@@ -43,7 +43,7 @@ const Counter = view<{ initial: number }>(({ props, state }) => {
 | `key={id}` | `{ key: id }` in props |
 | `useContext` | `store` (context-like shared state) |
 | `<div className="x">` | `div({ class: "x" }, () => { ... })` |
-| `ReactDOM.createRoot(el).render(<App/>)` | `createApp(App).mount("#app")` |
+| `ReactDOM.createRoot(el).render(<App/>)` | `createApp(App, new HtmlRender(el)).mount()` |
 
 ### Children / Composition
 
