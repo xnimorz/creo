@@ -3,17 +3,19 @@ import { View, type PendingView } from "./internal_view";
 import { Engine } from "./engine";
 import type { ViewFn, ViewBody } from "@/public/view";
 import type { Wildcard } from "./wildcard";
-import { List } from "@/structures/list";
+import { IndexedList } from "@/structures/indexed_list";
 import { just } from "@/functional/maybe";
 import type { IRender } from "@/render/render_interface";
 
 // Mock renderer
 const createMockRenderer = (): IRender<Wildcard> => ({
   render: mock(() => {}),
+  unmount: mock(() => {}),
+  registerPrimitive: mock(() => {}) as IRender<Wildcard>["registerPrimitive"],
 });
 
 // Mock view function that returns a simple view body
-const createMockViewFn = (onRender?: () => void): ViewFn<any, any, any> => {
+const createMockViewFn = (onRender?: () => void): ViewFn<any, any> => {
   return ({ props, state, store, slot }) => ({
     render: onRender || (() => {}),
   });
@@ -39,13 +41,12 @@ const dumpVirtualDom = (view: View): any => {
   };
 };
 
-// Helper to get array from List using iterator
-const listToArray = <T>(list: List<T>): T[] => Array.from(list);
+const toArray = <T>(list: IndexedList<T>): T[] => Array.from(list);
 
 describe("View - virtual_dom correctness", () => {
   let engine: Engine;
   let renderer: IRender<Wildcard>;
-  let rootViewFn: ViewFn<any, any, any>;
+  let rootViewFn: ViewFn<any, any>;
   let rootView: View;
 
   beforeEach(() => {
@@ -75,7 +76,7 @@ describe("View - virtual_dom correctness", () => {
         },
       ];
 
-      rootView.reconsileChildren(pending);
+      rootView.reconsileChildren(new Set(pending));
 
       expect(rootView.virtualDom.length).toBe(1);
       const child = rootView.virtualDom.at(0);
@@ -108,11 +109,11 @@ describe("View - virtual_dom correctness", () => {
         },
       ];
 
-      rootView.reconsileChildren(pending);
+      rootView.reconsileChildren(new Set(pending));
 
       expect(rootView.virtualDom.length).toBe(3);
 
-      const children = listToArray(rootView.virtualDom);
+      const children = toArray(rootView.virtualDom);
       expect(children[0]?.props.id).toBe(1);
       expect(children[1]?.props?.id).toBe(2);
       expect(children[2]?.props?.id).toBe(3);
@@ -131,7 +132,7 @@ describe("View - virtual_dom correctness", () => {
           userKey: null,
         },
       ];
-      rootView.reconsileChildren(pending1);
+      rootView.reconsileChildren(new Set(pending1));
       expect(rootView.virtualDom.length).toBe(1);
 
       // Second reconcile with different children
@@ -149,10 +150,10 @@ describe("View - virtual_dom correctness", () => {
           userKey: null,
         },
       ];
-      rootView.reconsileChildren(pending2);
+      rootView.reconsileChildren(new Set(pending2));
 
       expect(rootView.virtualDom.length).toBe(2);
-      const children = listToArray(rootView.virtualDom);
+      const children = toArray(rootView.virtualDom);
       expect(children[0]?.props?.id).toBe(2);
       expect(children[1]?.props?.id).toBe(3);
     });
@@ -174,7 +175,7 @@ describe("View - virtual_dom correctness", () => {
           userKey: null,
         },
       ];
-      rootView.reconsileChildren(pending1);
+      rootView.reconsileChildren(new Set(pending1));
       expect(rootView.virtualDom.length).toBe(2);
 
       // Now reconcile with only one child
@@ -186,7 +187,7 @@ describe("View - virtual_dom correctness", () => {
           userKey: null,
         },
       ];
-      rootView.reconsileChildren(pending2);
+      rootView.reconsileChildren(new Set(pending2));
 
       expect(rootView.virtualDom.length).toBe(1);
     });
@@ -200,7 +201,7 @@ describe("View - virtual_dom correctness", () => {
         slot: null,
         userKey: null,
       }));
-      rootView.reconsileChildren(pending1);
+      rootView.reconsileChildren(new Set(pending1));
       expect(rootView.virtualDom.length).toBe(5);
 
       const pending2: PendingView[] = Array.from({ length: 2 }, (_, i) => ({
@@ -209,7 +210,7 @@ describe("View - virtual_dom correctness", () => {
         slot: null,
         userKey: null,
       }));
-      rootView.reconsileChildren(pending2);
+      rootView.reconsileChildren(new Set(pending2));
 
       expect(rootView.virtualDom.length).toBe(2);
     });
@@ -225,7 +226,7 @@ describe("View - virtual_dom correctness", () => {
           userKey: null,
         },
       ];
-      rootView.reconsileChildren(pending1);
+      rootView.reconsileChildren(new Set(pending1));
       expect(rootView.virtualDom.length).toBe(1);
 
       const pending2: PendingView[] = Array.from({ length: 5 }, (_, i) => ({
@@ -234,7 +235,7 @@ describe("View - virtual_dom correctness", () => {
         slot: null,
         userKey: null,
       }));
-      rootView.reconsileChildren(pending2);
+      rootView.reconsileChildren(new Set(pending2));
 
       expect(rootView.virtualDom.length).toBe(5);
     });
@@ -244,7 +245,7 @@ describe("View - virtual_dom correctness", () => {
     it("should add child with key to key_to_view map", () => {
       const viewFn = createMockViewFn();
       const key = "child-key-1";
-      const newDom = new List<View>([]);
+      const newDom = new IndexedList<View>();
 
       const pending: PendingView = {
         viewFn: viewFn,
@@ -272,7 +273,7 @@ describe("View - virtual_dom correctness", () => {
           userKey: key,
         },
       ];
-      rootView.reconsileChildren(pending1);
+      rootView.reconsileChildren(new Set(pending1));
 
       const firstChild = rootView.virtualDom.at(0);
 
@@ -285,7 +286,7 @@ describe("View - virtual_dom correctness", () => {
           userKey: key,
         },
       ];
-      rootView.reconsileChildren(pending2);
+      rootView.reconsileChildren(new Set(pending2));
 
       const secondChild = rootView.virtualDom.at(0);
 
@@ -309,7 +310,7 @@ describe("View - virtual_dom correctness", () => {
           userKey: key1,
         },
       ];
-      rootView.reconsileChildren(pending1);
+      rootView.reconsileChildren(new Set(pending1));
 
       const firstChild = rootView.virtualDom.at(0);
       expect(rootView.keyToView.has(key1)).toBe(true);
@@ -323,7 +324,7 @@ describe("View - virtual_dom correctness", () => {
           userKey: key2,
         },
       ];
-      rootView.reconsileChildren(pending2);
+      rootView.reconsileChildren(new Set(pending2));
 
       const secondChild = rootView.virtualDom.at(0);
 
@@ -345,12 +346,12 @@ describe("View - virtual_dom correctness", () => {
         userKey: key,
       }));
 
-      rootView.reconsileChildren(pending);
+      rootView.reconsileChildren(new Set(pending));
 
       expect(rootView.virtualDom.length).toBe(3);
       expect(rootView.keyToView.size).toBe(3);
 
-      const children = listToArray(rootView.virtualDom);
+      const children = toArray(rootView.virtualDom);
       keys.forEach((key, i) => {
         expect(children[i]?.props.name).toBe(key);
         expect(rootView.keyToView.get(key)).toBe(children[i]);
@@ -370,11 +371,11 @@ describe("View - virtual_dom correctness", () => {
           userKey: key,
         },
       ];
-      rootView.reconsileChildren(pending1);
+      rootView.reconsileChildren(new Set(pending1));
       expect(rootView.keyToView.has(key)).toBe(true);
 
       // Remove child (reconcile with empty)
-      rootView.reconsileChildren([]);
+      rootView.reconsileChildren(new Set());
 
       expect(rootView.keyToView.has(key)).toBe(false);
     });
@@ -384,7 +385,7 @@ describe("View - virtual_dom correctness", () => {
     it("should replace view when viewFn changes", () => {
       const viewFn1 = createMockViewFn();
       const viewFn2 = createMockViewFn();
-      const newDom = new List<View>([]);
+      const newDom = new IndexedList<View>();
 
       // First child with viewFn1
       const pending1: PendingView = {
@@ -397,9 +398,8 @@ describe("View - virtual_dom correctness", () => {
       const firstChild = newDom.at(0);
 
       // Clear and reconcile with viewFn2
-      const secondIndex = newDom.indexOf(firstChild!);
-      if (secondIndex !== undefined) {
-        newDom.deleteAt(secondIndex);
+      if (firstChild) {
+        newDom.delete(firstChild);
       }
 
       const pending2: PendingView = {
@@ -427,7 +427,7 @@ describe("View - virtual_dom correctness", () => {
           userKey: null,
         },
       ];
-      rootView.reconsileChildren(pending);
+      rootView.reconsileChildren(new Set(pending));
       expect(rootView.virtualDom.length).toBe(1);
 
       const child = rootView.virtualDom.at(0);
@@ -450,7 +450,7 @@ describe("View - virtual_dom correctness", () => {
           userKey: key,
         },
       ];
-      rootView.reconsileChildren(pending);
+      rootView.reconsileChildren(new Set(pending));
 
       const child = rootView.virtualDom.at(0);
       if (child) {
@@ -470,7 +470,7 @@ describe("View - virtual_dom correctness", () => {
           userKey: null,
         },
       ];
-      rootView.reconsileChildren(pending);
+      rootView.reconsileChildren(new Set(pending));
 
       const child = rootView.virtualDom.at(0);
       if (child) {
@@ -492,7 +492,7 @@ describe("View - virtual_dom correctness", () => {
         userKey: null,
       }));
 
-      rootView.reconsileChildren(pending);
+      rootView.reconsileChildren(new Set(pending));
       expect(rootView.virtualDom.length).toBe(5);
 
       rootView.disposeChildrenFrom(2);
@@ -509,13 +509,13 @@ describe("View - virtual_dom correctness", () => {
         userKey: null,
       }));
 
-      rootView.reconsileChildren(pending);
+      rootView.reconsileChildren(new Set(pending));
 
-      const originalChildren = listToArray(rootView.virtualDom);
+      const originalChildren = toArray(rootView.virtualDom);
 
       rootView.disposeChildrenFrom(3);
 
-      const remainingChildren = listToArray(rootView.virtualDom);
+      const remainingChildren = toArray(rootView.virtualDom);
       expect(remainingChildren[0]).toBe(originalChildren[0]);
       expect(remainingChildren[1]).toBe(originalChildren[1]);
     });
@@ -529,7 +529,7 @@ describe("View - virtual_dom correctness", () => {
         userKey: null,
       }));
 
-      rootView.reconsileChildren(pending);
+      rootView.reconsileChildren(new Set(pending));
       expect(rootView.virtualDom.length).toBe(3);
 
       rootView.disposeChildrenFrom(0);
@@ -546,7 +546,7 @@ describe("View - virtual_dom correctness", () => {
       rootView.props = { initial: true };
       rootView.nextProps(newProps, null);
 
-      expect(rootView.props).toBe(newProps);
+      expect(rootView.props).toEqual(newProps);
     });
 
     it("should check should_update before marking for re-render", () => {
@@ -573,7 +573,7 @@ describe("View - virtual_dom correctness", () => {
   describe("should_update", () => {
     it("should use custom update.should if provided", () => {
       const shouldUpdate = mock(() => false);
-      const viewFn: ViewFn<any, any, any> = () => ({
+      const viewFn: ViewFn<any, any> = () => ({
         render: () => {},
         update: { should: shouldUpdate },
       });
@@ -601,7 +601,7 @@ describe("View - virtual_dom correctness", () => {
   describe("lifecycle hooks", () => {
     it("should call mount.before", () => {
       const beforeMount = mock(() => {});
-      const viewFn: ViewFn<any, any, any> = () => ({
+      const viewFn: ViewFn<any, any> = () => ({
         render: () => {},
         mount: { before: beforeMount },
       });
@@ -614,7 +614,7 @@ describe("View - virtual_dom correctness", () => {
 
     it("should call mount.after", () => {
       const afterMount = mock(() => {});
-      const viewFn: ViewFn<any, any, any> = () => ({
+      const viewFn: ViewFn<any, any> = () => ({
         render: () => {},
         mount: { after: afterMount },
       });
@@ -627,7 +627,7 @@ describe("View - virtual_dom correctness", () => {
 
     it("should call update.before during render_before", () => {
       const beforeUpdate = mock(() => {});
-      const viewFn: ViewFn<any, any, any> = () => ({
+      const viewFn: ViewFn<any, any> = () => ({
         render: () => {},
         update: { before: beforeUpdate },
       });
@@ -640,7 +640,7 @@ describe("View - virtual_dom correctness", () => {
 
     it("should call update.after during render_after", () => {
       const afterUpdate = mock(() => {});
-      const viewFn: ViewFn<any, any, any> = () => ({
+      const viewFn: ViewFn<any, any> = () => ({
         render: () => {},
         update: { after: afterUpdate },
       });
@@ -670,7 +670,7 @@ describe("View - virtual_dom correctness", () => {
         },
       ];
 
-      rootView.reconsileChildren(pending);
+      rootView.reconsileChildren(new Set(pending));
 
       const dump = dumpVirtualDom(rootView);
 
@@ -699,7 +699,7 @@ describe("View - virtual_dom correctness", () => {
           userKey: null,
         },
       ];
-      rootView.reconsileChildren(pending1);
+      rootView.reconsileChildren(new Set(pending1));
 
       // Add grandchildren to first child
       const firstChild = rootView.virtualDom.at(0);
@@ -718,7 +718,7 @@ describe("View - virtual_dom correctness", () => {
             userKey: null,
           },
         ];
-        firstChild.reconsileChildren(pending2);
+        firstChild.reconsileChildren(new Set(pending2));
       }
 
       const dump = dumpVirtualDom(rootView);
@@ -746,7 +746,7 @@ describe("View - virtual_dom correctness", () => {
         },
       ];
 
-      rootView.reconsileChildren(pending);
+      rootView.reconsileChildren(new Set(pending));
 
       const dump = dumpVirtualDom(rootView);
 
@@ -765,7 +765,7 @@ describe("View - virtual_dom correctness", () => {
         { viewFn: viewFn, props: { id: "B" }, slot: null, userKey: "B" },
         { viewFn: viewFn, props: { id: "C" }, slot: null, userKey: "C" },
       ];
-      rootView.reconsileChildren(pending1);
+      rootView.reconsileChildren(new Set(pending1));
 
       const childA = rootView.keyToView.get("A");
       const childB = rootView.keyToView.get("B");
@@ -777,7 +777,7 @@ describe("View - virtual_dom correctness", () => {
         { viewFn: viewFn, props: { id: "A" }, slot: null, userKey: "A" },
         { viewFn: viewFn, props: { id: "B" }, slot: null, userKey: "B" },
       ];
-      rootView.reconsileChildren(pending2);
+      rootView.reconsileChildren(new Set(pending2));
 
       // Same instances should be reused
       expect(rootView.keyToView.get("A")).toBe(childA);
@@ -785,7 +785,7 @@ describe("View - virtual_dom correctness", () => {
       expect(rootView.keyToView.get("C")).toBe(childC);
 
       // Verify order in virtual_dom
-      const children = listToArray(rootView.virtualDom);
+      const children = toArray(rootView.virtualDom);
       expect(children[0]?.props.id).toBe("C");
       expect(children[1]?.props.id).toBe("A");
       expect(children[2]?.props.id).toBe("B");
@@ -800,7 +800,7 @@ describe("View - virtual_dom correctness", () => {
         { viewFn: viewFn, props: { id: 3 }, slot: null, userKey: "key-3" },
       ];
 
-      rootView.reconsileChildren(pending);
+      rootView.reconsileChildren(new Set(pending));
 
       expect(rootView.virtualDom.length).toBe(3);
       expect(rootView.keyToView.size).toBe(2);
@@ -819,13 +819,13 @@ describe("View - virtual_dom correctness", () => {
         userKey: `key-${i}`,
       }));
 
-      rootView.reconsileChildren(pending);
+      rootView.reconsileChildren(new Set(pending));
 
       expect(rootView.virtualDom.length).toBe(count);
       expect(rootView.keyToView.size).toBe(count);
 
       // Verify order and keys
-      const children = listToArray(rootView.virtualDom);
+      const children = toArray(rootView.virtualDom);
       for (let i = 0; i < Math.min(count, 10); i++) {
         expect(children[i]?.props.id).toBe(i);
         expect(rootView.keyToView.get(`key-${i}`)).toBe(children[i]);

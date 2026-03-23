@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "lib": ["ESNext", "DOM"],
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleDetection": "force",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "noEmit": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "paths": {
+      "@/*": ["../../src/*"]
+    }
+  },
+  "include": ["src", "../../src", "../perf_profiler/profile.ts"]
+}

@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Creo — Editable Table</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      padding: 32px;
+      background: #f5f5f5;
+      color: #1a1a1a;
+    }
+
+    .toolbar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .btn {
+      padding: 6px 14px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      background: #fff;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .btn:hover { background: #eee; }
+
+    .table {
+      display: inline-block;
+      border: 1px solid #bbb;
+      border-radius: 4px;
+      overflow: hidden;
+      background: #fff;
+      outline: none;
+    }
+    .table:focus {
+      border-color: #4a90d9;
+    }
+
+    .row {
+      display: flex;
+    }
+    .row:not(:last-child) {
+      border-bottom: 1px solid #ddd;
+    }
+
+    .cell {
+      min-width: 120px;
+      padding: 8px 12px;
+      cursor: pointer;
+      font-size: 14px;
+      min-height: 36px;
+    }
+    .cell:not(:last-child) {
+      border-right: 1px solid #ddd;
+    }
+    .cell:hover {
+      background: #f0f6ff;
+    }
+    .cell.selected {
+      outline: 2px solid #4a90d9;
+      outline-offset: -2px;
+      background: #e8f0fe;
+    }
+
+    .header-cell {
+      font-weight: 600;
+      background: #f9f9f9;
+      cursor: default;
+    }
+    .header-cell:hover {
+      background: #f9f9f9;
+    }
+
+    .cell-input {
+      min-width: 120px;
+      width: 120px;
+      padding: 8px 12px;
+      font-size: 14px;
+      border: none;
+      outline: 2px solid #4a90d9;
+      outline-offset: -2px;
+      min-height: 36px;
+      font-family: inherit;
+      background: #fff;
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

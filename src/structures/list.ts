@@ -1,97 +1,290 @@
-import { just } from "@/functional/maybe";
+/**
+ * Linked list implementation
+ */
 
-export class List<Node> {
-  map: Map<Node, number> = new Map();
-  constructor(protected items: Node[]) {
-    items.forEach((item, index) => {
-      this.map.set(item, index);
-    });
+import type { Maybe } from "@/functional/maybe";
+
+const $next: unique symbol = Symbol("next");
+const $prev: unique symbol = Symbol("prev");
+const $owner: unique symbol = Symbol("owner");
+
+export interface INode<T> {
+  insertNext(value: T): INode<T>;
+  insertPrev(value: T): INode<T>;
+  v: T;
+  delete(): void;
+  getNext(): Maybe<INode<T>>;
+  getPrev(): Maybe<INode<T>>;
+  isFirst(): boolean;
+  isLast(): boolean;
+}
+
+export class ListNode<T> implements INode<T> {
+  [$owner]: Maybe<IBaseContainer<T>>;
+  [$next]: Maybe<ListNode<T>>;
+  [$prev]: Maybe<ListNode<T>>;
+  public v: T;
+
+  constructor(
+    node: T,
+    prev: Maybe<ListNode<T>> = null,
+    next: Maybe<ListNode<T>> = null,
+    list: IBaseContainer<T>,
+  ) {
+    this[$prev] = prev;
+    this[$next] = next;
+    this[$owner] = list;
+    this.v = node;
   }
 
-  /**
-   * Appends new elements to the end of a list
-   * @param items — New elements to add to the list.
-   */
-  push(...items: Node[]) {
-    for (const item of items) {
-      this.map.set(item, this.items.length);
-      this.items.push(item);
+  isFirst(): boolean {
+    return this[$prev] == null;
+  }
+
+  isLast(): boolean {
+    return this[$next] == null;
+  }
+
+  delete() {
+    this[$owner]?.delete(this);
+  }
+
+  clearFields() {
+    this[$next] = null;
+    this[$prev] = null;
+    this[$owner] = null;
+  }
+
+  insertNext(value: T) {
+    const owner = this[$owner];
+    if (!owner) {
+      throw new Error("The item is detached from DataContainer");
     }
+    return owner.insertNext(this, value);
   }
 
-  /**
-   * Inserts new elements at the start of a list
-   * @param items — Elements to insert at the start of the list.
-   */
-  unshift(...items: Node[]) {
-    for (const item of items) {
-      this.map.set(item, 0);
-      this.items.unshift(item);
+  insertPrev(value: T) {
+    const owner = this[$owner];
+    if (!owner) {
+      throw new Error("The item is detached from DataContainer");
     }
+    return owner.insertPrev(this, value);
   }
 
-  get length() {
-    return this.items.length;
+  getNext(): Maybe<ListNode<T>> {
+    return this[$next];
   }
 
-  /**
-   * Returns a copy of a section of an array. For both start and end,
-   *    a negative index can be used to indicate an offset from the end of the array.
-   * For example, -2 refers to the second to last element of the array.
-   *
-   * @param start
-   * The beginning index of the specified portion of the array. If start is undefined, then the slice begins at index 0.
-   *
-   * @param end
-   * The end index of the specified portion of the array. This is exclusive of the element at the index 'end'. If end is undefined, then the slice extends to the end of the array.
-   */
-  slice(start?: number, end?: number): List<Node> {
-    return new List(this.items.slice(start, end));
+  getPrev(): Maybe<ListNode<T>> {
+    return this[$prev];
   }
 
-  delete(item: Node) {
-    const index = this.map.get(item);
-    if (index === undefined) {
-      return;
+  getList() {
+    return this[$owner];
+  }
+}
+
+interface IBaseContainer<T> {
+  delete(node: INode<T>): void;
+  insertNext(ref: INode<T>, value: T): INode<T>;
+  insertPrev(ref: INode<T>, value: T): INode<T>;
+}
+
+export interface IList<T> extends Iterable<INode<T>>, IBaseContainer<T> {
+  insertStart(value: T): INode<T>;
+  insertEnd(value: T): INode<T>;
+  at(n: number): Maybe<INode<T>>;
+  first(): Maybe<INode<T>>;
+  last(): Maybe<INode<T>>;
+  readonly size: number;
+  [Symbol.iterator](): IterableIterator<INode<T>>;
+}
+
+export class InternalList<T> implements IList<T> {
+  #head: Maybe<ListNode<T>>;
+  #tail: Maybe<ListNode<T>>;
+  #size = 0;
+
+  // Cursor cache: remembers last .at() result so sequential access is O(1)
+  #cursorNode: Maybe<ListNode<T>>;
+  #cursorIndex = -1;
+
+  #invalidateCursor() {
+    this.#cursorNode = null;
+    this.#cursorIndex = -1;
+  }
+
+  insertStart(value: T) {
+    const node = new ListNode(value, null, this.#head, this);
+    if (this.#head != null) {
+      this.#head[$prev] = node;
+    } else {
+      this.#tail = node;
     }
-    this.#delete(index, item);
+    this.#head = node;
+    this.#size++;
+    this.#invalidateCursor();
+    return this.#head;
   }
 
-  indexOf(item: Node) {
-    return this.map.get(item);
-  }
+  delete(node: INode<T>): void {
+    const n = node as ListNode<T>;
+    const prev = n[$prev];
+    const next = n[$next];
 
-  has(item: Node) {
-    return this.map.has(item);
-  }
-
-  #delete(index: number, item: Node) {
-    this.map.delete(item);
-    this.items.splice(index, 1);
-    // Update the map for items after the deleted item
-    let $;
-    for (let i = index; i < this.items.length; i++) {
-      $ = this.items[i];
-      just($);
-      this.map.set($, i);
+    if (next) {
+      next[$prev] = prev;
     }
-  }
-
-  deleteAt(index: number) {
-    const item = this.items[index];
-    if (item === undefined) {
-      return;
+    if (prev) {
+      prev[$next] = next;
     }
-    this.#delete(index, item);
+    if (node === this.#head) {
+      this.#head = next;
+    }
+    if (node === this.#tail) {
+      this.#tail = prev;
+    }
+    n.clearFields();
+    this.#size--;
+    this.#invalidateCursor();
   }
 
-  at(index: number) {
-    return this.items.at(index);
+  at(n: number): Maybe<ListNode<T>> {
+    // Normalise negative index
+    if (n < 0) n = this.#size + n;
+    if (n < 0 || n >= this.#size) return;
+
+    // Pick the closest starting point among head, tail, and cached cursor
+    let current: Maybe<ListNode<T>>;
+    let pos: number;
+
+    const distFromHead = n;
+    const distFromTail = this.#size - 1 - n;
+    const distFromCursor =
+      this.#cursorNode != null ? Math.abs(n - this.#cursorIndex) : Infinity;
+
+    if (distFromCursor <= distFromHead && distFromCursor <= distFromTail) {
+      // Start from cursor
+      current = this.#cursorNode;
+      pos = this.#cursorIndex;
+    } else if (distFromHead <= distFromTail) {
+      // Start from head
+      current = this.#head;
+      pos = 0;
+    } else {
+      // Start from tail
+      current = this.#tail;
+      pos = this.#size - 1;
+    }
+
+    // Walk to target
+    while (pos < n && current != null) {
+      current = current[$next];
+      pos++;
+    }
+    while (pos > n && current != null) {
+      current = current[$prev];
+      pos--;
+    }
+
+    // Update cursor cache
+    if (current != null) {
+      this.#cursorNode = current;
+      this.#cursorIndex = pos;
+    }
+
+    return current;
+  }
+
+  get size(): number {
+    return this.#size;
+  }
+
+  /** Reset the list to empty. O(1). */
+  clear(): void {
+    this.#head = null;
+    this.#tail = null;
+    this.#size = 0;
+    this.#invalidateCursor();
+  }
+
+  /** O(1) head access. */
+  first(): Maybe<ListNode<T>> {
+    return this.#head;
+  }
+
+  /** O(1) tail access. */
+  last(): Maybe<ListNode<T>> {
+    return this.#tail;
+  }
+
+  insertEnd(value: T): ListNode<T> {
+    const node = new ListNode(value, this.#tail, null, this);
+    if (this.#tail != null) {
+      this.#tail[$next] = node;
+    } else {
+      this.#head = node;
+    }
+    this.#tail = node;
+    this.#size++;
+    // Don't invalidate cursor — appending doesn't shift existing indices
+    return this.#tail;
+  }
+
+  insertNext(ref: INode<T>, value: T): ListNode<T> {
+    const r = ref as ListNode<T>;
+    if (r[$owner] != this) {
+      throw new TypeError(
+        "The reference node does not belong to the current list",
+      );
+    }
+    const node = new ListNode(value, r, r[$next], this);
+    if (r[$next]) {
+      r[$next][$prev] = node;
+    } else {
+      this.#tail = node;
+    }
+    r[$next] = node;
+    this.#size++;
+    this.#invalidateCursor();
+    return node;
+  }
+
+  insertPrev(ref: INode<T>, value: T): ListNode<T> {
+    const r = ref as ListNode<T>;
+    if (r[$owner] != this) {
+      throw new TypeError(
+        "The reference node does not belong to the current list",
+      );
+    }
+    const node = new ListNode(value, r[$prev], r, this);
+    if (r[$prev]) {
+      r[$prev][$next] = node;
+    } else {
+      this.#head = node;
+    }
+    r[$prev] = node;
+    this.#size++;
+    this.#invalidateCursor();
+    return node;
   }
 
   *[Symbol.iterator]() {
-    for (const item of this.items) {
-      yield item;
+    let current = this.#head;
+    while (current) {
+      const next = current[$next]; // save before yield — node may be deleted during iteration
+      yield current;
+      current = next;
     }
+  }
+}
+
+export class List<T> extends InternalList<T> implements IList<T> {
+  static from<T>(arrayLike: Iterable<T>): List<T> {
+    const list = new List<T>();
+    for (const item of arrayLike) {
+      list.insertEnd(item);
+    }
+    return list;
   }
 }

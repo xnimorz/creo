@@ -1,31 +1,26 @@
 import type { IRender } from "@/render/render_interface";
-import type { PendingView, View } from "./internal_view";
-import { List } from "@/structures/list";
+import { View, type PendingView } from "./internal_view";
+import { IndexedList } from "@/structures/indexed_list";
 import type { Wildcard } from "./wildcard";
 
 /**
- * Engine keeps track on related views for this particular engine
+ * Engine orchestrates the render cycle:
+ *   1. Pick dirty views from needRender
+ *   2. For each: renderer.render (create/update DOM), then view.render (VDOM reconciliation)
+ *   3. Childless primitives are rendered immediately on creation
+ *   4. Unmounts happen directly in View[Symbol.dispose]
  */
 export class Engine {
-  // Currently rendering views
-  protected rendering: List<View> = new List<View>([]);
-
-  // List of views marked as dirty, so that they need to be re-rendered
-  protected needRender: List<View> = new List<View>([]);
-
-  // Registry of all views related to this engine, so that we can find them by key
-  protected registry: List<View> = new List<View>([]);
-
-  // List of disposed views, that need to be cleaned up after rendering
-  protected needDelete: List<View> = new List<View>([]);
+  protected rendering = new IndexedList<View>();
+  protected needRender = new IndexedList<View>();
 
   constructor(public renderer: IRender<Wildcard>) {}
 
+  // -- View lifecycle ---------------------------------------------------------
+
   disposeView(view: View) {
-    this.registry.delete(view);
     this.needRender.delete(view);
     this.rendering.delete(view);
-    this.needDelete.push(view);
   }
 
   renderBefore(view: View) {
@@ -47,22 +42,89 @@ export class Engine {
     this.needRender.push(view);
   }
 
+  /** Cursor for depth-first child insertion in needRender */
+  #childCursor: View | null = null;
+
   register(view: View) {
-    this.registry.push(view);
-    this.needRender.push(view);
+    if (view.isPrimitive && view.ctx.slot == null) {
+      // Childless primitive — render immediately (parent DOM exists), skip render queue
+      this.renderer.render(view);
+      return;
+    }
+    // Insert children right after previously registered sibling (depth-first)
+    if (this.#childCursor) {
+      this.needRender.insertAfter(this.#childCursor, view);
+    } else {
+      // First child — insert at front of queue (before remaining siblings)
+      this.needRender.unshift(view);
+    }
+    this.#childCursor = view;
   }
 
-  #pendingViewCache: PendingView[] = [];
+  // -- Pending views ----------------------------------------------------------
+
+  #pendingViewCache: Set<PendingView> = new Set();
+
   addToPendingViews(pendingView: PendingView) {
-    this.#pendingViewCache.push(pendingView);
+    this.#pendingViewCache.add(pendingView);
   }
 
   getPendingViews() {
+    if (this.#pendingViewCache.size === 0) return this.#pendingViewCache;
     const pendingViews = this.#pendingViewCache;
-    this.#pendingViewCache = [];
+    this.#pendingViewCache = new Set();
     return pendingViews;
   }
 
-  // Debugging method to dump the current state of the engine
-  dump() {}
+  // -- Render cycle -----------------------------------------------------------
+
+  initialRender() {
+    for (const p of this.getPendingViews()) {
+      new View(p.viewFn, this, p.props, p.slot, null, null);
+    }
+    this.#processQueue();
+  }
+
+  #cycling = false;
+
+  renderCycle() {
+    if (this.#cycling) return;
+    this.#cycling = true;
+    try {
+      this.#processQueue();
+    } finally {
+      this.#cycling = false;
+    }
+  }
+
+  #mountAfter: View[] = [];
+
+  #processQueue() {
+    while (this.needRender.length > 0) {
+      const view = this.needRender.first()!;
+
+      const isNew = view.renderRef == null;
+
+      // Create/update DOM first so children can be mounted during view.render()
+      this.renderer.render(view);
+
+      if (isNew && view.viewBody.mount?.after) {
+        this.#mountAfter.push(view);
+      }
+
+      // Reset child cursor — children registered during render()
+      // will be inserted at the front of the queue (depth-first order)
+      this.#childCursor = null;
+
+      // Run viewBody + reconcile children
+      view.render();
+    }
+
+    // mount.after callbacks — after all DOM work is done
+    const ma = this.#mountAfter;
+    for (let i = 0; i < ma.length; i++) {
+      ma[i]!.mountAfter();
+    }
+    ma.length = 0;
+  }
 }
