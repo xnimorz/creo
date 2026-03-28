@@ -72,7 +72,7 @@ export class HtmlRender implements IRender<HTMLElement | Text> {
       } else {
         const parentNode = this.getParentDomNode(parent);
         if (parentNode) {
-          parentNode.insertBefore(node, this.findInsertionPoint(parent, view));
+          parentNode.insertBefore(node, this.fastInsertionPoint(parent, view));
         }
       }
       // Handle autofocus
@@ -87,24 +87,27 @@ export class HtmlRender implements IRender<HTMLElement | Text> {
       return;
     }
 
-    // --- Update: reposition + diff ---
+    // --- Update: reposition (only if moved) + diff ---
 
-    if (view.parent) {
-      const expectedStart = this.findInsertionPoint(view.parent, view);
-      const firstDom = this.getFirstDomNode(view);
+    if (view.moved) {
+      view.moved = false;
+      if (view.parent) {
+        const expectedStart = this.fastInsertionPoint(view.parent, view);
+        const firstDom = this.getFirstDomNode(view);
 
-      if (firstDom && firstDom !== expectedStart) {
-        const parentNode = this.getParentDomNode(view.parent);
-        if (parentNode) {
-          if (ref.kind === "primitive") {
-            parentNode.insertBefore(ref.element, expectedStart);
-          } else {
-            if (view.virtualDom) {
-              for (const child of view.virtualDom) {
-                this.moveDomNodes(child, parentNode, expectedStart);
+        if (firstDom && firstDom !== expectedStart) {
+          const parentNode = this.getParentDomNode(view.parent);
+          if (parentNode) {
+            if (ref.kind === "primitive") {
+              parentNode.insertBefore(ref.element, expectedStart);
+            } else {
+              if (view.virtualDom) {
+                for (const child of view.virtualDom) {
+                  this.moveDomNodes(child, parentNode, expectedStart);
+                }
               }
+              parentNode.insertBefore(ref.endComment, expectedStart);
             }
-            parentNode.insertBefore(ref.endComment, expectedStart);
           }
         }
       }
@@ -321,31 +324,65 @@ export class HtmlRender implements IRender<HTMLElement | Text> {
 
   // -- Internal: DOM navigation -----------------------------------------------
 
-  private findInsertionPoint(parent: View, view: View): Node | null {
+  /**
+   * Compute where a view's DOM node should be placed in its parent.
+   *
+   * Fast paths (O(1)):
+   *  - Last child → endComment (composite) or null/appendChild (primitive)
+   *  - Previous sibling rendered → nextSibling of prev's last DOM node
+   *
+   * Slow path (O(k)): walk backward through unrendered siblings.
+   *
+   * Composite parents always return endComment as fallback (never null),
+   * so insertBefore(node, result) is safe for all parent types.
+   */
+  private fastInsertionPoint(parent: View, view: View): Node | null {
     const vdom = parent.virtualDom;
-    if (vdom) {
-      let prev = vdom.getNode(view)?.getPrev();
-      while (prev) {
-        const prevRef = prev.v.renderRef as Maybe<DomRef>;
-        if (prevRef) {
-          const lastDom =
-            prevRef.kind === "composite" ? prevRef.endComment : prevRef.element;
-          return lastDom.nextSibling;
+    if (vdom && vdom.length > 0) {
+      const node = vdom.getNode(view);
+      if (node) {
+        // Fast path: last child → append at end of parent
+        if (node.isLast() || parent.quickRerender) {
+          const ref = parent.renderRef as Maybe<DomRef>;
+          if (ref?.kind === "composite") {
+            return ref.endComment;
+          } else {
+            return null;
+          }
         }
-        prev = prev.getPrev();
+
+        // Fast path: immediate previous sibling is rendered
+        const prev = node.getPrev();
+        if (prev) {
+          const prevRef = prev.v.renderRef as Maybe<DomRef>;
+          if (prevRef) {
+            return (
+              prevRef.kind === "composite"
+                ? prevRef.endComment
+                : prevRef.element
+            ).nextSibling;
+          }
+          // Slow path: walk further back through unrendered siblings
+          let cur = prev.getPrev();
+          while (cur) {
+            const curRef = cur.v.renderRef as Maybe<DomRef>;
+            if (curRef) {
+              return (
+                curRef.kind === "composite" ? curRef.endComment : curRef.element
+              ).nextSibling;
+            }
+            cur = cur.getPrev();
+          }
+        }
       }
     }
 
-    // No rendered previous sibling — insert at the start of the parent
+    // First child (or no vdom): insert at start of parent
     const ref = parent.renderRef as Maybe<DomRef>;
     if (!ref) return null;
-
-    if (ref.kind === "composite") {
-      return ref.endComment;
-    }
-
-    // Primitive parent: insert before its first child (beginning of container)
-    return ref.element.firstChild;
+    // Composite: endComment is both start and end anchor (children go before it)
+    // Primitive: firstChild (null if empty → appendChild)
+    return ref.kind === "composite" ? ref.endComment : ref.element.firstChild;
   }
 
   private getParentDomNode(parent: View): Maybe<Node> {

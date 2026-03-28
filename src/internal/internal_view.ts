@@ -36,6 +36,10 @@ export class View<Props = Wildcard, Api = Wildcard> implements Disposable {
   // marks if the entity itself needs rerender
   dirty: boolean = true;
 
+  // marks if the entity was moved in the vdom (needs DOM repositioning)
+  moved: boolean = false;
+  quickRerender: boolean = true;
+
   #unsubscribe: (() => void)[] = [];
 
   constructor(
@@ -82,7 +86,8 @@ export class View<Props = Wildcard, Api = Wildcard> implements Disposable {
     this.engine.markDirty(this);
   };
 
-  markMoved() {
+  markMove() {
+    this.moved = true;
     this.engine.markDirty(this);
   }
 
@@ -94,6 +99,7 @@ export class View<Props = Wildcard, Api = Wildcard> implements Disposable {
   }
 
   onMount = () => {
+    this.quickRerender = false;
     this.body.onMount?.();
   };
 
@@ -102,6 +108,7 @@ export class View<Props = Wildcard, Api = Wildcard> implements Disposable {
   }
 
   onUpdateAfter = () => {
+    this.quickRerender = false;
     this.body.onUpdateBefore?.();
   };
 
@@ -122,6 +129,7 @@ export class View<Props = Wildcard, Api = Wildcard> implements Disposable {
     const children = this.engine.collect(this.body.render);
     if (!this.virtualDom && children.length === 0) return;
     if (!this.virtualDom) this.virtualDom = new IndexedList();
+    this.quickRerender = true;
     const vdom = this.virtualDom;
 
     for (let i = 0; i < children.length; i++) {
@@ -130,6 +138,7 @@ export class View<Props = Wildcard, Api = Wildcard> implements Disposable {
       // Non-keyed operation
       if (pending.userKey == null) {
         if (expectedNext?.viewFn === pending.viewFn) {
+          this.quickRerender = false;
           expectedNext.nextProps(pending.props, pending.slot);
         } else {
           if (expectedNext) {
@@ -157,14 +166,15 @@ export class View<Props = Wildcard, Api = Wildcard> implements Disposable {
         const matchedIndex = this.keyToIndex?.get(pending.userKey);
         const matched = matchedIndex != null ? vdom.at(matchedIndex) : null;
         if (matched && matched.viewFn === pending.viewFn) {
+          this.quickRerender = false;
           matched.nextProps(pending.props, pending.slot);
 
           // We have some element in expectedNext. Need to identify actions
           if (expectedNext != null) {
             // We have non-matched element in expectedNext, we need to swap them
             if (matched !== expectedNext) {
-              matched.markMoved();
-              expectedNext.markMoved();
+              matched.markMove();
+              expectedNext.markMove();
               vdom.swap(matched, expectedNext);
               // Update keyToIndex after swap: matched is now at i, expectedNext at matchedIndex
               if (this.keyToIndex) {
@@ -179,7 +189,7 @@ export class View<Props = Wildcard, Api = Wildcard> implements Disposable {
             // No element in expectedNext, we just need to put matched to correct position.
             // TODO:
             // technically this case should NOT be possible, as we have matched item, while exceeding the array size already.
-            matched.markMoved();
+            matched.markMove();
             vdom.upsert(i, matched);
             if (this.keyToIndex && matched.userKey != null) {
               this.keyToIndex.set(matched.userKey, i);
