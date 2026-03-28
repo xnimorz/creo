@@ -1,7 +1,12 @@
-import { primitive } from "../primitive";
-import type { PrimitiveComponent } from "../primitive";
-import type { ViewFn } from "../view";
 import type { Wildcard } from "@/internal/wildcard";
+import { $primitive, type EventHandlerProps } from "../primitive";
+import {
+  view,
+  type PublicView,
+  type Slot,
+  type ViewBody,
+  type ViewFn,
+} from "../view";
 
 // ---------------------------------------------------------------------------
 // Engine-agnostic event data types
@@ -67,41 +72,28 @@ export type HtmlAttrs = {
   [attr: string]: unknown;
 };
 
-// ---------------------------------------------------------------------------
-// html(tag) factory — creates a primitive for any HTML element
-// ---------------------------------------------------------------------------
-
-const $htmlTag: unique symbol = Symbol("htmlTag");
-const tagCache = new Map<string, PrimitiveComponent<HtmlAttrs, ContainerEvents>>();
-
-export function getHtmlTag(
-  viewFn: ViewFn<Wildcard, Wildcard>,
-): string | undefined {
-  return (viewFn as Wildcard)[$htmlTag];
-}
-
 export function html<
   Attrs extends HtmlAttrs = HtmlAttrs,
   Events = ContainerEvents,
->(tag: string): PrimitiveComponent<Attrs, Events> {
-  const cached = tagCache.get(tag);
-  if (cached) return cached as unknown as PrimitiveComponent<Attrs, Events>;
-  const p = primitive<Attrs, Events>();
-  (p.viewFn as Wildcard)[$htmlTag] = tag;
-  tagCache.set(tag, p as unknown as PrimitiveComponent<HtmlAttrs, ContainerEvents>);
-  return p;
+>(tag: string): PublicView<Attrs & EventHandlerProps<Events>, void> {
+  const fn: ViewFn<Attrs & EventHandlerProps<Events>, void> = <Props>({
+    slot,
+  }: {
+    slot: Slot;
+  }): ViewBody<Props, void> => ({
+    render() {
+      slot();
+    },
+  });
+  fn[$primitive] = tag;
+  return view(fn);
 }
 
 // ---------------------------------------------------------------------------
-// Text node (special — not an HTMLElement)
+// Text node
 // ---------------------------------------------------------------------------
 
-const textPrimitive = primitive<{ content: string }>();
-
-export function text(value: string | number): void {
-  textPrimitive({ content: String(value) });
-}
-text.viewFn = textPrimitive.viewFn;
+export const text = html<Wildcard>("text");
 
 // ---------------------------------------------------------------------------
 // Layout / structural
@@ -283,7 +275,7 @@ export const source = html<
 >("source");
 
 // ---------------------------------------------------------------------------
-// Other
+// Interactive
 // ---------------------------------------------------------------------------
 
 export const details = html<HtmlAttrs & { open?: boolean }, ContainerEvents>(
@@ -293,12 +285,200 @@ export const summary = html("summary");
 export const dialog = html<HtmlAttrs & { open?: boolean }, ContainerEvents>(
   "dialog",
 );
+export const menu = html("menu");
+
+// ---------------------------------------------------------------------------
+// Embedded content
+// ---------------------------------------------------------------------------
+
 export const iframe = html<
   HtmlAttrs & {
     src?: string;
     width?: number;
     height?: number;
     sandbox?: string;
+    allow?: string;
+    loading?: string;
+    referrerpolicy?: string;
   },
   ContainerEvents
 >("iframe");
+export const embed = html<
+  HtmlAttrs & { src?: string; type?: string; width?: number; height?: number },
+  ContainerEvents
+>("embed");
+export const object = html<
+  HtmlAttrs & {
+    data?: string;
+    type?: string;
+    width?: number;
+    height?: number;
+    name?: string;
+  },
+  ContainerEvents
+>("object");
+export const picture = html("picture");
+export const portal = html<HtmlAttrs & { src?: string }, ContainerEvents>(
+  "portal",
+);
+
+// ---------------------------------------------------------------------------
+// SVG (container only — inner SVG elements use html() ad-hoc)
+// ---------------------------------------------------------------------------
+
+export const svg = html<
+  HtmlAttrs & {
+    viewBox?: string;
+    xmlns?: string;
+    width?: number | string;
+    height?: number | string;
+    fill?: string;
+  },
+  ContainerEvents
+>("svg");
+
+// ---------------------------------------------------------------------------
+// Scripting / metadata (rarely used in render, but complete for parity)
+// ---------------------------------------------------------------------------
+
+export const script = html<
+  HtmlAttrs & { src?: string; type?: string; async?: boolean; defer?: boolean },
+  ContainerEvents
+>("script");
+export const noscript = html("noscript");
+export const template = html("template");
+export const slot = html<HtmlAttrs & { name?: string }, ContainerEvents>(
+  "slot",
+);
+
+// ---------------------------------------------------------------------------
+// Sectioning
+// ---------------------------------------------------------------------------
+
+export const address = html("address");
+export const hgroup = html("hgroup");
+export const search = html("search");
+
+// ---------------------------------------------------------------------------
+// Text semantics
+// ---------------------------------------------------------------------------
+
+export const abbr = html("abbr");
+export const b = html("b");
+export const bdi = html("bdi");
+export const bdo = html<HtmlAttrs & { dir?: string }, ContainerEvents>("bdo");
+export const cite = html("cite");
+export const data = html<HtmlAttrs & { value?: string }, ContainerEvents>(
+  "data",
+);
+export const dfn = html("dfn");
+export const i = html("i");
+export const kbd = html("kbd");
+export const mark = html("mark");
+export const q = html<HtmlAttrs & { cite?: string }, ContainerEvents>("q");
+export const rp = html("rp");
+export const rt = html("rt");
+export const ruby = html("ruby");
+export const s = html("s");
+export const samp = html("samp");
+export const sub = html("sub");
+export const sup = html("sup");
+export const time = html<HtmlAttrs & { datetime?: string }, ContainerEvents>(
+  "time",
+);
+export const u = html("u");
+export const varEl = html("var");
+export const wbr = html("wbr");
+
+// ---------------------------------------------------------------------------
+// Demarcating edits
+// ---------------------------------------------------------------------------
+
+export const del = html<
+  HtmlAttrs & { cite?: string; datetime?: string },
+  ContainerEvents
+>("del");
+export const ins = html<
+  HtmlAttrs & { cite?: string; datetime?: string },
+  ContainerEvents
+>("ins");
+
+// ---------------------------------------------------------------------------
+// Table (additional)
+// ---------------------------------------------------------------------------
+
+export const caption = html("caption");
+export const colgroup = html<HtmlAttrs & { span?: number }, ContainerEvents>(
+  "colgroup",
+);
+export const col = html<HtmlAttrs & { span?: number }, ContainerEvents>("col");
+
+// ---------------------------------------------------------------------------
+// Form (additional)
+// ---------------------------------------------------------------------------
+
+export const datalist = html("datalist");
+export const optgroup = html<
+  HtmlAttrs & { label?: string; disabled?: boolean },
+  ContainerEvents
+>("optgroup");
+export const output = html<
+  HtmlAttrs & { for?: string; name?: string },
+  ContainerEvents
+>("output");
+export const progress = html<
+  HtmlAttrs & { value?: number; max?: number },
+  ContainerEvents
+>("progress");
+export const meter = html<
+  HtmlAttrs & {
+    value?: number;
+    min?: number;
+    max?: number;
+    low?: number;
+    high?: number;
+    optimum?: number;
+  },
+  ContainerEvents
+>("meter");
+
+// ---------------------------------------------------------------------------
+// Figure
+// ---------------------------------------------------------------------------
+
+export const figure = html("figure");
+export const figcaption = html("figcaption");
+
+// ---------------------------------------------------------------------------
+// Line break opportunity / content
+// ---------------------------------------------------------------------------
+
+export const dd = html("dd");
+export const dl = html("dl");
+export const dt = html("dt");
+
+// ---------------------------------------------------------------------------
+// Media (additional)
+// ---------------------------------------------------------------------------
+
+export const track = html<
+  HtmlAttrs & {
+    src?: string;
+    kind?: string;
+    srclang?: string;
+    label?: string;
+    default?: boolean;
+  },
+  ContainerEvents
+>("track");
+export const map = html<HtmlAttrs & { name?: string }, ContainerEvents>("map");
+export const area = html<
+  HtmlAttrs & {
+    alt?: string;
+    coords?: string;
+    href?: string;
+    shape?: string;
+    target?: string;
+  },
+  ContainerEvents
+>("area");

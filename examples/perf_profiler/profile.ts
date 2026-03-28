@@ -1,5 +1,5 @@
 import { Window } from "happy-dom";
-import { view } from "@/public/view";
+import { view, type ViewFn } from "@/public/view";
 import {
   span,
   text,
@@ -13,6 +13,7 @@ import { Engine } from "@/internal/engine";
 import { View } from "@/internal/internal_view";
 import { orchestrator } from "@/internal/orchestrator";
 import { HtmlRender } from "@/render/html_render";
+import { _ } from "@/index";
 
 const win = new Window({ url: "http://localhost" });
 Object.assign(globalThis, {
@@ -99,26 +100,26 @@ const Row = view<{
   selected: boolean;
   onSelect: () => void;
   onRemove: () => void;
-}>(({ props }) => ({
+}>((ctx) => ({
   update: {
     should(next: any) {
       return (
-        next.item.label !== props.item.label || next.selected !== props.selected
+        next.item.label !== ctx.props().item.label || next.selected !== ctx.props().selected
       );
     },
   },
   render() {
-    tr({ class: props.selected ? "danger" : "" }, () => {
+    tr({ class: ctx.props().selected ? "danger" : "" }, () => {
       td({ class: "col-md-1" }, () => {
-        text(props.item.id);
+        text(ctx.props().item.id);
       });
       td({ class: "col-md-4" }, () => {
-        a({ onClick: props.onSelect }, () => {
-          text(props.item.label);
+        a({ onClick: ctx.props().onSelect }, () => {
+          text(ctx.props().item.label);
         });
       });
       td({ class: "col-md-1" }, () => {
-        a({ onClick: props.onRemove }, () => {
+        a({ onClick: ctx.props().onRemove }, () => {
           span({ class: "glyphicon glyphicon-remove", "aria-hidden": "true" });
         });
       });
@@ -134,10 +135,10 @@ function percentile(arr: number[], p: number): number {
 
 // --- Capture root view ---
 let rootView: View;
-const origRegister = Engine.prototype.register;
-Engine.prototype.register = function (v: View) {
-  if (!v.parent) rootView = v;
-  origRegister.call(this, v);
+const origMarkDirty = Engine.prototype.markDirty;
+Engine.prototype.markDirty = function (v: View) {
+  if (!v.parent && !rootView) rootView = v as View;
+  origMarkDirty.call(this, v);
 };
 
 const container = document.createElement("div");
@@ -145,8 +146,9 @@ const renderer = new HtmlRender(container);
 const engine = new Engine(renderer);
 orchestrator.setCurrentEngine(engine);
 let listState: any;
-view(({ state }: any) => {
-  const list = state([]);
+
+const appViewFn: ViewFn<any, any> = ({ use }) => {
+  const list = use<RowData[]>([]);
   listState = list;
   return {
     render() {
@@ -164,12 +166,16 @@ view(({ state }: any) => {
       });
     },
   };
-})({} as any);
-engine.initialRender();
+};
+
+new View(appViewFn as any, {}, null, engine, null, null);
+engine.render();
 
 function countViews(v: View): number {
   let n = 1;
-  for (const c of v.virtualDom) n += countViews(c);
+  if (v.virtualDom) {
+    for (const c of v.virtualDom) n += countViews(c);
+  }
   return n;
 }
 
@@ -177,68 +183,36 @@ function countViews(v: View): number {
 console.log("=== Memory Leak Check ===\n");
 
 listState.set(buildData(1000));
-engine.renderCycle();
+engine.render();
 console.log(
   `After create 1K: views=${countViews(rootView!)} TRs=${container.getElementsByTagName("tr").length}`,
 );
 
 listState.set([]);
-engine.renderCycle();
+engine.render();
 console.log(
   `After clear:     views=${countViews(rootView!)} TRs=${container.getElementsByTagName("tr").length}`,
 );
 
 for (let i = 0; i < 10; i++) {
   listState.set(buildData(1000));
-  engine.renderCycle();
+  engine.render();
 }
 console.log(
   `After 10 cycles: views=${countViews(rootView!)} TRs=${container.getElementsByTagName("tr").length}`,
 );
 
 listState.set([]);
-engine.renderCycle();
+engine.render();
 console.log(
   `After clear:     views=${countViews(rootView!)} TRs=${container.getElementsByTagName("tr").length}`,
 );
 
-// _prevDom check
-listState.set(buildData(100));
-engine.renderCycle();
-listState.set(buildData(100));
-engine.renderCycle();
-let prevDomDisposed = 0;
-function checkPrev(v: any) {
-  if (v._prevDom) {
-    for (const old of v._prevDom) {
-      if (old._disposed) prevDomDisposed++;
-    }
-  }
-  for (const c of v.virtualDom) checkPrev(c);
-}
-checkPrev(rootView!);
-console.log(
-  `\n_prevDom holding disposed: ${prevDomDisposed} ${prevDomDisposed === 0 ? "✓" : "⚠ LEAK"}`,
-);
+// _prevDom removed — no longer applicable
+console.log(`\n_prevDom: removed ✓`);
 
-// _vdomNode check
-listState.set(buildData(50));
-engine.renderCycle();
-const views: any[] = [];
-function collect(v: any) {
-  views.push(v);
-  for (const c of v.virtualDom) collect(c);
-}
-collect(rootView!);
-listState.set([]);
-engine.renderCycle();
-let staleNodes = 0;
-for (const v of views) {
-  if (v._disposed && v._vdomNode) staleNodes++;
-}
-console.log(
-  `Stale _vdomNode on disposed: ${staleNodes} ${staleNodes === 0 ? "✓" : "⚠ LEAK"}`,
-);
+// _vdomNode removed — no longer applicable
+console.log(`Stale _vdomNode: removed ✓`);
 
 // ========== Performance ==========
 console.log("\n=== Performance (50 runs, 10K rows) ===\n");
@@ -291,11 +265,11 @@ for (let run = 0; run < RUNS; run++) {
   nextId = 1;
   const c2 = document.createElement("div");
   const r2 = new HtmlRender(c2);
-  const e2 = new Engine(r2) as any;
+  const e2 = new Engine(r2);
   orchestrator.setCurrentEngine(e2);
   let ls: any;
-  view(({ state }: any) => {
-    const list = state([]);
+  const benchAppViewFn: ViewFn<any, any> = ({ use }) => {
+    const list = use<RowData[]>([]);
     ls = list;
     return {
       render() {
@@ -313,12 +287,13 @@ for (let run = 0; run < RUNS; run++) {
         });
       },
     };
-  })({} as any);
-  e2.initialRender();
+  };
+  new View(benchAppViewFn as any, {}, null, e2, null, null);
+  e2.render();
   const data = buildData(10_000);
   ls.set(data);
   const t0 = performance.now();
-  e2.renderCycle();
+  e2.render();
   fwkTimes.push(performance.now() - t0);
 }
 

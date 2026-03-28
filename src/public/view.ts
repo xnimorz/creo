@@ -1,66 +1,59 @@
 import type { Key } from "@/functional/key";
-import { just, type Maybe } from "@/functional/maybe";
+import type { Maybe } from "@/functional/maybe";
 import { orchestrator } from "@/internal/orchestrator";
-import type { Store } from "@/public/store";
-import type { StateFactory } from "./state";
+import type { Use } from "./state";
+import type { PendingView } from "@/internal/internal_view";
+import type { $primitive } from "./primitive";
 
 export type ViewBody<Props, Api> = Api extends void
   ? {
       render: () => void;
-      mount?: {
-        before?: () => void;
-        after?: () => void;
-      };
-      update?: {
-        should?: (nextProps: Props) => boolean;
-        before?: () => void;
-        after?: () => void;
-      };
+      onMount?: () => void;
+      shouldUpdate?: (nextProps: Props) => boolean;
+      onUpdateBefore?: () => void;
+      onUpdateafter?: () => void;
     }
   : {
       render: () => void;
-      mount?: {
-        before?: () => void;
-        after?: () => void;
-      };
-      update?: {
-        should?: (nextProps: Props) => boolean;
-        before?: () => void;
-        after?: () => void;
-      };
+      onMount?: () => void;
+      shouldUpdate?: (nextProps: Props) => boolean;
+      onUpdateBefore?: () => void;
+      onUpdateafter?: () => void;
       api: Api;
     };
 
-export type ViewFn<Props, Api> = (ctx: {
-  props: Props;
-  state: StateFactory;
-  store: Store;
-  slot: Slot;
-}) => ViewBody<Props, Api>;
-
+/** Slot callback — passed by the caller at the call site. */
 export type Slot = () => void;
 
+/** Children — pre-collected PendingViews available inside the view. */
+export type Children = Maybe<PendingView[]>;
+
+export type ViewFn<Props, Api> = {
+  (ctx: { props: () => Props; use: Use; slot: Slot }): ViewBody<Props, Api>;
+  [$primitive]?: string;
+};
+
 export function view<Props = void, Api = void>(
-  body: (ctx: {
-    props: Props;
-    state: StateFactory;
-    store: Store;
-    slot: Slot;
-  }) => ViewBody<Props, Api>,
-) {
-  return (props: Props & { key?: Key }, slot?: Slot) => {
-    const userKey: Maybe<Key> = maybeGetUserKey(props);
-    const engine = orchestrator.currentEngine()!;    
-    engine.addToPendingViews({
+  body: ViewFn<Props, Api>,
+): (
+  props: Props extends void ? { key?: Key } | void : Props & { key?: Key },
+  slot?: Slot,
+) => void {
+  return (
+    props: Props extends void ? { key?: Key } | void : Props & { key?: Key },
+    slot?: Slot,
+  ) => {
+    orchestrator.currentEngine()!.pendingView({
       viewFn: body,
       props,
       slot,
-      userKey: userKey,
+      userKey: maybeGetUserKey(props),
     });
   };
 }
 
-// If key is provided separately, use provided key:
+export type PublicView<Props, Api> = ReturnType<typeof view<Props, Api>>;
+
 function maybeGetUserKey<P>(params: P): Maybe<Key> {
   if (
     params != null &&

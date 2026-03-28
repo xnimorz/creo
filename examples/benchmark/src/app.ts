@@ -101,26 +101,22 @@ const Row = view<{
   onRemove: () => void;
 }>(({ props }) => ({
   update: {
-    should(next) {
+    should(next: { item: RowData; selected: boolean; onSelect: () => void; onRemove: () => void }) {
       return (
-        next.item.label !== props.item.label || next.selected !== props.selected
+        next.item.label !== props().item.label || next.selected !== props().selected
       );
     },
   },
   render() {
-    tr({ class: props.selected ? "danger" : "" }, () => {
-      td({ class: "col-md-1" }, () => {
-        text(props.item.id);
-      });
+    tr({ class: props().selected ? "danger" : "" }, () => {
+      td({ class: "col-md-1" }, () => text(props().item.id));
       td({ class: "col-md-4" }, () => {
-        a({ onClick: props.onSelect }, () => {
-          text(props.item.label);
-        });
+        a({ onClick: props().onSelect }, () => text(props().item.label));
       });
       td({ class: "col-md-1" }, () => {
-        a({ onClick: props.onRemove }, () => {
-          span({ class: "glyphicon glyphicon-remove", "aria-hidden": "true" });
-        });
+        a({ onClick: props().onRemove }, () =>
+          span({ class: "glyphicon glyphicon-remove", "aria-hidden": "true" }),
+        );
       });
       td({ class: "col-md-6" });
     });
@@ -135,7 +131,7 @@ const ActionButton = view<{
   title: string;
   id: string;
   onClick: () => void;
-}>(({ props }) => ({
+}>((ctx) => ({
   update: { should: () => false },
   render() {
     div({ class: "col-sm-6 smallpad" }, () => {
@@ -143,11 +139,11 @@ const ActionButton = view<{
         {
           type: "button",
           class: "btn btn-primary btn-block",
-          id: props.id,
-          onClick: props.onClick,
+          id: ctx.props().id,
+          onClick: ctx.props().onClick,
         },
         () => {
-          text(props.title);
+          text(ctx.props().title);
         },
       );
     });
@@ -158,9 +154,9 @@ const ActionButton = view<{
 // Root app view
 // ---------------------------------------------------------------------------
 
-export const App = view(({ state }) => {
-  const list = state<RowData[]>([]);
-  const selectedId = state(0);
+export const App = view(({ use }) => {
+  const list = use<RowData[]>([]);
+  const selectedId = use(0);
 
   // -- Actions --
 
@@ -258,7 +254,7 @@ export const App = view(({ state }) => {
 
         // Table
         table({ class: "table table-hover table-striped test-data" }, () => {
-          tbody(_, () => {
+          tbody({}, () => {
             const data = list.get();
             const sel = selectedId.get();
             for (const item of data) {

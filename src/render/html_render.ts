@@ -1,8 +1,6 @@
 import type { View } from "@/internal/internal_view";
-import type { IRender, PrimitiveRenderHandler } from "./render_interface";
-import { PrimitiveRegistry } from "./primitive_registry";
-import type { PrimitiveComponent } from "@/public/primitive";
-import { text, getHtmlTag } from "@/public/primitives/primitives";
+import type { IRender } from "./render_interface";
+import { $primitive } from "@/public/primitive";
 import type { Wildcard } from "@/internal/wildcard";
 import type { Maybe } from "@/functional/maybe";
 
@@ -43,7 +41,7 @@ const DOM_EVENT: Record<string, string> = {
 };
 
 // Props that are framework-internal, not HTML attributes
-const SKIP_PROPS = new Set(["key", "content"]);
+const SKIP_PROPS = new Set(["key"]);
 
 // DOM properties that must be set directly (not via setAttribute)
 const DOM_PROPERTIES = new Set([
@@ -58,11 +56,7 @@ const DOM_PROPERTIES = new Set([
 // ---------------------------------------------------------------------------
 
 export class HtmlRender implements IRender<HTMLElement | Text> {
-  private primitives = new PrimitiveRegistry<HTMLElement | Text>();
-
-  constructor(private container: HTMLElement) {
-    this.registerBuiltins();
-  }
+  constructor(private container: HTMLElement) {}
 
   // -- IRender ----------------------------------------------------------------
 
@@ -78,10 +72,7 @@ export class HtmlRender implements IRender<HTMLElement | Text> {
       } else {
         const parentNode = this.getParentDomNode(parent);
         if (parentNode) {
-          parentNode.insertBefore(
-            node,
-            this.findInsertionPoint(parent, view),
-          );
+          parentNode.insertBefore(node, this.findInsertionPoint(parent, view));
         }
       }
       // Handle autofocus
@@ -89,7 +80,7 @@ export class HtmlRender implements IRender<HTMLElement | Text> {
       if (
         newRef?.kind === "primitive" &&
         newRef.element instanceof HTMLElement &&
-        (view.props as Record<string, unknown>).autofocus
+        (view.props as Record<string, unknown>)?.autofocus
       ) {
         newRef.element.focus();
       }
@@ -98,40 +89,39 @@ export class HtmlRender implements IRender<HTMLElement | Text> {
 
     // --- Update: reposition + diff ---
 
-    // Ensure DOM position is correct (handles keyed reordering)
     if (view.parent) {
-      const insertBefore = this.findInsertionPoint(view.parent, view);
-      if (ref.kind === "primitive") {
-        if (ref.element.nextSibling !== insertBefore) {
-          this.getParentDomNode(view.parent)?.insertBefore(
-            ref.element,
-            insertBefore,
-          );
-        }
-      } else if (ref.endComment.nextSibling !== insertBefore) {
+      const expectedStart = this.findInsertionPoint(view.parent, view);
+      const firstDom = this.getFirstDomNode(view);
+
+      if (firstDom && firstDom !== expectedStart) {
         const parentNode = this.getParentDomNode(view.parent);
         if (parentNode) {
-          for (const child of view.virtualDom) {
-            this.moveDomNodes(child, parentNode, insertBefore);
+          if (ref.kind === "primitive") {
+            parentNode.insertBefore(ref.element, expectedStart);
+          } else {
+            if (view.virtualDom) {
+              for (const child of view.virtualDom) {
+                this.moveDomNodes(child, parentNode, expectedStart);
+              }
+            }
+            parentNode.insertBefore(ref.endComment, expectedStart);
           }
-          parentNode.insertBefore(ref.endComment, insertBefore);
         }
       }
     }
 
     // Diff attributes for primitives
     if (ref.kind !== "primitive") return;
+    if (ref.element instanceof Text) {
+      const nextText = String(view.props);
+      if (ref.element.textContent !== nextText) {
+        ref.element.textContent = nextText;
+      }
+      return;
+    }
     const nextProps = view.props as Record<string, unknown>;
     if (!ref.prevProps) {
-      if (ref.element instanceof Text) {
-        ref.element.textContent = String(nextProps.content);
-      } else {
-        this.setAttributes(ref, ref.element, nextProps);
-      }
-    } else if (ref.element instanceof Text) {
-      if (ref.prevProps.content !== nextProps.content) {
-        ref.element.textContent = String(nextProps.content);
-      }
+      this.setAttributes(ref, ref.element, nextProps);
     } else {
       this.diffAttributes(ref, ref.element, ref.prevProps, nextProps);
     }
@@ -143,18 +133,24 @@ export class HtmlRender implements IRender<HTMLElement | Text> {
     view.renderRef = undefined;
   }
 
-  registerPrimitive(
-    entries: [PrimitiveComponent<any, any>, PrimitiveRenderHandler<HTMLElement | Text>][],
-  ): void {
-    this.primitives.register(entries);
-  }
-
   // -- Internal: DOM building -------------------------------------------------
 
   private buildDom(view: View): Node {
-    // Check htmlTag first — most common case (80K hits vs 20K for primitiveRegistry)
-    const tag = getHtmlTag(view.viewFn);
-    if (tag) {
+    const tag = view.viewFn[$primitive];
+
+    if (tag != null) {
+      if (tag === "text") {
+        const textNode = document.createTextNode(String(view.props));
+        const ref: PrimitiveDomRef = {
+          kind: "primitive",
+          element: textNode,
+          prevProps: null,
+          listeners: null,
+        };
+        view.renderRef = ref;
+        return textNode;
+      }
+
       const element = document.createElement(tag);
       const props = view.props as Record<string, unknown>;
       const ref: PrimitiveDomRef = {
@@ -168,25 +164,7 @@ export class HtmlRender implements IRender<HTMLElement | Text> {
       return element;
     }
 
-    const handler = this.primitives.getHandler(view.viewFn);
-    if (handler) {
-      const element = handler.render(view);
-      const props = view.props as Record<string, unknown>;
-      const ref: PrimitiveDomRef = {
-        kind: "primitive",
-        element,
-        prevProps: null,
-        listeners: null,
-      };
-      view.renderRef = ref;
-      if (element instanceof HTMLElement) {
-        this.setAttributes(ref, element, props);
-      }
-      return element;
-    }
-
     const endComment = document.createComment("");
-
     view.renderRef = {
       kind: "composite",
       endComment,
@@ -195,20 +173,17 @@ export class HtmlRender implements IRender<HTMLElement | Text> {
     return endComment;
   }
 
-  // -- Internal: built-in primitives ------------------------------------------
-
-  private registerBuiltins() {
-    this.registerPrimitive([
-      [text, { render: (view) => document.createTextNode(view.props.content) }],
-    ]);
-  }
-
   // -- Internal: attributes + events ------------------------------------------
 
   private isEventProp(key: string, value: unknown): boolean {
-    return key.length > 2 && key[0] === "o" && key[1] === "n" &&
-      key[2]! >= "A" && key[2]! <= "Z" &&
-      typeof value === "function";
+    return (
+      key.length > 2 &&
+      key[0] === "o" &&
+      key[1] === "n" &&
+      key[2]! >= "A" &&
+      key[2]! <= "Z" &&
+      typeof value === "function"
+    );
   }
 
   private eventPropToCreoName(prop: string): string {
@@ -347,21 +322,33 @@ export class HtmlRender implements IRender<HTMLElement | Text> {
   // -- Internal: DOM navigation -----------------------------------------------
 
   private findInsertionPoint(parent: View, view: View): Node | null {
-    const nextSibling = view.getNextSibling();
-    if (nextSibling) {
-      return this.getFirstDomNode(nextSibling);
+    const vdom = parent.virtualDom;
+    if (vdom) {
+      let prev = vdom.getNode(view)?.getPrev();
+      while (prev) {
+        const prevRef = prev.v.renderRef as Maybe<DomRef>;
+        if (prevRef) {
+          const lastDom =
+            prevRef.kind === "composite" ? prevRef.endComment : prevRef.element;
+          return lastDom.nextSibling;
+        }
+        prev = prev.getPrev();
+      }
     }
 
+    // No rendered previous sibling — insert at the start of the parent
     const ref = parent.renderRef as Maybe<DomRef>;
     if (!ref) return null;
 
     if (ref.kind === "composite") {
       return ref.endComment;
     }
-    return null;
+
+    // Primitive parent: insert before its first child (beginning of container)
+    return ref.element.firstChild;
   }
 
-  private getParentDomNode(parent: View): Node | null {
+  private getParentDomNode(parent: View): Maybe<Node> {
     const ref = parent.renderRef as Maybe<DomRef>;
     if (!ref) return null;
 
@@ -381,8 +368,10 @@ export class HtmlRender implements IRender<HTMLElement | Text> {
     if (ref.kind === "primitive") {
       parentNode.insertBefore(ref.element, insertBefore);
     } else {
-      for (const child of view.virtualDom) {
-        this.moveDomNodes(child, parentNode, insertBefore);
+      if (view.virtualDom) {
+        for (const child of view.virtualDom) {
+          this.moveDomNodes(child, parentNode, insertBefore);
+        }
       }
       parentNode.insertBefore(ref.endComment, insertBefore);
     }
@@ -392,10 +381,11 @@ export class HtmlRender implements IRender<HTMLElement | Text> {
     const ref = view.renderRef as Maybe<DomRef>;
     if (!ref) return null;
     if (ref.kind === "primitive") return ref.element;
-    // Composite: first child's DOM node, or endComment if no children
-    for (const child of view.virtualDom) {
-      const node = this.getFirstDomNode(child);
-      if (node) return node;
+    if (view.virtualDom) {
+      for (const child of view.virtualDom) {
+        const node = this.getFirstDomNode(child);
+        if (node) return node;
+      }
     }
     return ref.endComment;
   }

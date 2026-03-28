@@ -1,15 +1,6 @@
 import type { View } from "@/internal/internal_view";
-import type { IRender, PrimitiveRenderHandler } from "./render_interface";
-import { PrimitiveRegistry } from "./primitive_registry";
-import type { PrimitiveComponent } from "@/public/primitive";
-import {
-  div,
-  span,
-  text,
-  button,
-  input,
-  img,
-} from "@/public/primitives/primitives";
+import type { IRender } from "./render_interface";
+import { $primitive } from "@/public/primitive";
 import type { Maybe } from "@/functional/maybe";
 
 // ---------------------------------------------------------------------------
@@ -28,14 +19,8 @@ export type JsonNode = {
 // ---------------------------------------------------------------------------
 
 export class JsonRender implements IRender<JsonNode> {
-  private primitives = new PrimitiveRegistry<JsonNode>();
-
   /** The root JSON node after mount. */
   root: Maybe<JsonNode>;
-
-  constructor() {
-    this.registerBuiltins();
-  }
 
   // -- IRender ----------------------------------------------------------------
 
@@ -61,7 +46,7 @@ export class JsonRender implements IRender<JsonNode> {
     if (parentNode) {
       const oldIdx = parentNode.children.indexOf(existing);
       if (oldIdx !== -1) {
-        const nextSibling = view.getNextSibling();
+        const nextSibling = this.getNextSibling(view);
         const nextNode = nextSibling?.renderRef as Maybe<JsonNode>;
         const expectedIdx = nextNode
           ? parentNode.children.indexOf(nextNode)
@@ -75,7 +60,10 @@ export class JsonRender implements IRender<JsonNode> {
         }
       }
     }
-    existing.props = { ...view.props };
+    const tag = view.viewFn[$primitive];
+    existing.props = tag === "text"
+      ? { content: view.props }
+      : { ...view.props };
   }
 
   unmount(view: View): void {
@@ -87,51 +75,26 @@ export class JsonRender implements IRender<JsonNode> {
     }
   }
 
-  registerPrimitive(
-    entries: [PrimitiveComponent<any, any>, PrimitiveRenderHandler<JsonNode>][],
-  ): void {
-    this.primitives.register(entries);
-  }
-
   // -- Internal ---------------------------------------------------------------
 
-  /** Build output for this view only. Children mount themselves. */
-  private buildNode(view: View): JsonNode {
-    const handler = this.primitives.getHandler(view.viewFn);
+  private getNextSibling(view: View): Maybe<View> {
+    return view.parent?.virtualDom?.getNode(view)?.getNext()?.v;
+  }
 
-    if (handler) {
-      const node = handler.render(view);
-      if (view.userKey != null) node.key = view.userKey;
-      view.renderRef = node;
-      return node;
-    }
+  private buildNode(view: View): JsonNode {
+    const tag = view.viewFn[$primitive];
+
+    const props = tag === "text"
+      ? { content: view.props }
+      : { ...view.props };
 
     const node: JsonNode = {
-      type: "composite",
-      props: { ...view.props },
+      type: tag ?? "composite",
+      props,
       children: [],
     };
     if (view.userKey != null) node.key = view.userKey;
     view.renderRef = node;
     return node;
-  }
-
-  private registerBuiltins() {
-    const simple = (type: string): PrimitiveRenderHandler<JsonNode> => ({
-      render: (view: View): JsonNode => ({
-        type,
-        props: { ...view.props },
-        children: [],
-      }),
-    });
-
-    this.registerPrimitive([
-      [div, simple("div")],
-      [span, simple("span")],
-      [text, simple("text")],
-      [button, simple("button")],
-      [input, simple("input")],
-      [img, simple("img")],
-    ]);
   }
 }

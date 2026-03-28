@@ -1,0 +1,14 @@
+{
+  "name": "creo-example-todo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "devDependencies": {
+    "vite": "^6.0.0",
+    "typescript": "^5",
+    "@types/bun": "latest"
+  }
+}

@@ -35,7 +35,10 @@ export class IndexedList<T> {
   insertAfter(ref: T, item: T): void {
     if (this.#map.has(item)) return;
     const refNode = this.#map.get(ref);
-    if (!refNode) { this.push(item); return; }
+    if (!refNode) {
+      this.push(item);
+      return;
+    }
     const node = refNode.insertNext(item);
     this.#map.set(item, node);
   }
@@ -76,6 +79,36 @@ export class IndexedList<T> {
   /** Positional access. O(n) — prefer getNode + getNext for traversal. */
   at(index: number): Maybe<T> {
     return this.#list.at(index)?.v;
+  }
+
+  /**
+   * Replace item at `pos`, or insert if nothing is there.
+   * If `pos >= length`, appends to the end.
+   * Returns the node.
+   */
+  upsert(pos: number, item: T): INode<T> {
+    const existing = this.#list.at(pos);
+    if (!existing) {
+      return this.push(item);
+    }
+    // Remove old identity mapping
+    this.#map.delete(existing.v);
+    // Replace value in-place
+    existing.v = item;
+    // Register new identity
+    this.#map.set(item, existing);
+    return existing;
+  }
+
+  /** Swap two items in the list. O(1). No-op if either item is missing. */
+  swap(a: T, b: T): void {
+    const nodeA = this.#map.get(a);
+    const nodeB = this.#map.get(b);
+    if (!nodeA || !nodeB) return;
+    nodeA.v = b;
+    nodeB.v = a;
+    this.#map.set(a, nodeB);
+    this.#map.set(b, nodeA);
   }
 
   /** Reset to empty. O(1). */

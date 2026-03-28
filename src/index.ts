@@ -9,38 +9,49 @@ export { createApp } from "@/public/app";
 // ---------------------------------------------------------------------------
 
 export { view } from "@/public/view";
-export type { ViewBody, ViewFn, Slot } from "@/public/view";
-export type { StateFactory } from "@/public/state";
+export type { ViewBody, ViewFn, Slot, Children, PublicView } from "@/public/view";
+export type { Reactive, Use } from "@/public/state";
 export { State } from "@/public/state";
-export { Store } from "@/public/store";
+export { Store, store, isStore } from "@/public/store";
 
 // ---------------------------------------------------------------------------
 // Primitives
 // ---------------------------------------------------------------------------
 
-export { primitive, $primitive } from "@/public/primitive";
-export type { PrimitiveComponent, PrimitiveProps, EventHandlerProps } from "@/public/primitive";
+export { $primitive } from "@/public/primitive";
+export type { PrimitiveProps, EventHandlerProps } from "@/public/primitive";
 
 export {
   // Factory
   html,
-  getHtmlTag,
   // Text
   text,
   // Layout / structural
   div, span, section, article, aside, nav, header, footer, main,
+  // Sectioning
+  address, hgroup, search,
   // Text / inline
   p, h1, h2, h3, h4, h5, h6, pre, code, em, strong, small, br, hr, a, blockquote, label,
+  // Text semantics
+  abbr, b, bdi, bdo, cite, data, dfn, i, kbd, mark, q, rp, rt, ruby, s, samp, sub, sup, time, u, varEl, wbr,
+  // Demarcating edits
+  del, ins,
   // Lists
-  ul, ol, li,
+  ul, ol, li, dl, dt, dd,
   // Table
-  table, thead, tbody, tfoot, tr, th, td,
+  table, thead, tbody, tfoot, tr, th, td, caption, colgroup, col,
   // Form
-  form, button, input, textarea, select, option, fieldset, legend,
+  form, button, input, textarea, select, option, fieldset, legend, datalist, optgroup, output, progress, meter,
   // Media
-  img, video, audio, canvas, source,
-  // Other
-  details, summary, dialog, iframe,
+  img, video, audio, canvas, source, track, map, area, picture,
+  // Embedded
+  iframe, embed, object, portal, svg,
+  // Interactive
+  details, summary, dialog, menu,
+  // Figure
+  figure, figcaption,
+  // Scripting
+  script, noscript, template, slot,
 } from "@/public/primitives/primitives";
 
 // ---------------------------------------------------------------------------
@@ -62,7 +73,7 @@ export type {
 // Renderer interface (for custom renderers)
 // ---------------------------------------------------------------------------
 
-export type { IRender, PrimitiveRenderHandler } from "@/render/render_interface";
+export type { IRender } from "@/render/render_interface";
 export { HtmlRender } from "@/render/html_render";
 export { JsonRender } from "@/render/json_render";
 export type { JsonNode } from "@/render/json_render";
@@ -72,7 +83,7 @@ export { StringRender } from "@/render/string_render";
 // Engine (advanced — for custom renderer wiring)
 // ---------------------------------------------------------------------------
 
-export { Engine } from "@/internal/engine";
+export { Engine, type Scheduler } from "@/internal/engine";
 
 // ---------------------------------------------------------------------------
 // Utilities

@@ -1,130 +1,97 @@
 import type { IRender } from "@/render/render_interface";
-import { View, type PendingView } from "./internal_view";
+import type { View, PendingView } from "./internal_view";
 import { IndexedList } from "@/structures/indexed_list";
 import type { Wildcard } from "./wildcard";
+import type { Maybe } from "@/functional/maybe";
 
-/**
- * Engine orchestrates the render cycle:
- *   1. Pick dirty views from needRender
- *   2. For each: renderer.render (create/update DOM), then view.render (VDOM reconciliation)
- *   3. Childless primitives are rendered immediately on creation
- *   4. Unmounts happen directly in View[Symbol.dispose]
- */
+export type Scheduler = (callback: () => void) => void;
+
 export class Engine {
-  protected rendering = new IndexedList<View>();
-  protected needRender = new IndexedList<View>();
+  dirty = new IndexedList<View>();
+  #scheduler: Scheduler;
 
-  constructor(public renderer: IRender<Wildcard>) {}
+  #renderScheduled = false;
 
-  // -- View lifecycle ---------------------------------------------------------
+  #collector: Maybe<(view: PendingView) => void>;
+
+  constructor(
+    public renderer: IRender<Wildcard>,
+    scheduler?: Scheduler,
+  ) {
+    this.#scheduler =
+      (scheduler ?? "scheduler" in globalThis)
+        ? // @ts-ignore
+          (cb) => window.scheduler.postTask(cb)
+        : (cb) => queueMicrotask(cb);
+  }
 
   disposeView(view: View) {
-    this.needRender.delete(view);
-    this.rendering.delete(view);
+    this.dirty.delete(view);
   }
 
-  renderBefore(view: View) {
-    if (this.rendering.has(view)) {
+  schedule() {
+    if (this.#renderScheduled) {
       return;
     }
-    this.needRender.delete(view);
-    this.rendering.push(view);
+
+    this.#renderScheduled = true;
+    this.#scheduler(() => {
+      this.#renderScheduled = false;
+      this.render();
+    });
   }
 
-  renderAfter(view: View) {
-    this.rendering.delete(view);
+  /** Mark a view dirty and schedule a render loop if not already scheduled. */
+  markDirty(view: View) {
+    this.dirty.push(view);
+    this.schedule();
   }
 
-  markNeedRender(view: View) {
-    if (this.needRender.has(view) || this.rendering.has(view)) {
-      return;
-    }
-    this.needRender.push(view);
+  pendingView(view: PendingView) {
+    this.#collector?.(view);
   }
 
-  /** Cursor for depth-first child insertion in needRender */
-  #childCursor: View | null = null;
-
-  register(view: View) {
-    if (view.isPrimitive && view.ctx.slot == null) {
-      // Childless primitive — render immediately (parent DOM exists), skip render queue
-      this.renderer.render(view);
-      return;
-    }
-    // Insert children right after previously registered sibling (depth-first)
-    if (this.#childCursor) {
-      this.needRender.insertAfter(this.#childCursor, view);
-    } else {
-      // First child — insert at front of queue (before remaining siblings)
-      this.needRender.unshift(view);
-    }
-    this.#childCursor = view;
+  collect(slot: () => void): PendingView[] {
+    const list: PendingView[] = [];
+    const prev = this.#collector;
+    this.#collector = list.push.bind(list);
+    slot();
+    this.#collector = prev;
+    return list;
   }
 
-  // -- Pending views ----------------------------------------------------------
+  #rendering = false;
+  render() {
+    if (this.#rendering) return;
 
-  #pendingViewCache: Set<PendingView> = new Set();
-
-  addToPendingViews(pendingView: PendingView) {
-    this.#pendingViewCache.add(pendingView);
-  }
-
-  getPendingViews() {
-    if (this.#pendingViewCache.size === 0) return this.#pendingViewCache;
-    const pendingViews = this.#pendingViewCache;
-    this.#pendingViewCache = new Set();
-    return pendingViews;
-  }
-
-  // -- Render cycle -----------------------------------------------------------
-
-  initialRender() {
-    for (const p of this.getPendingViews()) {
-      new View(p.viewFn, this, p.props, p.slot, null, null);
-    }
-    this.#processQueue();
-  }
-
-  #cycling = false;
-
-  renderCycle() {
-    if (this.#cycling) return;
-    this.#cycling = true;
+    this.#rendering = true;
     try {
-      this.#processQueue();
-    } finally {
-      this.#cycling = false;
-    }
-  }
+      const cbs: (() => void)[] = [];
 
-  #mountAfter: View[] = [];
+      while (this.dirty.length > 0) {
+        const view = this.dirty.first()!;
+        const isNew = view.renderRef == null;
 
-  #processQueue() {
-    while (this.needRender.length > 0) {
-      const view = this.needRender.first()!;
+        if (!isNew) view.onUpdateBefore();
 
-      const isNew = view.renderRef == null;
+        // Physical render. Might need to have separate queue for this.
+        this.renderer.render(view);
 
-      // Create/update DOM first so children can be mounted during view.render()
-      this.renderer.render(view);
+        if (view.dirty) {
+          // Reconsiling view to prepare their children & vdom
+          view.reconsile();
+          cbs.push(isNew ? view.onMount : view.onUpdateAfter);
+          view.dirty = false; // view is renrendered at this stage
+        }
 
-      if (isNew && view.viewBody.mount?.after) {
-        this.#mountAfter.push(view);
+        this.dirty.delete(view);
       }
 
-      // Reset child cursor — children registered during render()
-      // will be inserted at the front of the queue (depth-first order)
-      this.#childCursor = null;
-
-      // Run viewBody + reconcile children
-      view.render();
+      for (const cb of cbs) {
+        cb();
+      }
+    } finally {
+      this.#rendering = false;
     }
-
-    // mount.after callbacks — after all DOM work is done
-    const ma = this.#mountAfter;
-    for (let i = 0; i < ma.length; i++) {
-      ma[i]!.mountAfter();
-    }
-    ma.length = 0;
   }
 }

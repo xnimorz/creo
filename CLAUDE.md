@@ -14,8 +14,8 @@ function Counter({ initial }: { initial: number }) {
 
 Creo:
 ```ts
-const Counter = view<{ initial: number }>(({ props, state }) => {
-  const count = state(props.initial);
+const Counter = view<{ initial: number }>(({ props, use }) => {
+  const count = use(props().initial);
   const handleClick = () => count.update(n => n + 1);
 
   return {
@@ -32,8 +32,8 @@ const Counter = view<{ initial: number }>(({ props, state }) => {
 
 | React | Creo |
 |-------|------|
-| `function Component(props)` | `view<Props>(({ props }) => ({ render() {} }))` |
-| `useState(initial)` | `state(initial)` → `.get()` / `.set()` / `.update()` |
+| `function Component(props)` | `view<Props>(({ props }) => ({ render() {} }))` — `props` is a function: call `props()` |
+| `useState(initial)` | `use(initial)` → `.get()` / `.set()` / `.update()` |
 | `props.children` | `slot` — called as `slot?.()` inside render |
 | `onClick={handler}` | `onClick: handler` in primitive props |
 | `useEffect(() => {}, [])` (mount) | `mount.after()` |
@@ -41,7 +41,7 @@ const Counter = view<{ initial: number }>(({ props, state }) => {
 | `useLayoutEffect` (before paint) | `mount.before()` / `update.before()` |
 | `React.memo(Component, areEqual)` | `update: { should: (nextProps) => boolean }` |
 | `key={id}` | `{ key: id }` in props |
-| `useContext` | `store` (context-like shared state) |
+| `useContext` | `store.new()` + `use(store)` (global shared state) |
 | `<div className="x">` | `div({ class: "x" }, () => { ... })` |
 | `ReactDOM.createRoot(el).render(<App/>)` | `createApp(App, new HtmlRender(el)).mount()` |
 
@@ -79,8 +79,8 @@ React:
 
 Creo — declare handlers before ViewBody, pass as `on*` props:
 ```ts
-const MyView = view(({ state }) => {
-  const value = state("");
+const MyView = view(({ use }) => {
+  const value = use("");
   const handleClick = () => { ... };
   const handleInput = (e: InputEventData) => value.set(e.value);
 
@@ -139,25 +139,28 @@ for (const item of items.get()) {
 }
 ```
 
-### State
+### State & Store
 
-React:
-```tsx
-const [count, setCount] = useState(0);
-setCount(5);              // direct
-setCount(prev => prev+1); // functional
-```
-
-Creo:
+Local state (inside a view):
 ```ts
-const count = state(0);
-count.set(5);              // queued, applied before next render
+const count = use(0);
+count.set(5);              // set immediately, schedule render
 count.update(n => n + 1);  // functional, chains through pending
 count.update(async n => {  // async supported
   const data = await fetch(...);
   return n + data.value;
 });
 count.get();               // read committed value
+```
+
+Global store (outside views):
+```ts
+const ThemeStore = store.new("light");
+ThemeStore.set("dark"); // updates all subscribers
+
+// Inside a view:
+const theme = use(ThemeStore); // subscribes, re-renders on change
+theme.get(); // "dark"
 ```
 
 ### Lifecycle
@@ -179,6 +182,7 @@ count.get();               // read committed value
 5. **No JSX** — function calls instead of markup; `slot` instead of `children`
 6. **Render returns void** — primitives are called for side effects (stream-based), not returned as a tree
 7. **Slot is optional** — omit the second argument if no children needed
+8. **Unified `use()`** — both local state and global store use the same `use()` function
 
 ---
 
@@ -189,8 +193,8 @@ count.get();               // read committed value
 Declare handler functions before returning ViewBody. Pass them as `on*` props on primitives. This keeps handlers stable across re-renders and render functions clean:
 
 ```ts
-const MyView = view(({ state }) => {
-  const count = state(0);
+const MyView = view(({ use }) => {
+  const count = use(0);
 
   // Declare handlers here — stable references, access state via .get()
   const increment = () => count.update(n => n + 1);
@@ -211,7 +215,7 @@ const MyView = view(({ state }) => {
 
 ### State
 
-- `state(initial)` must be called in the viewFn body (before returning ViewBody), never inside `render()`.
+- `use(initial)` must be called in the viewFn body (before returning ViewBody), never inside `render()`.
 - State is cursor-tracked (like React hooks) — call order must be stable across re-renders.
 - `set()` / `update()` queue changes. Values are applied (flushed) before the next render, not immediately.
 - For ephemeral values that don't need re-renders (e.g., tracking current input text), use a plain `let` variable instead of state.

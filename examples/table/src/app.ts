@@ -12,10 +12,10 @@ type CellPos = { rowIdx: number; colIdx: number };
 // Child views
 // ---------------------------------------------------------------------------
 
-const HeaderRow = view<{ columns: string[] }>(({ props }) => ({
+const HeaderRow = view<{ columns: string[] }>((ctx) => ({
   render() {
     div({ class: "row header" }, () => {
-      for (const col of props.columns) {
+      for (const col of ctx.props().columns) {
         div({ class: "cell header-cell", key: col }, () => text(col));
       }
     });
@@ -26,8 +26,8 @@ const EditableCell = view<{
   value: string;
   onSave: (value: string) => void;
   onDiscard: () => void;
-}>(({ props }) => {
-  let current = props.value;
+}>((ctx) => {
+  let current = ctx.props().value;
 
   const handleInput = (e: { value: string }) => {
     current = e.value;
@@ -36,22 +36,22 @@ const EditableCell = view<{
   const handleKeyDown = (e: { key: string; stopPropagation: () => void }) => {
     if (e.key === "Enter") {
       e.stopPropagation();
-      props.onSave(current);
+      ctx.props().onSave(current);
     } else if (e.key === "Escape") {
       e.stopPropagation();
-      props.onDiscard();
+      ctx.props().onDiscard();
     }
   };
 
   const handleBlur = () => {
-    props.onSave(current);
+    ctx.props().onSave(current);
   };
 
   return {
     render() {
       input({
         class: "cell-input",
-        value: props.value,
+        value: ctx.props().value,
         autofocus: true,
         onInput: handleInput,
         onKeyDown: handleKeyDown,
@@ -66,16 +66,16 @@ const DisplayCell = view<{
   selected: boolean;
   onEdit: () => void;
   onSelect: () => void;
-}>(({ props }) => ({
+}>((ctx) => ({
   render() {
     div(
       {
-        class: props.selected ? "cell selected" : "cell",
-        onClick: () => props.onEdit(),
-        onDblclick: () => props.onEdit(),
+        class: ctx.props().selected ? "cell selected" : "cell",
+        onClick: () => ctx.props().onEdit(),
+        onDblclick: () => ctx.props().onEdit(),
       },
       () => {
-        text(props.value || "\u00A0");
+        text(ctx.props().value || "\u00A0");
       },
     );
   },
@@ -87,14 +87,14 @@ const DisplayCell = view<{
 
 let nextId = 1;
 
-export const App = view(({ state }) => {
-  const columns = state<string[]>(["A", "B", "C"]);
-  const rows = state<Row[]>([
+export const App = view(({ use }) => {
+  const columns = use<string[]>(["A", "B", "C"]);
+  const rows = use<Row[]>([
     { id: String(nextId++), cells: { A: "", B: "", C: "" } },
     { id: String(nextId++), cells: { A: "", B: "", C: "" } },
   ]);
-  const selected = state<CellPos | null>(null);
-  const editing = state<CellPos | null>(null);
+  const selected = use<CellPos | null>(null);
+  const editing = use<CellPos | null>(null);
 
   // -- Helpers --
 
@@ -126,7 +126,6 @@ export const App = view(({ state }) => {
     r[rowIdx]!.cells[col] = val;
     rows.set([...r]);
     editing.set(null);
-    // Keep selection on the cell we just edited
     selected.set({ rowIdx, colIdx });
     refocusTable();
   };
@@ -174,7 +173,6 @@ export const App = view(({ state }) => {
 
   return {
     render() {
-      // Toolbar
       div({ class: "toolbar" }, () => {
         button({ class: "btn", onClick: addRow }, () => {
           text("Add Row");
@@ -184,7 +182,6 @@ export const App = view(({ state }) => {
         });
       });
 
-      // Table
       div(
         { class: "table", tabindex: 0, onKeyDown: handleTableKeyDown },
         () => {

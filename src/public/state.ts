@@ -1,21 +1,26 @@
-import type { View } from "@/internal/internal_view";
 import type { MaybePromise } from "@/functional/maybe_promise";
 
-const NO_PENDING = Symbol();
+/**
+ * Reactive value — the shared interface returned by `use()`.
+ * Both local state and store bindings implement this.
+ */
+export interface Reactive<T> {
+  get(): T;
+  set(value: T): void;
+  update(fn: (current: T) => MaybePromise<T>): void;
+}
 
 /**
  * A single reactive state slot.
- * Returned by calling state(initial) during view init.
+ * Returned by calling use(initial) during view init.
  *
- *   const count = state(0);
- *   count.get()              // read committed value
- *   count.set(5)             // queues — applied before next render
- *   count.update(n => n + 1) // queues via fn — chains through pending
- *   count.update(async n => fetch(..))  // async — queues when resolved
+ *   const count = use(0);
+ *   count.get()              // read current value
+ *   count.set(5)             // set immediately, schedule render
+ *   count.update(n => n + 1) // update via fn, schedule render
  */
-export class State<T> {
+export class State<T> implements Reactive<T> {
   #current: T;
-  #pending: T | typeof NO_PENDING = NO_PENDING;
   #schedule: () => void;
 
   constructor(initial: T, schedule: () => void) {
@@ -28,76 +33,32 @@ export class State<T> {
   }
 
   set(value: T): void {
-    this.#pending = value;
+    this.#current = value;
     this.#schedule();
   }
 
   update(fn: (current: T) => MaybePromise<T>): void {
-    const base =
-      this.#pending !== NO_PENDING ? (this.#pending as T) : this.#current;
-    const result = fn(base);
+    const result = fn(this.#current);
     if (result instanceof Promise) {
       result.then((value) => {
-        this.#pending = value;
+        this.#current = value;
         this.#schedule();
       });
     } else {
-      this.#pending = result;
+      this.#current = result;
       this.#schedule();
-    }
-  }
-
-  /** @internal Apply pending value. Called by the framework before render. */
-  flush(): void {
-    if (this.#pending !== NO_PENDING) {
-      this.#current = this.#pending as T;
-      this.#pending = NO_PENDING;
     }
   }
 }
 
 /**
- * State factory bound to a view.
+ * Use factory bound to a view.
  * Tracks instances by call order (like React hooks).
- * On first render state(initial) creates a new instance.
- * On re-renders state(initial) returns the existing instance
- * at the same position (initial is ignored).
+ *
+ * use(store)    — subscribe to a Store, returns Store<T> (Reactive<T>)
+ * use(initial)  — create local State<T> (Reactive<T>)
  */
-export type StateFactory = <T>(initial: T) => State<T>;
-
-export function createStateFactory(view: View): {
-  state: StateFactory;
-  flush: () => void;
-} {
-  let scheduled = false;
-  let cursor = 0;
-  const instances: State<unknown>[] = [];
-
-  function schedule() {
-    view.engine.markNeedRender(view);
-    if (!scheduled) {
-      scheduled = true;
-      queueMicrotask(() => {
-        scheduled = false;
-        view.engine.renderCycle();
-      });
-    }
-  }
-
-  function state<T>(initial: T): State<T> {
-    if (cursor < instances.length) {
-      return instances[cursor++] as State<T>;
-    }
-    const instance = new State(initial, schedule);
-    instances.push(instance as State<unknown>);
-    cursor++;
-    return instance;
-  }
-
-  function flush() {
-    cursor = 0;
-    for (const instance of instances) instance.flush();
-  }
-
-  return { state, flush };
-}
+export type Use = {
+  <T>(storeOrInitial: import("@/public/store").Store<T>): Reactive<T>;
+  <T>(initial: T): Reactive<T>;
+};

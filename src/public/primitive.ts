@@ -1,8 +1,5 @@
-import { orchestrator } from "@/internal/orchestrator";
-import type { Maybe } from "@/functional/maybe";
 import type { Key } from "@/functional/key";
-import type { ViewFn, Slot } from "./view";
-import type { Wildcard } from "@/internal/wildcard";
+import type { Slot, ViewBody } from "./view";
 
 /**
  * Maps event type { click: (e: X) => void } to
@@ -21,44 +18,14 @@ export type PrimitiveProps<Attrs, Events> = Attrs &
 
 export const $primitive = Symbol("primitive");
 
-export interface PrimitiveComponent<Attrs, Events> {
-  (props?: PrimitiveProps<Attrs, Events> | undefined, slot?: Slot): void;
-  viewFn: ViewFn<PrimitiveProps<Attrs, Events>, void>;
-}
-
-/**
- * Creates an engine-agnostic primitive component.
- *
- *   const canvas = primitive<CanvasAttrs, CanvasEvents>();
- *
- *   // In render — event handlers as props:
- *   canvas({ width: 800, onClick: (e) => { ... } });
- */
-export function primitive<Attrs = {}, Events = {}>(): PrimitiveComponent<
-  Attrs,
-  Events
-> {
-  const viewFn: ViewFn<PrimitiveProps<Attrs, Events>, void> = (ctx) => ({
+export function primitiveViewFn<Props>({
+  slot,
+}: {
+  slot: Slot;
+}): ViewBody<Props, void> {
+  return {
     render() {
-      ctx.slot?.();
+      slot();
     },
-  });
-  (viewFn as Wildcard)[$primitive] = true;
-
-  const invoke = ((
-    props?: PrimitiveProps<Attrs, Events> | undefined,
-    slot?: Slot,
-  ): void => {
-    const userKey: Maybe<Key> = props?.key ?? undefined;
-    const engine = orchestrator.currentEngine()!;
-    engine.addToPendingViews({
-      viewFn: viewFn as ViewFn<Wildcard, Wildcard>,
-      props: props ?? {},
-      slot,
-      userKey,
-    });
-  }) as PrimitiveComponent<Attrs, Events>;
-
-  invoke.viewFn = viewFn as ViewFn<Wildcard, Wildcard>;
-  return invoke;
+  };
 }

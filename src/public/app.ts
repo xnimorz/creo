@@ -1,7 +1,12 @@
-import { Engine } from "@/internal/engine";
+import { Engine, type Scheduler } from "@/internal/engine";
+import { View } from "@/internal/internal_view";
 import { orchestrator } from "@/internal/orchestrator";
 import type { IRender } from "@/render/render_interface";
 import type { Wildcard } from "@/internal/wildcard";
+
+type AppOptions = {
+  scheduler?: Scheduler;
+};
 
 type AppHandle = {
   engine: Engine;
@@ -10,20 +15,27 @@ type AppHandle = {
 /**
  * Create a Creo application.
  *
- *   createApp(App, new HtmlRender(document.getElementById("app")!)).mount();
- *   createApp(App, new JsonRender()).mount();
- *   createApp(App, new StringRender()).mount();
+ *   createApp(() => App(), new HtmlRender(el)).mount();
+ *   createApp(() => App(), new HtmlRender(el), { scheduler: requestAnimationFrame }).mount();
  */
 export function createApp(
-  view: (props: Wildcard, slot: () => void) => void,
+  slot: () => void,
   renderer: IRender<Wildcard>,
+  options?: AppOptions,
 ) {
   return {
     mount(props?: Wildcard): AppHandle {
-      const engine = new Engine(renderer);
+      const engine = new Engine(renderer, options?.scheduler);
       orchestrator.setCurrentEngine(engine);
-      view(props ?? {}, () => {});
-      engine.initialRender();
+      new View(
+        () => ({ render() { slot(); } }),
+        props ?? {},
+        null,
+        engine,
+        null,
+        null,
+      );
+      engine.render();
       return { engine };
     },
   };

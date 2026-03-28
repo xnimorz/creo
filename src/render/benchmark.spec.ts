@@ -1,6 +1,6 @@
 import { describe, it, expect } from "bun:test";
 import { Window } from "happy-dom";
-import { view } from "@/public/view";
+import { view, type ViewFn } from "@/public/view";
 import {
   div,
   span,
@@ -11,7 +11,7 @@ import {
   td,
   a,
 } from "@/public/primitives/primitives";
-import type { State } from "@/public/state";
+import type { Reactive } from "@/public/state";
 import { Engine } from "@/internal/engine";
 import { View } from "@/internal/internal_view";
 import { orchestrator } from "@/internal/orchestrator";
@@ -74,27 +74,27 @@ const Row = view<{
   selected: boolean;
   onSelect: () => void;
   onRemove: () => void;
-}>(({ props }) => ({
+}>((ctx) => ({
   update: {
-    should(next) {
+    should(next: { item: RowData; selected: boolean; onSelect: () => void; onRemove: () => void }) {
       return (
-        next.item.label !== props.item.label ||
-        next.selected !== props.selected
+        next.item.label !== ctx.props().item.label ||
+        next.selected !== ctx.props().selected
       );
     },
   },
   render() {
-    tr({ class: props.selected ? "danger" : "" }, () => {
+    tr({ class: ctx.props().selected ? "danger" : "" }, () => {
       td({ class: "col-md-1" }, () => {
-        text(props.item.id);
+        text(ctx.props().item.id);
       });
       td({ class: "col-md-4" }, () => {
-        a({ onClick: props.onSelect }, () => {
-          text(props.item.label);
+        a({ onClick: ctx.props().onSelect }, () => {
+          text(ctx.props().item.label);
         });
       });
       td({ class: "col-md-1" }, () => {
-        a({ onClick: props.onRemove }, () => {
+        a({ onClick: ctx.props().onRemove }, () => {
           span({
             class: "glyphicon glyphicon-remove",
             "aria-hidden": "true",
@@ -111,12 +111,12 @@ const Row = view<{
 // ---------------------------------------------------------------------------
 
 function createBenchApp() {
-  let listState: State<RowData[]>;
-  let selectedIdState: State<number>;
+  let listState: Reactive<RowData[]>;
+  let selectedIdState: Reactive<number>;
 
-  const appViewFn = view(({ state }) => {
-    const list = state<RowData[]>([]);
-    const selectedId = state(0);
+  const appViewFn: ViewFn<Wildcard, Wildcard> = ({ use }) => {
+    const list = use<RowData[]>([]);
+    const selectedId = use(0);
     listState = list;
     selectedIdState = selectedId;
 
@@ -143,14 +143,14 @@ function createBenchApp() {
         });
       },
     };
-  });
+  };
 
   const container = document.createElement("div");
   const renderer = new HtmlRender(container);
   const engine = new Engine(renderer);
   orchestrator.setCurrentEngine(engine);
-  appViewFn({} as Wildcard);
-  engine.initialRender();
+  new View(appViewFn, {}, null, engine, null, null);
+  engine.render();
 
   return {
     container,
@@ -184,7 +184,7 @@ describe("Benchmark", () => {
 
     const ms = time(() => {
       app.list.set(buildData(1000));
-      app.engine.renderCycle();
+      app.engine.render();
     });
 
     expect(countElements(app.container, "tr")).toBe(1000);
@@ -197,7 +197,7 @@ describe("Benchmark", () => {
 
     const ms = time(() => {
       app.list.set(buildData(10_000));
-      app.engine.renderCycle();
+      app.engine.render();
     });
 
     expect(countElements(app.container, "tr")).toBe(10_000);
@@ -208,11 +208,11 @@ describe("Benchmark", () => {
   it("append 1,000 rows to 1,000", () => {
     const app = createBenchApp();
     app.list.set(buildData(1000));
-    app.engine.renderCycle();
+    app.engine.render();
 
     const ms = time(() => {
       app.list.set(app.list.get().concat(buildData(1000)));
-      app.engine.renderCycle();
+      app.engine.render();
     });
 
     expect(countElements(app.container, "tr")).toBe(2000);
@@ -223,7 +223,7 @@ describe("Benchmark", () => {
   it("update every 10th row (1,000 rows)", () => {
     const app = createBenchApp();
     app.list.set(buildData(1000));
-    app.engine.renderCycle();
+    app.engine.render();
 
     const ms = time(() => {
       const data = app.list.get();
@@ -233,7 +233,7 @@ describe("Benchmark", () => {
         next[i] = { id: r.id, label: r.label + " !!!" };
       }
       app.list.set(next);
-      app.engine.renderCycle();
+      app.engine.render();
     });
 
     console.log(`  update every 10th row: ${ms.toFixed(1)}ms`);
@@ -243,7 +243,7 @@ describe("Benchmark", () => {
   it("swap rows (1,000 rows)", () => {
     const app = createBenchApp();
     app.list.set(buildData(1000));
-    app.engine.renderCycle();
+    app.engine.render();
 
     // Verify initial order
     const trs = app.container.getElementsByTagName("tr");
@@ -257,7 +257,7 @@ describe("Benchmark", () => {
       next[1] = next[998]!;
       next[998] = tmp;
       app.list.set(next);
-      app.engine.renderCycle();
+      app.engine.render();
     });
 
     // Verify swap happened in DOM
@@ -272,12 +272,12 @@ describe("Benchmark", () => {
   it("select row (1,000 rows)", () => {
     const app = createBenchApp();
     app.list.set(buildData(1000));
-    app.engine.renderCycle();
+    app.engine.render();
 
     const ms = time(() => {
       const data = app.list.get();
       app.selectedId.set(data[5]!.id);
-      app.engine.renderCycle();
+      app.engine.render();
     });
 
     console.log(`  select row: ${ms.toFixed(1)}ms`);
@@ -287,12 +287,12 @@ describe("Benchmark", () => {
   it("clear 1,000 rows", () => {
     const app = createBenchApp();
     app.list.set(buildData(1000));
-    app.engine.renderCycle();
+    app.engine.render();
     expect(countElements(app.container, "tr")).toBe(1000);
 
     const ms = time(() => {
       app.list.set([]);
-      app.engine.renderCycle();
+      app.engine.render();
     });
 
     expect(countElements(app.container, "tr")).toBe(0);
@@ -303,11 +303,11 @@ describe("Benchmark", () => {
   it("replace 1,000 rows", () => {
     const app = createBenchApp();
     app.list.set(buildData(1000));
-    app.engine.renderCycle();
+    app.engine.render();
 
     const ms = time(() => {
       app.list.set(buildData(1000));
-      app.engine.renderCycle();
+      app.engine.render();
     });
 
     expect(countElements(app.container, "tr")).toBe(1000);

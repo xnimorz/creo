@@ -3,7 +3,7 @@ import { Window } from "happy-dom";
 import type { ViewFn } from "@/public/view";
 import { view } from "@/public/view";
 import { div, span, text, button, input } from "@/public/primitives/primitives";
-import type { State } from "@/public/state";
+import type { Reactive } from "@/public/state";
 import { Engine } from "@/internal/engine";
 import { View } from "@/internal/internal_view";
 import { orchestrator } from "@/internal/orchestrator";
@@ -36,22 +36,22 @@ Object.assign(globalThis, {
 
 type TodoItem = { id: string; text: string; done: boolean; key?: string };
 
-const TodoItemCall = view<TodoItem>(({ props }) => ({
+const TodoItemCall = view<TodoItem>((ctx) => ({
   render() {
-    div({ class: props.done ? "todo done" : "todo" }, () => {
+    div({ class: ctx.props().done ? "todo done" : "todo" }, () => {
       span({ class: "text" }, () => {
-        text(props.text);
+        text(ctx.props().text);
       });
       button({ class: "delete" });
     });
   },
 }));
 
-const todoAppViewFn: ViewFn<Wildcard, Wildcard> = ({ props }) => ({
+const todoAppViewFn: ViewFn<Wildcard, Wildcard> = (ctx) => ({
   render() {
     div({ class: "app" }, () => {
-      (props.items as TodoItem[]).forEach((item: TodoItem) => {
-        TodoItemCall({ ...item, key: item.id }, () => {});
+      (ctx.props().items as TodoItem[]).forEach((item: TodoItem) => {
+        TodoItemCall({ ...item, key: item.id });
       });
     });
   },
@@ -95,20 +95,20 @@ function createApp(renderer: IRender<Wildcard>) {
   const items = initialItems();
   const rootView = new View(
     todoAppViewFn,
-    engine,
     { items },
-    () => {},
+    null,
+    engine,
     null,
     null,
   );
-  engine.initialRender();
+  engine.render();
   return { engine, rootView, items };
 }
 
 function rerender(engine: Engine, rootView: View, newItems: TodoItem[]) {
   rootView.props = { items: newItems };
-  engine.markNeedRender(rootView);
-  engine.renderCycle();
+  rootView.markDirty();
+  engine.render();
 }
 
 // ---------------------------------------------------------------------------
@@ -393,8 +393,8 @@ describe("HtmlRender", () => {
     const r = new HtmlRender(c);
     const e = new Engine(r);
     orchestrator.setCurrentEngine(e);
-    new View(clickViewFn, e, {}, () => {}, null, null);
-    e.initialRender();
+    new View(clickViewFn, {}, null, e, null, null);
+    e.render();
 
     const btn = c.getElementsByTagName("button")[0]!;
     expect(btn).toBeDefined();
@@ -413,14 +413,14 @@ describe("State", () => {
     const renderer = new HtmlRender(container);
     const engine = new Engine(renderer);
     orchestrator.setCurrentEngine(engine);
-    new View(viewFn, engine, {}, () => {}, null, null);
-    engine.initialRender();
+    new View(viewFn, {}, null, engine, null, null);
+    engine.render();
     return { container, engine };
   }
 
   it("should render initial state", () => {
-    const viewFn: ViewFn<Wildcard, Wildcard> = ({ state }) => {
-      const count = state(0);
+    const viewFn: ViewFn<Wildcard, Wildcard> = ({ use }) => {
+      const count = use(0);
       return {
         render() {
           div({ class: "counter" }, () => {
@@ -435,10 +435,10 @@ describe("State", () => {
   });
 
   it("should update DOM after state.set + renderCycle", () => {
-    let countState: State<number>;
+    let countState: Reactive<number>;
 
-    const viewFn: ViewFn<Wildcard, Wildcard> = ({ state }) => {
-      const count = state(0);
+    const viewFn: ViewFn<Wildcard, Wildcard> = ({ use }) => {
+      const count = use(0);
       countState = count;
       return {
         render() {
@@ -451,15 +451,15 @@ describe("State", () => {
     expect(container.textContent).toBe("0");
 
     countState!.set(42);
-    engine.renderCycle();
+    engine.render();
     expect(container.textContent).toBe("42");
   });
 
-  it("should not apply state immediately (deferred until render)", () => {
-    let countState: State<number>;
+  it("should apply state immediately on set", () => {
+    let countState: Reactive<number>;
 
-    const viewFn: ViewFn<Wildcard, Wildcard> = ({ state }) => {
-      const count = state(10);
+    const viewFn: ViewFn<Wildcard, Wildcard> = ({ use }) => {
+      const count = use(10);
       countState = count;
       return {
         render() {
@@ -471,16 +471,16 @@ describe("State", () => {
     mountStateful(viewFn);
 
     countState!.set(99);
-    // Before renderCycle, get() still returns old value
-    expect(countState!.get()).toBe(10);
+    // State is immediate — get() returns new value right away
+    expect(countState!.get()).toBe(99);
   });
 
   it("should batch multiple sets into one render", () => {
-    let countState: State<number>;
+    let countState: Reactive<number>;
     let renderCount = 0;
 
-    const viewFn: ViewFn<Wildcard, Wildcard> = ({ state }) => {
-      const count = state(0);
+    const viewFn: ViewFn<Wildcard, Wildcard> = ({ use }) => {
+      const count = use(0);
       countState = count;
       return {
         render() {
@@ -496,17 +496,17 @@ describe("State", () => {
     countState!.set(1);
     countState!.set(2);
     countState!.set(3);
-    engine.renderCycle();
+    engine.render();
 
     expect(countState!.get()).toBe(3);
     expect(renderCount).toBe(1);
   });
 
   it("should chain updates through pending", () => {
-    let countState: State<number>;
+    let countState: Reactive<number>;
 
-    const viewFn: ViewFn<Wildcard, Wildcard> = ({ state }) => {
-      const count = state(0);
+    const viewFn: ViewFn<Wildcard, Wildcard> = ({ use }) => {
+      const count = use(0);
       countState = count;
       return {
         render() {
@@ -520,24 +520,24 @@ describe("State", () => {
     countState!.update((n) => n + 1);
     countState!.update((n) => n + 1);
     countState!.update((n) => n + 1);
-    engine.renderCycle();
+    engine.render();
 
     expect(container.textContent).toBe("3");
   });
 
   it("should re-render a list managed by state", () => {
-    let itemsState: State<string[]>;
+    let itemsState: Reactive<string[]>;
 
-    const Item = view<{ label: string }>(({ props }) => ({
+    const Item = view<{ label: string }>((ctx) => ({
       render() {
         div({ class: "item" }, () => {
-          text(props.label);
+          text(ctx.props().label);
         });
       },
     }));
 
-    const viewFn: ViewFn<Wildcard, Wildcard> = ({ state }) => {
-      const items = state<string[]>(["one", "two"]);
+    const viewFn: ViewFn<Wildcard, Wildcard> = ({ use }) => {
+      const items = use<string[]>(["one", "two"]);
       itemsState = items;
       return {
         render() {
@@ -557,22 +557,22 @@ describe("State", () => {
 
     // Add item
     itemsState!.update((items) => [...items, "three"]);
-    engine.renderCycle();
+    engine.render();
     expect(findByClass(container, "item").length).toBe(3);
     expect(container.textContent).toContain("three");
 
     // Remove item
     itemsState!.update((items) => items.filter((i) => i !== "two"));
-    engine.renderCycle();
+    engine.render();
     expect(findByClass(container, "item").length).toBe(2);
     expect(container.textContent).not.toContain("two");
   });
 
   it("should handle state-driven conditional rendering", () => {
-    let editingState: State<boolean>;
+    let editingState: Reactive<boolean>;
 
-    const viewFn: ViewFn<Wildcard, Wildcard> = ({ state }) => {
-      const editing = state(false);
+    const viewFn: ViewFn<Wildcard, Wildcard> = ({ use }) => {
+      const editing = use(false);
       editingState = editing;
       return {
         render() {
@@ -593,22 +593,22 @@ describe("State", () => {
 
     // Switch to editing
     editingState!.set(true);
-    engine.renderCycle();
+    engine.render();
     expect(findByClass(container, "display").length).toBe(0);
     expect(container.getElementsByTagName("input").length).toBe(1);
 
     // Switch back
     editingState!.set(false);
-    engine.renderCycle();
+    engine.render();
     expect(findByClass(container, "display").length).toBe(1);
     expect(container.getElementsByTagName("input").length).toBe(0);
   });
 
   it("should work with JSON renderer", () => {
-    let countState: State<number>;
+    let countState: Reactive<number>;
 
-    const viewFn: ViewFn<Wildcard, Wildcard> = ({ state }) => {
-      const count = state(0);
+    const viewFn: ViewFn<Wildcard, Wildcard> = ({ use }) => {
+      const count = use(0);
       countState = count;
       return {
         render() {
@@ -620,21 +620,21 @@ describe("State", () => {
     const renderer = new JsonRender();
     const engine = new Engine(renderer);
     orchestrator.setCurrentEngine(engine);
-    new View(viewFn, engine, {}, () => {}, null, null);
-    engine.initialRender();
+    new View(viewFn, {}, null, engine, null, null);
+    engine.render();
 
-    expect(renderer.root!.children[0]!.props.content).toBe("0");
+    expect(renderer.root!.children[0]!.props.content).toBe(0);
 
     countState!.set(7);
-    engine.renderCycle();
-    expect(renderer.root!.children[0]!.props.content).toBe("7");
+    engine.render();
+    expect(renderer.root!.children[0]!.props.content).toBe(7);
   });
 
   it("should work with String renderer", () => {
-    let countState: State<number>;
+    let countState: Reactive<number>;
 
-    const viewFn: ViewFn<Wildcard, Wildcard> = ({ state }) => {
-      const count = state(0);
+    const viewFn: ViewFn<Wildcard, Wildcard> = ({ use }) => {
+      const count = use(0);
       countState = count;
       return {
         render() {
@@ -646,35 +646,341 @@ describe("State", () => {
     const renderer = new StringRender();
     const engine = new Engine(renderer);
     orchestrator.setCurrentEngine(engine);
-    new View(viewFn, engine, {}, () => {}, null, null);
-    engine.initialRender();
+    new View(viewFn, {}, null, engine, null, null);
+    engine.render();
 
     expect(renderer.renderToString()).toBe("0");
 
     countState!.set(99);
-    engine.renderCycle();
+    engine.render();
     expect(renderer.renderToString()).toBe("99");
   });
 
-  it("should reorder DOM when keyed children swap positions", () => {
-    type RowData = { id: number; label: string };
-    let listState: State<RowData[]>;
-
-    const Row = view<{ item: RowData }>(({ props }) => ({
-      update: {
-        should(next) {
-          return next.item.label !== props.item.label;
-        },
-      },
+  it("should render children through composite view slot", () => {
+    const Card = view<{ title: string }>(({ props, slot }) => ({
       render() {
-        div({ class: "row" }, () => {
-          text(props.item.label);
+        div({ class: "card" }, () => {
+          div({ class: "card-title" }, () => {
+            text(props().title);
+          });
+          div({ class: "card-body" }, slot);
         });
       },
     }));
 
-    const viewFn: ViewFn<Wildcard, Wildcard> = ({ state }) => {
-      const items = state<RowData[]>([
+    const viewFn: ViewFn<Wildcard, Wildcard> = () => ({
+      render() {
+        Card({ title: "Hello" }, () => {
+          span({ class: "child" }, () => {
+            text("child content");
+          });
+        });
+      },
+    });
+
+    const container = document.createElement("div");
+    const renderer = new HtmlRender(container);
+    const engine = new Engine(renderer);
+    orchestrator.setCurrentEngine(engine);
+    new View(viewFn, {}, null, engine, null, null);
+    engine.render();
+
+    expect(findByClass(container, "card").length).toBe(1);
+    expect(findByClass(container, "card-title").length).toBe(1);
+    expect(findByClass(container, "card-body").length).toBe(1);
+    expect(findByClass(container, "child").length).toBe(1);
+    expect(container.textContent).toContain("Hello");
+    expect(container.textContent).toContain("child content");
+  });
+
+  it("should propagate child prop changes through composite slot", () => {
+    let activeState: Reactive<string | null>;
+
+    const Wrapper = view<{ label: string }>(({ props, slot }) => ({
+      render() {
+        div({ class: "wrapper" }, () => {
+          text(props().label);
+          div({ class: "body" }, slot);
+        });
+      },
+    }));
+
+    const Item = view<{ id: string; highlight: boolean }>(({ props }) => ({
+      render() {
+        div({ class: props().highlight ? "item active" : "item" }, () => {
+          text(props().id);
+        });
+      },
+    }));
+
+    const viewFn: ViewFn<Wildcard, Wildcard> = ({ use }) => {
+      const active = use<string | null>(null);
+      activeState = active;
+      return {
+        render() {
+          const a = active.get();
+          Wrapper({ label: "list" }, () => {
+            for (const id of ["X", "Y", "Z"]) {
+              Item({ key: id, id, highlight: a === id });
+            }
+          });
+        },
+      };
+    };
+
+    const { container, engine } = mountStateful(viewFn);
+    expect(findByClass(container, "active").length).toBe(0);
+    expect(findByClass(container, "item").length).toBe(3);
+
+    // Highlight Y — prop change must propagate through Wrapper
+    activeState!.set("Y");
+    engine.render();
+    expect(findByClass(container, "active").length).toBe(1);
+    expect(findByClass(container, "active")[0]!.textContent).toBe("Y");
+
+    // Switch to Z
+    activeState!.set("Z");
+    engine.render();
+    expect(findByClass(container, "active").length).toBe(1);
+    expect(findByClass(container, "active")[0]!.textContent).toBe("Z");
+
+    // Clear
+    activeState!.set(null);
+    engine.render();
+    expect(findByClass(container, "active").length).toBe(0);
+  });
+
+  it("should update children through composite view slot on re-render", () => {
+    let itemsState: Reactive<string[]>;
+
+    const Card = view<{ title: string }>(({ props, slot }) => ({
+      render() {
+        div({ class: "card" }, () => {
+          div({ class: "card-title" }, () => {
+            text(props().title);
+          });
+          div({ class: "card-body" }, slot);
+        });
+      },
+    }));
+
+    const viewFn: ViewFn<Wildcard, Wildcard> = ({ use }) => {
+      const items = use<string[]>(["one", "two"]);
+      itemsState = items;
+      return {
+        render() {
+          Card({ title: "List" }, () => {
+            for (const item of items.get()) {
+              div({ class: "item", key: item }, () => {
+                text(item);
+              });
+            }
+          });
+        },
+      };
+    };
+
+    const container = document.createElement("div");
+    const renderer = new HtmlRender(container);
+    const engine = new Engine(renderer);
+    orchestrator.setCurrentEngine(engine);
+    new View(viewFn, {}, null, engine, null, null);
+    engine.render();
+
+    expect(findByClass(container, "item").length).toBe(2);
+    expect(container.textContent).toContain("one");
+    expect(container.textContent).toContain("two");
+
+    // Update children
+    itemsState!.update((items) => [...items, "three"]);
+    engine.render();
+
+    expect(findByClass(container, "item").length).toBe(3);
+    expect(container.textContent).toContain("three");
+
+    // Remove children
+    itemsState!.set(["only"]);
+    engine.render();
+
+    expect(findByClass(container, "item").length).toBe(1);
+    expect(container.textContent).toContain("only");
+    expect(container.textContent).not.toContain("one");
+  });
+
+  it("should preserve DOM order when switching viewFn on keyed children", () => {
+    let editingState: Reactive<string | null>;
+
+    const Display = view<{ label: string }>(({ props }) => ({
+      render() {
+        div({ class: "display" }, () => {
+          text(props().label);
+        });
+      },
+    }));
+
+    const Editor = view<{ label: string }>(({ props }) => ({
+      render() {
+        input({ class: "editor", value: props().label });
+      },
+    }));
+
+    const viewFn: ViewFn<Wildcard, Wildcard> = ({ use }) => {
+      const editing = use<string | null>(null);
+      editingState = editing;
+      return {
+        render() {
+          div({ class: "list" }, () => {
+            for (const id of ["A", "B", "C"]) {
+              if (editing.get() === id) {
+                Editor({ key: id, label: id });
+              } else {
+                Display({ key: id, label: id });
+              }
+            }
+          });
+        },
+      };
+    };
+
+    const { container, engine } = mountStateful(viewFn);
+    const list = findByClass(container, "list")[0]!;
+
+    // Initial: all display
+    expect(list.textContent).toBe("ABC");
+
+    // Edit B → should stay between A and C
+    editingState!.set("B");
+    engine.render();
+    const displays = findByClass(list, "display");
+    const editors = list.getElementsByTagName("input");
+    expect(displays.length).toBe(2);
+    expect(editors.length).toBe(1);
+    expect(displays[0]!.textContent).toBe("A");
+    expect(displays[1]!.textContent).toBe("C");
+    expect(
+      displays[0]!.compareDocumentPosition(editors[0]!) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      editors[0]!.compareDocumentPosition(displays[1]!) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+
+    // Stop editing → B goes back to display, must keep A B C order
+    editingState!.set(null);
+    engine.render();
+    expect(list.textContent).toBe("ABC");
+
+    // Edit A → should stay first
+    editingState!.set("A");
+    engine.render();
+    {
+      const d = findByClass(list, "display");
+      expect(d.length).toBe(2);
+      expect(d[0]!.textContent).toBe("B");
+      expect(d[1]!.textContent).toBe("C");
+    }
+
+    // Switch from editing A to editing C in one step
+    editingState!.set("C");
+    engine.render();
+    {
+      const d = findByClass(list, "display");
+      expect(d.length).toBe(2);
+      expect(d[0]!.textContent).toBe("A");
+      expect(d[1]!.textContent).toBe("B");
+      const e = list.getElementsByTagName("input");
+      expect(e.length).toBe(1);
+    }
+    const aDiv = findByClass(list, "display")[0]!;
+    const bDiv = findByClass(list, "display")[1]!;
+    expect(
+      aDiv.compareDocumentPosition(bDiv) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("should preserve DOM order after reorder then viewFn switch", () => {
+    let listState: Reactive<string[]>;
+    let editingState: Reactive<string | null>;
+
+    const Display = view<{ label: string }>(({ props }) => ({
+      render() {
+        div({ class: "display" }, () => { text(props().label); });
+      },
+    }));
+    const Editor = view<{ label: string }>(({ props }) => ({
+      render() {
+        input({ class: "editor", value: props().label });
+      },
+    }));
+
+    const viewFn: ViewFn<Wildcard, Wildcard> = ({ use }) => {
+      const items = use(["A", "B", "C"]);
+      const editing = use<string | null>(null);
+      listState = items;
+      editingState = editing;
+      return {
+        render() {
+          div({ class: "list" }, () => {
+            for (const id of items.get()) {
+              if (editing.get() === id) {
+                Editor({ key: id, label: id });
+              } else {
+                Display({ key: id, label: id });
+              }
+            }
+          });
+        },
+      };
+    };
+
+    const { container, engine } = mountStateful(viewFn);
+    const list = findByClass(container, "list")[0]!;
+    expect(list.textContent).toBe("ABC");
+
+    // Step 1: reorder [A, B, C] → [B, C, A]
+    listState!.set(["B", "C", "A"]);
+    engine.render();
+    expect(list.textContent).toBe("BCA");
+
+    // Step 2: click edit on B — must NOT rearrange
+    editingState!.set("B");
+    engine.render();
+    {
+      const d = findByClass(list, "display");
+      expect(d.length).toBe(2);
+      expect(d[0]!.textContent).toBe("C");
+      expect(d[1]!.textContent).toBe("A");
+      const e = list.getElementsByTagName("input");
+      expect(e.length).toBe(1);
+      expect(
+        e[0]!.compareDocumentPosition(d[0]!) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    }
+
+    // Step 3: stop editing — back to [B, C, A] display
+    editingState!.set(null);
+    engine.render();
+    expect(list.textContent).toBe("BCA");
+  });
+
+  it("should reorder DOM when keyed children swap positions", () => {
+    type RowData = { id: number; label: string };
+    let listState: Reactive<RowData[]>;
+
+    const Row = view<{ item: RowData }>((ctx) => ({
+      update: {
+        should(next: { item: RowData }) {
+          return next.item.label !== ctx.props().item.label;
+        },
+      },
+      render() {
+        div({ class: "row" }, () => {
+          text(ctx.props().item.label);
+        });
+      },
+    }));
+
+    const viewFn: ViewFn<Wildcard, Wildcard> = ({ use }) => {
+      const items = use<RowData[]>([
         { id: 1, label: "A" },
         { id: 2, label: "B" },
         { id: 3, label: "C" },
@@ -703,7 +1009,7 @@ describe("State", () => {
     next[1] = next[3]!;
     next[3] = tmp;
     listState!.set(next);
-    engine.renderCycle();
+    engine.render();
 
     expect(container.textContent).toBe("ADCBE");
   });
