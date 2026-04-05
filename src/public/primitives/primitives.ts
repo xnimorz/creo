@@ -7,6 +7,7 @@ import {
   type ViewBody,
   type ViewFn,
 } from "../view";
+import { orchestrator } from "@/internal/orchestrator";
 
 // ---------------------------------------------------------------------------
 // Engine-agnostic event data types
@@ -90,10 +91,17 @@ export function html<
 }
 
 // ---------------------------------------------------------------------------
-// Text node
+// Text node — typed as (content: string | number) => void
 // ---------------------------------------------------------------------------
 
-export const text = html<Wildcard>("text");
+const textViewFn: ViewFn<string | number, void> = Object.assign(
+  (() => ({ render() {} })) as ViewFn<string | number, void>,
+  { [$primitive]: "text" as string },
+);
+
+export function text(content: string | number): void {
+  orchestrator.currentEngine()!.view(textViewFn, content, null, null);
+}
 
 // ---------------------------------------------------------------------------
 // Layout / structural
