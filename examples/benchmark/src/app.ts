@@ -2,7 +2,6 @@ import { view } from "@/public/view";
 import {
   div,
   span,
-  text,
   button,
   table,
   tbody,
@@ -109,9 +108,9 @@ const Row = view<{
   },
   render() {
     tr({ class: props().selected ? "danger" : "" }, () => {
-      td({ class: "col-md-1" }, () => text(props().item.id));
+      td({ class: "col-md-1" }, String(props().item.id));
       td({ class: "col-md-4" }, () => {
-        a({ onClick: props().onSelect }, () => text(props().item.label));
+        a({ onClick: props().onSelect }, props().item.label);
       });
       td({ class: "col-md-1" }, () => {
         a({ onClick: props().onRemove }, () =>
@@ -142,9 +141,7 @@ const ActionButton = view<{
           id: ctx.props().id,
           onClick: ctx.props().onClick,
         },
-        () => {
-          text(ctx.props().title);
-        },
+        ctx.props().title,
       );
     });
   },
@@ -215,9 +212,7 @@ export const App = view(({ use }) => {
         div({ class: "jumbotron" }, () => {
           div({ class: "row" }, () => {
             div({ class: "col-md-6" }, () => {
-              h1(_, () => {
-                text("Creo keyed");
-              });
+              h1(_, "Creo keyed");
             });
             div({ class: "col-md-6" }, () => {
               div({ class: "row" }, () => {
