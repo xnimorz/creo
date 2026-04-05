@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Creo — Benchmark (Canvas)</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { padding: 16px; background: #f5f5f5; font-family: sans-serif; }
+    .canvas-wrap { position: relative; }
+    canvas { border: 1px solid #ddd; background: #fff; }
+  </style>
+</head>
+<body>
+  <div class="canvas-wrap">
+    <canvas id="canvas" width="1000" height="800" style="width:1000px;height:800px;"></canvas>
+  </div>
+  <script type="module" src="/src/canvas-main.ts"></script>
+</body>
+</html>

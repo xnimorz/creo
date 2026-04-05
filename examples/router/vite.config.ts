@@ -9,4 +9,12 @@ export default defineConfig({
       "creo-router": path.resolve(__dirname, "../../packages/creo-router/src/index.ts"),
     },
   },
+  build: {
+    rollupOptions: {
+      input: {
+        main: path.resolve(__dirname, "index.html"),
+        canvas: path.resolve(__dirname, "canvas.html"),
+      },
+    },
+  },
 });

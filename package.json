@@ -28,5 +28,8 @@
   },
   "peerDependencies": {
     "typescript": "^5"
+  },
+  "dependencies": {
+    "canvaskit-wasm": "^0.41.0"
   }
 }

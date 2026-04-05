@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Creo — Chess (Canvas)</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { display: flex; justify-content: center; padding: 32px; background: #1a1a2e; font-family: sans-serif; color: #ddd; }
+    .canvas-wrap { position: relative; }
+    canvas { border: 1px solid #444; }
+  </style>
+</head>
+<body>
+  <div class="canvas-wrap">
+    <canvas id="canvas" width="560" height="640" style="width:560px;height:640px;"></canvas>
+  </div>
+  <script type="module" src="/src/canvas-main.ts"></script>
+</body>
+</html>

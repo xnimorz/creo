@@ -78,6 +78,8 @@ export { HtmlRender } from "@/render/html_render";
 export { JsonRender } from "@/render/json_render";
 export type { JsonNode } from "@/render/json_render";
 export { HtmlStringRender, StringRender } from "@/render/string_render";
+export { CanvasRender, CanvasStyleSheet, type CanvasRenderOptions } from "@/render/canvas_render";
+export type { CanvasStyle, CanvasNode } from "@/render/canvas_render";
 
 // ---------------------------------------------------------------------------
 // Engine (advanced — for custom renderer wiring)

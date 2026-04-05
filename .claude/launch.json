@@ -10,10 +10,38 @@
     },
     {
       "name": "router",
-      "runtimeExecutable": "npx",
+      "runtimeExecutable": "bun",
       "runtimeArgs": ["vite", "--port", "5200"],
       "port": 5200,
       "cwd": "examples/router"
+    },
+    {
+      "name": "canvas-demo",
+      "runtimeExecutable": "bun",
+      "runtimeArgs": ["vite", "--port", "5201"],
+      "port": 5201,
+      "cwd": "examples/canvas-demo"
+    },
+    {
+      "name": "chess",
+      "runtimeExecutable": "bun",
+      "runtimeArgs": ["vite", "--port", "5202"],
+      "port": 5202,
+      "cwd": "examples/chess"
+    },
+    {
+      "name": "table",
+      "runtimeExecutable": "bun",
+      "runtimeArgs": ["vite", "--port", "5203"],
+      "port": 5203,
+      "cwd": "examples/table"
+    },
+    {
+      "name": "benchmark",
+      "runtimeExecutable": "bun",
+      "runtimeArgs": ["vite", "--port", "5204"],
+      "port": 5204,
+      "cwd": "examples/benchmark"
     }
   ]
 }

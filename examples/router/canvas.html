@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Creo — Router (Canvas)</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { display: flex; justify-content: center; padding: 32px; background: #f5f5f5; font-family: sans-serif; }
+    .canvas-wrap { position: relative; }
+    canvas { border: 1px solid #ddd; background: #fff; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <div class="canvas-wrap">
+    <canvas id="canvas" width="640" height="500" style="width:640px;height:500px;"></canvas>
+  </div>
+  <script type="module" src="/src/canvas-main.ts"></script>
+</body>
+</html>
