@@ -44,13 +44,17 @@ export type ViewRecord<
   unsubscribe: Maybe<(() => void)[]>;
 
   parent: Maybe<ViewRecord>;
+
+  /** The primitive whose .children contains the live sc items after reconcile. */
+  scHost: Maybe<ViewRecord>;
 };
 
 // ---------------------------------------------------------------------------
 // Utilities
 // ---------------------------------------------------------------------------
 
-export function hasNewSlotChildren(
+/** Structural change: viewFn, key, or count differs. Does NOT check props. */
+export function hasScStructuralChange(
   prev: Maybe<ViewRecord[]>,
   next: Maybe<ViewRecord[]>,
 ): boolean {
@@ -60,13 +64,8 @@ export function hasNewSlotChildren(
   if (!prev || !next) return true;
   if (prev.length !== next.length) return true;
   for (let i = 0; i < next.length; i++) {
-    const n = next[i]!;
-    const p = prev[i]!;
-    if (n.viewFn !== p.viewFn) return true;
-    if (n.userKey !== p.userKey) return true;
-    if (n.props !== p.props) return true;
-    // TODO we need optimise this — essentially parent is responsible for children to be there,
-    // but children themselves are responsible for their params
+    if (next[i]!.viewFn !== prev[i]!.viewFn) return true;
+    if (next[i]!.userKey !== prev[i]!.userKey) return true;
   }
   return false;
 }

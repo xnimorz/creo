@@ -1,7 +1,7 @@
 import type { IRender } from "@/render/render_interface";
 import {
   type ViewRecord,
-  hasNewSlotChildren,
+  hasScStructuralChange,
   F_DIRTY,
   F_MOVED,
   F_PRIMITIVE,
@@ -36,7 +36,6 @@ export class Engine {
   #scheduler: Scheduler;
   #renderScheduled = false;
   #rendering = false;
-  #inlineDepth = 0;
 
   constructor(
     public renderer: IRender<Wildcard>,
@@ -73,9 +72,7 @@ export class Engine {
       keyToView: null,
       unsubscribe: null,
       parent,
-
-      /** Per-instance render cache. Indexed by slot. */
-      // renderCache: Maybe<unknown[]>;
+      scHost: null,
     };
     if (slot) {
       res.sc = this.#collect(slot, [], res);
@@ -132,6 +129,7 @@ export class Engine {
       },
       slot: () => {
         if (!view.sc) return;
+        view.scHost = this.#collectFor ?? view;
         for (const child of view.sc) {
           child.parent = this.#collectFor ?? view;
           this.#collector?.push(child);
@@ -221,17 +219,65 @@ export class Engine {
     view: ViewRecord<Props, Api, RenderRef>,
     nextProps: Props,
     nextSlot: Maybe<Slot>,
+    preCollectedSc?: Maybe<ViewRecord[]>,
   ): void {
     const prevSc = view.sc;
     view.slot = nextSlot;
-    view.sc = nextSlot ? this.#collect(nextSlot, [], view) : null;
-    const scChanged = hasNewSlotChildren(prevSc, view.sc);
+    // Use pre-collected sc if available (avoids re-running the slot function)
+    if (preCollectedSc) {
+      // Re-parent sc items to this view (they were parented to the pending view)
+      for (const child of preCollectedSc) child.parent = view;
+      view.sc = preCollectedSc;
+    } else {
+      view.sc = nextSlot ? this.#collect(nextSlot, [], view) : null;
+    }
+
+    const structChanged = hasScStructuralChange(prevSc, view.sc);
     const shouldUpdate = view.body?.shouldUpdate
       ? view.body.shouldUpdate(nextProps)
       : !shallowEqual(view.props, nextProps);
-    if (shouldUpdate || scChanged) {
+
+    if (shouldUpdate || structChanged) {
+      // Full re-render: own props or slot structure changed
       view.props = nextProps;
       this.markDirty(view);
+    } else if (view.sc && view.scHost?.children) {
+      // Composite with stable structure and own props — propagate sc prop changes directly
+      this.#propagateScProps(view);
+    } else if (view.sc && prevSc) {
+      // No scHost (e.g. primitive) — check if any sc child props changed
+      for (let i = 0; i < view.sc.length; i++) {
+        if (view.sc[i]!.props !== prevSc[i]!.props) {
+          this.markDirty(view);
+          break;
+        }
+      }
+    }
+  }
+
+  /** Propagate slot children prop changes directly to live children, skipping parent reconcile. */
+  #propagateScProps(owner: ViewRecord): void {
+    const host = owner.scHost;
+    const sc = owner.sc;
+    if (!host?.children || !sc) return;
+
+    if (host.keyToView) {
+      for (const item of sc) {
+        if (item.userKey != null) {
+          const live = host.keyToView.get(item.userKey);
+          if (live && live.viewFn === item.viewFn) {
+            this.nextProps(live, item.props, item.slot);
+          }
+        }
+      }
+    } else {
+      const len = Math.min(sc.length, host.children.length);
+      for (let i = 0; i < len; i++) {
+        const live = host.children[i]!;
+        if (live.viewFn === sc[i]!.viewFn) {
+          this.nextProps(live, sc[i]!.props, sc[i]!.slot);
+        }
+      }
     }
   }
 
@@ -448,7 +494,7 @@ export class Engine {
     pendView: ViewRecord,
   ): void {
     if (oldView.viewFn === pendView.viewFn) {
-      this.nextProps(oldView, pendView.props, pendView.slot);
+      this.nextProps(oldView, pendView.props, pendView.slot, pendView.sc);
     } else {
       this.dispose(oldView);
       oldChildren[idx] = pendView;
