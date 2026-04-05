@@ -19,28 +19,24 @@ const users = [
 
 const HomePage = view(() => ({
   render() {
-    h1({}, () => { text("Home"); });
-    p({}, () => { text("Welcome to the Creo Router example app."); });
-    p({}, () => {
-      text("Use the navigation above to browse pages. Try the Users section to see dynamic route params in action.");
-    });
+    h1({}, "Home");
+    p({}, "Welcome to the Creo Router example app.");
+    p({}, "Use the navigation above to browse pages. Try the Users section to see dynamic route params in action.");
   },
 }));
 
 const AboutPage = view(() => ({
   render() {
-    h1({}, () => { text("About"); });
-    p({}, () => {
-      text("This example demonstrates creo-router — a lightweight, store-based hash router for the Creo UI framework.");
-    });
-    p({}, () => { text("Features:"); });
+    h1({}, "About");
+    p({}, "This example demonstrates creo-router — a lightweight, store-based hash router for the Creo UI framework.");
+    p({}, "Features:");
     ul({}, () => {
-      li({}, () => { text("Hash-based navigation (#/path)"); });
-      li({}, () => { text("Dynamic route parameters (/users/:id)"); });
-      li({}, () => { text("Store-driven reactivity — views re-render on route change"); });
-      li({}, () => { text("Link component with click interception"); });
-      li({}, () => { text("Programmatic navigation via navigate()"); });
-      li({}, () => { text("Browser back/forward support"); });
+      li({}, "Hash-based navigation (#/path)");
+      li({}, "Dynamic route parameters (/users/:id)");
+      li({}, "Store-driven reactivity — views re-render on route change");
+      li({}, "Link component with click interception");
+      li({}, "Programmatic navigation via navigate()");
+      li({}, "Browser back/forward support");
     });
   },
 }));
@@ -48,8 +44,8 @@ const AboutPage = view(() => ({
 const NotFoundPage = view(() => ({
   render() {
     div({ class: "not-found" }, () => {
-      h1({}, () => { text("404"); });
-      p({}, () => { text("Page not found."); });
+      h1({}, "404");
+      p({}, "Page not found.");
     });
   },
 }));
@@ -74,15 +70,13 @@ const { routeStore, navigate, RouterView, Link } = createRouter({
 
 const UsersPage = view(() => ({
   render() {
-    h1({}, () => { text("Users"); });
-    p({}, () => { text("Click a user to view their profile:"); });
+    h1({}, "Users");
+    p({}, "Click a user to view their profile:");
     ul({ class: "user-list" }, () => {
       for (const user of users) {
         li({ key: user.id }, () => {
-          Link({ href: `/users/${user.id}` }, () => {
-            text(user.name);
-          });
-          span({}, () => { text(` — ${user.role}`); });
+          Link({ href: `/users/${user.id}` }, user.name);
+          span({}, ` — ${user.role}`);
         });
       }
     });
@@ -100,27 +94,23 @@ const UserPage = view(({ use }) => {
       const user = users.find((u) => u.id === Number(id));
 
       if (!user) {
-        h1({}, () => { text("User not found"); });
-        p({}, () => { text(`No user with ID "${id}".`); });
-        Link({ href: "/users", class: "back-link" }, () => {
-          text("← Back to users");
-        });
+        h1({}, "User not found");
+        p({}, `No user with ID "${id}".`);
+        Link({ href: "/users", class: "back-link" }, "← Back to users");
         return;
       }
 
-      h2({}, () => { text(user.name); });
+      h2({}, user.name);
       dl({ class: "profile-card" }, () => {
-        dt({}, () => { text("ID"); });
-        dd({}, () => { text(String(user.id)); });
-        dt({}, () => { text("Name"); });
-        dd({}, () => { text(user.name); });
-        dt({}, () => { text("Role"); });
-        dd({}, () => { text(user.role); });
+        dt({}, "ID");
+        dd({}, String(user.id));
+        dt({}, "Name");
+        dd({}, user.name);
+        dt({}, "Role");
+        dd({}, user.role);
       });
 
-      Link({ href: "/users", class: "back-link" }, () => {
-        text("← Back to users");
-      });
+      Link({ href: "/users", class: "back-link" }, "← Back to users");
     },
   };
 });
@@ -138,15 +128,9 @@ export const App = view(({ use }) => {
 
       div({ class: "shell" }, () => {
         nav({ class: "nav" }, () => {
-          Link({ href: "/", class: currentPath === "/" ? "active" : undefined }, () => {
-            text("Home");
-          });
-          Link({ href: "/about", class: currentPath === "/about" ? "active" : undefined }, () => {
-            text("About");
-          });
-          Link({ href: "/users", class: currentPath.startsWith("/users") ? "active" : undefined }, () => {
-            text("Users");
-          });
+          Link({ href: "/", class: currentPath === "/" ? "active" : undefined }, "Home");
+          Link({ href: "/about", class: currentPath === "/about" ? "active" : undefined }, "About");
+          Link({ href: "/users", class: currentPath.startsWith("/users") ? "active" : undefined }, "Users");
         });
 
         div({ class: "content" }, () => {

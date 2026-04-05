@@ -25,6 +25,9 @@ export type ViewBody<Props, Api> = Api extends void
 /** Slot callback — passed by the caller at the call site. */
 export type Slot = () => void;
 
+/** What callers may pass as a slot: a callback or a plain string (rendered as text). */
+export type SlotContent = Slot | string;
+
 export type ViewFn<Props, Api> = {
   (ctx: { props: () => Props; use: Use; slot: Slot }): ViewBody<Props, Api>;
   [$primitive]?: string;
@@ -34,11 +37,11 @@ export function view<Props = void, Api = void>(
   body: ViewFn<Props, Api>,
 ): (
   props: Props extends void ? { key?: Key } | void : Props & { key?: Key },
-  slot?: Slot,
+  slot?: SlotContent,
 ) => void {
   return (
     props: Props extends void ? { key?: Key } | void : Props & { key?: Key },
-    slot?: Slot,
+    slot?: SlotContent,
   ) => {
     orchestrator
       .currentEngine()!

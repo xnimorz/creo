@@ -651,4 +651,67 @@ describe("Renderer Parity — HtmlRender vs HtmlStringRender", () => {
       assertParity(App);
     });
   });
+
+  // -- String slots -----------------------------------------------------------
+
+  describe("string slots", () => {
+    it("string slot on primitive", () => {
+      const App = view(() => ({
+        render() {
+          span({ class: "label" }, "hello");
+        },
+      }));
+      const html = assertParity(App);
+      expect(html).toContain("hello");
+    });
+
+    it("string slot produces same output as function slot with text()", () => {
+      const AppString = view(() => ({
+        render() {
+          div({ class: "a" }, "hello");
+        },
+      }));
+      const AppFunc = view(() => ({
+        render() {
+          div({ class: "a" }, () => { text("hello"); });
+        },
+      }));
+      const htmlString = assertParity(AppString);
+      const htmlFunc = assertParity(AppFunc);
+      expect(htmlString).toBe(htmlFunc);
+    });
+
+    it("string slot on composite view", () => {
+      const Card = view<{ title: string }>(({ props, slot }) => ({
+        render() {
+          div({ class: "card" }, () => {
+            h1({}, () => text(props().title));
+            div({ class: "body" }, slot);
+          });
+        },
+      }));
+
+      const App = view(() => ({
+        render() {
+          Card({ title: "Title" }, "card content");
+        },
+      }));
+      const html = assertParity(App);
+      expect(html).toContain("Title");
+      expect(html).toContain("card content");
+    });
+
+    it("mixed string and function slots", () => {
+      const App = view(() => ({
+        render() {
+          div({ class: "a" }, "text slot");
+          div({ class: "b" }, () => {
+            span({}, "nested");
+            text(" and more");
+          });
+        },
+      }));
+      assertParity(App);
+    });
+  });
 });

@@ -453,9 +453,7 @@ const StatusBar = view<{ game: GameState }>(({ props }) => ({
 
     div({ class: "status-bar" }, () => {
       div({ class: `turn-dot ${g.turn === "w" ? "white" : "black"}` });
-      span({ class: "status-text" }, () => {
-        text(msg);
-      });
+      span({ class: "status-text" }, msg);
     });
   },
 }));
@@ -471,9 +469,9 @@ const PromotionDialog = view<{
     div({ class: "promo-overlay" }, () => {
       div({ class: "promo-dialog" }, () => {
         for (const t of ["Q", "R", "B", "N"] as PieceType[]) {
-          button({ class: "promo-btn", onClick: () => onSelect(t) }, () => {
-            text(pieceChar({ color, type: t }));
-          });
+          button({ class: "promo-btn", onClick: () => onSelect(t) },
+            pieceChar({ color, type: t }),
+          );
         }
       });
     });
@@ -490,9 +488,7 @@ const DragGhost = view<{ piece: Piece; x: number; y: number }>(({ props }) => ({
         class: "drag-ghost",
         style: `left:${x}px;top:${y}px`,
       },
-      () => {
-        text(pieceChar(piece));
-      },
+      pieceChar(piece),
     );
   },
 }));
@@ -539,9 +535,7 @@ const SquareView = view<{
               {
                 class: `piece ${p.piece.color === "w" ? "white-piece" : "black-piece"}`,
               },
-              () => {
-                text(pieceChar(p.piece!));
-              },
+              pieceChar(p.piece!),
             );
           }
           if (p.isValidTarget && !p.piece) {
@@ -704,12 +698,8 @@ export const App = view(({ use }) => {
         },
         () => {
           div({ class: "header" }, () => {
-            span({ class: "title" }, () => {
-              text("Chess");
-            });
-            button({ class: "reset-btn", onClick: resetGame }, () => {
-              text("New Game");
-            });
+            span({ class: "title" }, "Chess");
+            button({ class: "reset-btn", onClick: resetGame }, "New Game");
           });
 
           StatusBar({ game: g });
@@ -741,9 +731,7 @@ export const App = view(({ use }) => {
           // File labels
           div({ class: "file-labels" }, () => {
             for (const f of ["a", "b", "c", "d", "e", "f", "g", "h"]) {
-              span({ class: "file-label" }, () => {
-                text(f);
-              });
+              span({ class: "file-label" }, f);
             }
           });
 

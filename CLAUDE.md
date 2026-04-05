@@ -34,7 +34,7 @@ const Counter = view<{ initial: number }>(({ props, use }) => {
 |-------|------|
 | `function Component(props)` | `view<Props>(({ props }) => ({ render() {} }))` — `props` is a function: call `props()` |
 | `useState(initial)` | `use(initial)` → `.get()` / `.set()` / `.update()` |
-| `props.children` | `slot` — called as `slot?.()` inside render |
+| `props.children` | `slot` — called as `slot?.()` inside render; callers can pass a string or `() => void` |
 | `onClick={handler}` | `onClick: handler` in primitive props |
 | `useEffect(() => {}, [])` (mount) | `onMount()` on ViewBody |
 | `useEffect(() => {})` (update) | `onUpdateAfter()` on ViewBody |
@@ -65,8 +65,11 @@ const Card = view(({ slot }) => ({
 
 // In parent render — slot is optional:
 Card({}, () => {
-  p({}, () => { text("hello"); });
+  p({}, "hello");
 });
+
+// String slot — shorthand for () => text("..."):
+Card({}, "simple text content");
 ```
 
 ### Event Handling
@@ -86,7 +89,7 @@ const MyView = view(({ use }) => {
 
   return {
     render() {
-      button({ onClick: handleClick }, () => { text("Click"); });
+      button({ onClick: handleClick }, "Click");
       input({ value: value.get(), onInput: handleInput });
     },
   };
@@ -226,9 +229,7 @@ const MyView = view(({ use }) => {
       button({ onClick: increment }, () => {
         text(count.get());
       });
-      button({ onClick: reset }, () => {
-        text("Reset");
-      });
+      button({ onClick: reset }, "Reset");
     },
   };
 });
@@ -243,16 +244,22 @@ const MyView = view(({ use }) => {
 
 ### Slot
 
-Slot is optional. Omit it when a component has no children:
+Slot accepts a function `() => void` or a `string`. A string slot is shorthand for `() => text("...")`. Omit it when a component has no children:
 
 ```ts
 // No children:
 button({ onClick: handler });
 HeaderRow({ columns });
 
-// With children:
+// String slot — renders as a text node:
+button({ onClick: handler }, "Click me");
+span({ class: "label" }, title);
+li({}, "Item text");
+
+// Function slot — for complex children:
 div({ class: "wrapper" }, () => {
-  text("hello");
+  span({}, "hello");
+  text(" world");
 });
 ```
 
@@ -274,8 +281,8 @@ const { routeStore, navigate, RouterView, Link } = createRouter({
 
 // In a view's render():
 nav({}, () => {
-  Link({ href: "/" }, () => text("Home"));
-  Link({ href: "/about" }, () => text("About"));
+  Link({ href: "/" }, "Home");
+  Link({ href: "/about" }, "About");
 });
 div({ class: "content" }, () => {
   RouterView();
@@ -293,7 +300,7 @@ navigate("/users/42");
 
 - Use `Maybe<T>` from `@/functional/maybe` instead of `T | undefined`.
 - `text(content: string | number)` — typed scalar, not a generic element.
-- `view<Props, Api>` — returns `(props, slot?) => void`.
+- `view<Props, Api>` — returns `(props, slot?: SlotContent) => void`. `SlotContent = (() => void) | string`.
 - `store.new<T>(initial)` — creates `Store<T>` with `.get()`, `.set()`, `.update()`, `.subscribe()`.
 - `use(store)` returns the `Store<T>` itself (implements `Reactive<T>`).
 - `use(value)` returns a `Reactive<T>` (local `State<T>`).
