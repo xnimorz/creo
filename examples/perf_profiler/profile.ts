@@ -10,7 +10,7 @@ import {
   a,
 } from "@/public/primitives/primitives";
 import { Engine } from "@/internal/engine";
-import { View } from "@/internal/internal_view";
+import { type ViewRecord } from "@/internal/internal_view";
 import { orchestrator } from "@/internal/orchestrator";
 import { HtmlRender } from "@/render/html_render";
 import { _ } from "@/index";
@@ -134,10 +134,10 @@ function percentile(arr: number[], p: number): number {
 }
 
 // --- Capture root view ---
-let rootView: View;
+let rootView: ViewRecord;
 const origMarkDirty = Engine.prototype.markDirty;
-Engine.prototype.markDirty = function (v: View) {
-  if (!v.parent && !rootView) rootView = v as View;
+Engine.prototype.markDirty = function (v: ViewRecord) {
+  if (!v.parent && !rootView) rootView = v;
   origMarkDirty.call(this, v);
 };
 
@@ -168,13 +168,15 @@ const appViewFn: ViewFn<any, any> = ({ use }) => {
   };
 };
 
-new View(appViewFn as any, {}, null, engine, null, null);
+engine.createRoot(() => {
+  orchestrator.currentEngine()!.view(appViewFn, {}, null, null);
+}, {});
 engine.render();
 
-function countViews(v: View): number {
+function countViews(v: ViewRecord): number {
   let n = 1;
-  if (v.virtualDom) {
-    for (const c of v.virtualDom) n += countViews(c);
+  if (v.children) {
+    for (const c of v.children) n += countViews(c);
   }
   return n;
 }
@@ -288,7 +290,9 @@ for (let run = 0; run < RUNS; run++) {
       },
     };
   };
-  new View(benchAppViewFn as any, {}, null, e2, null, null);
+  e2.createRoot(() => {
+    orchestrator.currentEngine()!.view(benchAppViewFn, {}, null, null);
+  }, {});
   e2.render();
   const data = buildData(10_000);
   ls.set(data);

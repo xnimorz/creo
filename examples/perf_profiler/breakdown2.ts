@@ -4,7 +4,7 @@ import {
   span, text, table, tbody, tr, td, a,
 } from "@/public/primitives/primitives";
 import { Engine } from "@/internal/engine";
-import { View } from "@/internal/internal_view";
+import { type ViewRecord } from "@/internal/internal_view";
 import { orchestrator } from "@/internal/orchestrator";
 import { HtmlRender } from "@/render/html_render";
 import { $primitive } from "@/public/primitive";
@@ -72,7 +72,7 @@ function track(name: string, t: number) {
 // Patch HtmlRender.render to break down mount vs update
 const proto = HtmlRender.prototype as any;
 const origRender = proto.render;
-proto.render = function (view: View) {
+proto.render = function (view: ViewRecord) {
   const ref = view.renderRef;
   const label = ref ? "renderer.render(update)" : "renderer.render(mount)";
   const t0 = performance.now();
@@ -80,12 +80,12 @@ proto.render = function (view: View) {
   track(label, performance.now() - t0);
 };
 
-// Instrument View.reconsile
-const origReconsile = View.prototype.reconsile;
-View.prototype.reconsile = function () {
+// Instrument Engine.reconcile
+const origReconcile = Engine.prototype.reconcile;
+Engine.prototype.reconcile = function (view: ViewRecord) {
   const t0 = performance.now();
-  origReconsile.call(this);
-  track("View.reconsile", performance.now() - t0);
+  origReconcile.call(this, view);
+  track("Engine.reconcile", performance.now() - t0);
 };
 
 // Count object allocations
@@ -93,21 +93,12 @@ let primCount = 0;
 let compositeCount = 0;
 
 const origMarkDirty = Engine.prototype.markDirty;
-Engine.prototype.markDirty = function (v: View) {
+Engine.prototype.markDirty = function (v: ViewRecord) {
   if (!v.renderRef) {
     if (v.viewFn[$primitive]) primCount++;
     else compositeCount++;
   }
   origMarkDirty.call(this, v);
-};
-
-// Instrument Engine.collect
-const origCollect = Engine.prototype.collect;
-Engine.prototype.collect = function (slotFn: () => void) {
-  const t0 = performance.now();
-  const r = origCollect.call(this, slotFn);
-  track("Engine.collect", performance.now() - t0);
-  return r;
 };
 
 // ========== Run ==========
@@ -139,7 +130,9 @@ const appViewFn: ViewFn<any, any> = ({ use }) => {
     },
   };
 };
-new View(appViewFn as any, {}, null, e, null, null);
+e.createRoot(() => {
+  orchestrator.currentEngine()!.view(appViewFn, {}, null, null);
+}, {});
 e.render();
 
 const data = buildData(ROWS);

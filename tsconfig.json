@@ -26,7 +26,9 @@
     "noPropertyAccessFromIndexSignature": false,
 
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "creo": ["./src/index.ts"],
+      "creo-router": ["./packages/creo-router/src/index.ts"]
     }
   }
 }

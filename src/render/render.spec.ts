@@ -9,7 +9,8 @@ import type { ViewRecord } from "@/internal/internal_view";
 import { orchestrator } from "@/internal/orchestrator";
 import { HtmlRender } from "./html_render";
 import { JsonRender, type JsonNode } from "./json_render";
-import { StringRender } from "./string_render";
+import { HtmlStringRender } from "./string_render";
+
 import type { IRender } from "./render_interface";
 import type { Wildcard } from "@/internal/wildcard";
 
@@ -115,12 +116,12 @@ function createTodoApp(renderer: IRender<Wildcard>) {
 // String Renderer
 // ---------------------------------------------------------------------------
 
-describe("StringRender", () => {
-  let renderer: StringRender;
+describe("HtmlStringRender", () => {
+  let renderer: HtmlStringRender;
   let app: ReturnType<typeof createTodoApp>;
 
   beforeEach(() => {
-    renderer = new StringRender();
+    renderer = new HtmlStringRender();
     app = createTodoApp(renderer);
   });
 
@@ -128,9 +129,11 @@ describe("StringRender", () => {
     const html = renderer.renderToString();
     expect(html).toContain("Buy milk");
     expect(html).toContain("Walk dog");
-    expect(html).toContain("<div>");
-    expect(html).toContain("<span>");
-    expect(html).toContain("<button>");
+    expect(html).toContain("<div");
+    expect(html).toContain("<span");
+    expect(html).toContain("<button");
+    expect(html).toContain('class="app"');
+    expect(html).toContain('class="text"');
   });
 
   it("should re-render with updated items", () => {
@@ -402,7 +405,7 @@ describe("HtmlRender", () => {
 // ---------------------------------------------------------------------------
 
 describe("State", () => {
-  function mountStateful(viewFn: ReturnType<typeof view>) {
+  function mountStateful(viewFn: (props?: any, slot?: any) => void) {
     const container = document.createElement("div");
     const renderer = new HtmlRender(container);
     const engine = new Engine(renderer);
@@ -637,7 +640,7 @@ describe("State", () => {
       };
     });
 
-    const renderer = new StringRender();
+    const renderer = new HtmlStringRender();
     const engine = new Engine(renderer);
     orchestrator.setCurrentEngine(engine);
     engine.createRoot(() => { Counter(); }, {});

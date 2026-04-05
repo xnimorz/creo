@@ -1,4 +1,5 @@
 import type { ViewRecord } from "@/internal/internal_view";
+import { F_PRIMITIVE } from "@/internal/internal_view";
 import type { IRender } from "./render_interface";
 import { $primitive } from "@/public/primitive";
 import type { Maybe } from "@/functional/maybe";
@@ -10,12 +11,42 @@ const VOID_TAGS = new Set([
   "area", "col", "wbr",
 ]);
 
+// Attributes that are set as DOM properties, not HTML attributes
+const DOM_PROPERTIES = new Set(["value", "checked", "selected", "indeterminate"]);
+
+// Event handler prefix detection
+function isEventProp(key: string): boolean {
+  return (
+    key.charCodeAt(0) === 111 && // 'o'
+    key.charCodeAt(1) === 110 && // 'n'
+    key.charCodeAt(2) >= 65 &&   // 'A'
+    key.charCodeAt(2) <= 90      // 'Z'
+  );
+}
+
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function escapeAttr(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
 /**
- * Stateless string renderer — pull-based.
+ * HtmlStringRender — pull-based string renderer.
  * render/unmount are no-ops. Call renderToString() to
  * get the current HTML string from the VDOM.
+ *
+ * Output matches HtmlRender's DOM serialization (innerHTML).
  */
-export class StringRender implements IRender<string> {
+export class HtmlStringRender implements IRender<string> {
   private root: Maybe<ViewRecord> = null;
 
   engine!: Engine;
@@ -32,7 +63,6 @@ export class StringRender implements IRender<string> {
 
   // -- Public -----------------------------------------------------------------
 
-  /** Build and return the current HTML string from the VDOM. */
   renderToString(): string {
     if (!this.root) return "";
     return this.buildString(this.root);
@@ -45,23 +75,46 @@ export class StringRender implements IRender<string> {
 
     if (tag != null) {
       if (tag === "text") {
-        return `${rec.props}`;
+        return escapeHtml(String(rec.props));
       }
+      const attrs = this.buildAttrs(rec.props as Record<string, unknown>);
       if (VOID_TAGS.has(tag)) {
-        return this.buildVoidTag(tag, rec);
+        return `<${tag}${attrs}>`;
       }
-      return `<${tag}>${this.buildChildren(rec)}</${tag}>`;
+      return `<${tag}${attrs}>${this.buildChildren(rec)}</${tag}>`;
     }
 
+    // Composite — transparent, just render children
     return this.buildChildren(rec);
   }
 
-  private buildVoidTag(tag: string, rec: ViewRecord): string {
-    const props = rec.props as Record<string, unknown>;
-    let attrs = "";
-    if (props.src) attrs += ` src="${props.src}"`;
-    if (props.alt) attrs += ` alt="${props.alt}"`;
-    return `<${tag}${attrs} />`;
+  private buildAttrs(props: Record<string, unknown>): string {
+    let result = "";
+    for (const key in props) {
+      const value = props[key];
+      if (key === "key" || value == null) continue;
+      // Skip event handlers — they don't appear in HTML
+      if (isEventProp(key)) continue;
+      // Skip DOM-only properties (value, checked, etc.)
+      if (DOM_PROPERTIES.has(key)) continue;
+
+      if (key === "style") {
+        // Normalize style to match DOM's cssText (trailing semicolon)
+        let css = String(value);
+        css = css.trim();
+        if (css && !css.endsWith(";")) css += ";";
+        result += ` style="${escapeAttr(css)}"`;
+        continue;
+      }
+      if (typeof value === "boolean") {
+        if (value) result += ` ${key}=""`;
+        // false booleans are omitted
+      } else {
+        const attrName = key === "class" ? "class" : key;
+        result += ` ${attrName}="${escapeAttr(String(value))}"`;
+      }
+    }
+    return result;
   }
 
   private buildChildren(rec: ViewRecord): string {
@@ -73,3 +126,6 @@ export class StringRender implements IRender<string> {
     return result;
   }
 }
+
+/** @deprecated Use HtmlStringRender instead */
+export const StringRender = HtmlStringRender;

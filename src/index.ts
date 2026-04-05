@@ -77,7 +77,7 @@ export type { IRender } from "@/render/render_interface";
 export { HtmlRender } from "@/render/html_render";
 export { JsonRender } from "@/render/json_render";
 export type { JsonNode } from "@/render/json_render";
-export { StringRender } from "@/render/string_render";
+export { HtmlStringRender, StringRender } from "@/render/string_render";
 
 // ---------------------------------------------------------------------------
 // Engine (advanced — for custom renderer wiring)

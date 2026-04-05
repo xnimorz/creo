@@ -36,14 +36,14 @@ const Counter = view<{ initial: number }>(({ props, use }) => {
 | `useState(initial)` | `use(initial)` → `.get()` / `.set()` / `.update()` |
 | `props.children` | `slot` — called as `slot?.()` inside render |
 | `onClick={handler}` | `onClick: handler` in primitive props |
-| `useEffect(() => {}, [])` (mount) | `mount.after()` |
-| `useEffect(() => {}, [deps])` (update) | `update.after()` |
-| `useLayoutEffect` (before paint) | `mount.before()` / `update.before()` |
-| `React.memo(Component, areEqual)` | `update: { should: (nextProps) => boolean }` |
+| `useEffect(() => {}, [])` (mount) | `onMount()` on ViewBody |
+| `useEffect(() => {})` (update) | `onUpdateAfter()` on ViewBody |
+| `useLayoutEffect` (before paint) | `onUpdateBefore()` on ViewBody |
+| `React.memo(Component, areEqual)` | `shouldUpdate(nextProps)` on ViewBody |
 | `key={id}` | `{ key: id }` in props |
 | `useContext` | `store.new()` + `use(store)` (global shared state) |
 | `<div className="x">` | `div({ class: "x" }, () => { ... })` |
-| `ReactDOM.createRoot(el).render(<App/>)` | `createApp(App, new HtmlRender(el)).mount()` |
+| `ReactDOM.createRoot(el).render(<App/>)` | `createApp(() => App(), new HtmlRender(el)).mount()` |
 
 ### Children / Composition
 
@@ -65,7 +65,7 @@ const Card = view(({ slot }) => ({
 
 // In parent render — slot is optional:
 Card({}, () => {
-  p(_, () => { text("hello"); }); // _ is imported from Maybe.ts
+  p({}, () => { text("hello"); });
 });
 ```
 
@@ -161,28 +161,49 @@ ThemeStore.set("dark"); // updates all subscribers
 // Inside a view:
 const theme = use(ThemeStore); // subscribes, re-renders on change
 theme.get(); // "dark"
+theme.set("light"); // updates the store, all subscribers re-render
 ```
 
 ### Lifecycle
 
-| Phase | React | Creo |
+| Phase | React | Creo (ViewBody property) |
 |-------|-------|------|
-| Before first render | — | `mount.before()` |
-| After first mount | `useEffect(() => {}, [])` | `mount.after()` |
-| Before re-render | — | `update.before()` |
-| After re-render | `useEffect(() => {})` | `update.after()` |
-| Skip render | `React.memo(cmp, fn)` | `update.should(nextProps)` |
+| After first mount | `useEffect(() => {}, [])` | `onMount()` |
+| Before re-render | — | `onUpdateBefore()` |
+| After re-render | `useEffect(() => {})` | `onUpdateAfter()` |
+| Skip render | `React.memo(cmp, fn)` | `shouldUpdate(nextProps)` |
+
+```ts
+const MyView = view<{ value: number }>(({ props }) => ({
+  onMount() {
+    console.log("mounted");
+  },
+  onUpdateBefore() {
+    console.log("about to re-render");
+  },
+  onUpdateAfter() {
+    console.log("re-rendered");
+  },
+  shouldUpdate(nextProps) {
+    return nextProps.value !== props().value;
+  },
+  render() {
+    text(props().value);
+  },
+}));
+```
 
 ### Key Differences from React
 
-1. **Imperative render** — call primitives in `render()` instead of returning JSX. All JS cycles, if clauses are available to streamline your render.
-2. **Handlers declared before ViewBody** — define handler functions in the viewFn body (before `return`), reference them in render. Keeps render clean, handlers stable
-3. **State is deferred** — `set()`/`update()` queue changes, applied before next render
-4. **Explicit lifecycle** — named hooks (`mount.before`, `update.after`) instead of `useEffect` with dependency arrays
-5. **No JSX** — function calls instead of markup; `slot` instead of `children`
-6. **Render returns void** — primitives are called for side effects (stream-based), not returned as a tree
-7. **Slot is optional** — omit the second argument if no children needed
-8. **Unified `use()`** — both local state and global store use the same `use()` function
+1. **Imperative render** — call primitives in `render()` instead of returning JSX. All JS control flow (`if`, `for`, `while`) available directly.
+2. **Handlers declared before ViewBody** — define handler functions in the viewFn body (before `return`), reference them in render. Keeps render clean, handlers stable.
+3. **State is immediate** — `set()` updates the value immediately; `get()` returns the new value right away. Re-render is scheduled asynchronously.
+4. **Explicit lifecycle** — named hooks (`onMount`, `onUpdateBefore`, `onUpdateAfter`) on ViewBody instead of `useEffect` with dependency arrays.
+5. **No JSX** — function calls instead of markup; `slot` instead of `children`.
+6. **Render returns void** — primitives are called for side effects (stream-based), not returned as a tree.
+7. **Slot is optional** — omit the second argument if no children needed.
+8. **Unified `use()`** — both local state and global store use the same `use()` function.
+9. **`text()` is typed** — `text(content: string | number)`, not a generic element.
 
 ---
 
@@ -216,8 +237,8 @@ const MyView = view(({ use }) => {
 ### State
 
 - `use(initial)` must be called in the viewFn body (before returning ViewBody), never inside `render()`.
-- State is cursor-tracked (like React hooks) — call order must be stable across re-renders.
-- `set()` / `update()` queue changes. Values are applied (flushed) before the next render, not immediately.
+- `use()` is called **once** per view lifecycle (when the component is first created). It is NOT called on re-render — only `render()` is called on re-render.
+- `set()` / `update()` update the value immediately and schedule a re-render.
 - For ephemeral values that don't need re-renders (e.g., tracking current input text), use a plain `let` variable instead of state.
 
 ### Slot
@@ -235,6 +256,44 @@ div({ class: "wrapper" }, () => {
 });
 ```
 
+### Router (creo-router)
+
+Hash-based router available as a separate package (`packages/creo-router`):
+
+```ts
+import { createRouter } from "creo-router";
+
+const { routeStore, navigate, RouterView, Link } = createRouter({
+  routes: [
+    { path: "/", view: () => HomePage() },
+    { path: "/about", view: () => AboutPage() },
+    { path: "/users/:id", view: () => UserPage() },
+  ],
+  fallback: () => NotFoundPage(),
+});
+
+// In a view's render():
+nav({}, () => {
+  Link({ href: "/" }, () => text("Home"));
+  Link({ href: "/about" }, () => text("About"));
+});
+div({ class: "content" }, () => {
+  RouterView();
+});
+
+// Read route params:
+const route = use(routeStore);
+const userId = route.get().params.id;
+
+// Programmatic navigation:
+navigate("/users/42");
+```
+
 ## Types
 
 - Use `Maybe<T>` from `@/functional/maybe` instead of `T | undefined`.
+- `text(content: string | number)` — typed scalar, not a generic element.
+- `view<Props, Api>` — returns `(props, slot?) => void`.
+- `store.new<T>(initial)` — creates `Store<T>` with `.get()`, `.set()`, `.update()`, `.subscribe()`.
+- `use(store)` returns the `Store<T>` itself (implements `Reactive<T>`).
+- `use(value)` returns a `Reactive<T>` (local `State<T>`).
