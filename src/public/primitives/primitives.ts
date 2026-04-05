@@ -73,18 +73,22 @@ export type HtmlAttrs = {
   [attr: string]: unknown;
 };
 
+/** Api type for element primitives — call to get the underlying renderer output. */
+export type ElementApi = () => unknown;
+
 export function html<
   Attrs extends HtmlAttrs = HtmlAttrs,
   Events = ContainerEvents,
->(tag: string): PublicView<Attrs & EventHandlerProps<Events>, void> {
-  const fn: ViewFn<Attrs & EventHandlerProps<Events>, void> = <Props>({
+>(tag: string): PublicView<Attrs & EventHandlerProps<Events>, ElementApi> {
+  const fn: ViewFn<Attrs & EventHandlerProps<Events>, ElementApi> = <Props>({
     slot,
   }: {
     slot: Slot;
-  }): ViewBody<Props, void> => ({
+  }): ViewBody<Props, ElementApi> => ({
     render() {
       slot();
     },
+    api: () => undefined,
   });
   fn[$primitive] = tag;
   return view(fn);

@@ -24,6 +24,8 @@ export type { PrimitiveProps, EventHandlerProps } from "@/public/primitive";
 export {
   // Factory
   html,
+  // Element api type
+  type ElementApi,
   // Text
   text,
   // Layout / structural

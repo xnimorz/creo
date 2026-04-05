@@ -47,6 +47,9 @@ export type ViewRecord<
 
   /** The primitive whose .children contains the live sc items after reconcile. */
   scHost: Maybe<ViewRecord>;
+
+  /** Set during reconciliation: points a pending record to the live record it was matched with. */
+  alias: Maybe<ViewRecord>;
 };
 
 // ---------------------------------------------------------------------------

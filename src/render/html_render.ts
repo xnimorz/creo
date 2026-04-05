@@ -244,6 +244,11 @@ export class HtmlRender implements IRender<HTMLElement | Text> {
     view.renderRef = undefined;
   }
 
+  primitiveApi(view: ViewRecord): HTMLElement | Text | undefined {
+    const ref = view.renderRef as Maybe<PrimitiveDomRef>;
+    return ref?.element;
+  }
+
   // -- Internal: DOM tree navigation ------------------------------------------
 
   private findParentDom(view: ViewRecord): Node {

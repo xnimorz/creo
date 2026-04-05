@@ -8,4 +8,7 @@ export interface IRender<Output> {
 
   /** Remove a view's output artifacts. */
   unmount(view: ViewRecord): void;
+
+  /** Extract the public API value for a primitive view (e.g. the DOM element). */
+  primitiveApi?(view: ViewRecord): unknown;
 }

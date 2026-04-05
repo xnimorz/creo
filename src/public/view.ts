@@ -30,25 +30,35 @@ export type ViewFn<Props, Api> = {
   [$primitive]?: string;
 };
 
+type PropsArg<Props> = Props extends void
+  ? { key?: Key } | void
+  : Props & { key?: Key };
+
+/**
+ * When Api = void  → view call returns void
+ * When Api ≠ void  → view call returns Api (always a function per convention)
+ */
 export function view<Props = void, Api = void>(
-  body: ViewFn<Props, Api>,
-): (
-  props: Props extends void ? { key?: Key } | void : Props & { key?: Key },
-  slot?: Slot,
-) => void {
-  return (
-    props: Props extends void ? { key?: Key } | void : Props & { key?: Key },
-    slot?: Slot,
-  ) => {
-    orchestrator
+  viewFn: ViewFn<Props, Api>,
+): (props: PropsArg<Props>, slot?: Slot) => Api extends void ? void : Api {
+  return ((props: PropsArg<Props>, slot?: Slot) => {
+    const record = orchestrator
       .currentEngine()!
       .view(
-        body as ViewFn<Wildcard, Wildcard>,
+        viewFn as ViewFn<Wildcard, Wildcard>,
         props,
         slot,
         maybeGetUserKey(props),
       );
-  };
+    // Return a lazy api proxy: when called, delegates to body.api.
+    // Follows record.alias to the live record (set during reconciliation
+    // when a pending record is matched to an existing one on re-render).
+    // For void-api views this returns undefined (typed as void).
+    return ((...args: unknown[]) => {
+      const live = record.alias ?? record;
+      return (live.body as Wildcard)?.api?.(...args);
+    }) as Wildcard;
+  }) as Wildcard;
 }
 
 export type PublicView<Props, Api> = ReturnType<typeof view<Props, Api>>;

@@ -73,6 +73,7 @@ export class Engine {
       unsubscribe: null,
       parent,
       scHost: null,
+      alias: null,
     };
     if (slot) {
       res.sc = this.#collect(slot, [], res);
@@ -111,6 +112,7 @@ export class Engine {
         render() {
           engine.views(view.sc);
         },
+        api: () => engine.renderer.primitiveApi?.(view),
       };
       return;
     }
@@ -494,6 +496,7 @@ export class Engine {
     pendView: ViewRecord,
   ): void {
     if (oldView.viewFn === pendView.viewFn) {
+      pendView.alias = oldView;
       this.nextProps(oldView, pendView.props, pendView.slot, pendView.sc);
     } else {
       this.dispose(oldView);

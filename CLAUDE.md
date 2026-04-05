@@ -41,6 +41,7 @@ const Counter = view<{ initial: number }>(({ props, use }) => {
 | `useLayoutEffect` (before paint) | `onUpdateBefore()` on ViewBody |
 | `React.memo(Component, areEqual)` | `shouldUpdate(nextProps)` on ViewBody |
 | `key={id}` | `{ key: id }` in props |
+| `useRef` / `useImperativeHandle` | `api: () => (...)` on ViewBody; primitives return `() => element` |
 | `useContext` | `store.new()` + `use(store)` (global shared state) |
 | `<div className="x">` | `div({ class: "x" }, () => { ... })` |
 | `ReactDOM.createRoot(el).render(<App/>)` | `createApp(() => App(), new HtmlRender(el)).mount()` |
@@ -193,6 +194,71 @@ const MyView = view<{ value: number }>(({ props }) => ({
 }));
 ```
 
+### View API
+
+Views can expose an API function via the second generic parameter. API is always a function — call it to get the result. This is because some API values (like DOM elements) are only available after rendering.
+
+**Primitive element API** — all HTML primitives return `() => unknown`. With HtmlRender, calling it returns the underlying DOM element:
+
+```ts
+const MyView = view(({}) => {
+  let getDiv: () => unknown;
+  return {
+    onMount() {
+      const el = getDiv() as HTMLElement; // safe — element exists after mount
+      el.scrollTop = 0;
+    },
+    render() {
+      getDiv = div({ class: "scrollable" }, () => {
+        text("content");
+      });
+    },
+  };
+});
+```
+
+**Custom view API** — expose methods or values from a composite view:
+
+```ts
+type ScrollApi = () => { scrollTo(pos: number): void; getOffset(): number };
+
+const ScrollBox = view<{ height: number }, ScrollApi>(({ props, use }) => {
+  let containerEl: () => unknown;
+  return {
+    render() {
+      containerEl = div({ class: "scroll", style: `height:${props().height}px` });
+    },
+    api: () => ({
+      scrollTo(pos: number) {
+        (containerEl() as HTMLElement).scrollTop = pos;
+      },
+      getOffset() {
+        return (containerEl() as HTMLElement).scrollTop;
+      },
+    }),
+  };
+});
+
+// Parent usage:
+const Page = view(({}) => {
+  let scrollApi: ScrollApi;
+  return {
+    onMount() {
+      scrollApi().scrollTo(100); // call api after mount
+    },
+    render() {
+      scrollApi = ScrollBox({ height: 500 });
+    },
+  };
+});
+```
+
+| React | Creo |
+|-------|------|
+| `useRef` + `ref={ref}` | `getEl = div(...)` → `getEl() as HTMLElement` in `onMount` |
+| `useImperativeHandle(ref, () => api)` | `api: () => ({ ... })` on ViewBody |
+| `ref.current` | Call the api function: `myApi()` |
+
 ### Key Differences from React
 
 1. **Imperative render** — call primitives in `render()` instead of returning JSX. All JS control flow (`if`, `for`, `while`) available directly.
@@ -204,6 +270,7 @@ const MyView = view<{ value: number }>(({ props }) => ({
 7. **Slot is optional** — omit the second argument if no children needed.
 8. **Unified `use()`** — both local state and global store use the same `use()` function.
 9. **`text()` is typed** — `text(content: string | number)`, not a generic element.
+10. **API is a function** — `view<Props, Api>` where Api is a function type. Primitives return `() => unknown` (DOM element with HtmlRender). Call API only in `onMount` or `onUpdateAfter`.
 
 ---
 
