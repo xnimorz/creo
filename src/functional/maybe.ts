@@ -13,6 +13,14 @@ export function just<T>(
   }
 }
 
+export function isJust<T>(maybe: Maybe<T>): maybe is Just<T> {
+  return maybe != null;
+}
+
+export function isNone<T>(maybe: Maybe<T>): maybe is None {
+  return maybe == null;
+}
+
 export function withDefault<T, K>(v: Maybe<T>, alternative: K) {
   if (v != null) {
     return v;

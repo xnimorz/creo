@@ -1,7 +1,8 @@
-import type { View } from "@/internal/internal_view";
+import type { ViewRecord } from "@/internal/internal_view";
 import type { IRender } from "./render_interface";
 import { $primitive } from "@/public/primitive";
 import type { Maybe } from "@/functional/maybe";
+import type { Engine } from "@/internal/engine";
 
 // ---------------------------------------------------------------------------
 // JSON node — the output type
@@ -22,9 +23,14 @@ export class JsonRender implements IRender<JsonNode> {
   /** The root JSON node after mount. */
   root: Maybe<JsonNode>;
 
+  engine!: Engine;
+  constructor() {
+    this.root = null;
+  }
+
   // -- IRender ----------------------------------------------------------------
 
-  render(view: View): void {
+  render(view: ViewRecord): void {
     const existing = view.renderRef as Maybe<JsonNode>;
 
     if (!existing) {
@@ -36,27 +42,34 @@ export class JsonRender implements IRender<JsonNode> {
       }
       const parentNode = view.parent.renderRef as Maybe<JsonNode>;
       if (parentNode) {
-        parentNode.children.push(node);
+        // Insert at correct position
+        const idx = view.parent.children
+          ? view.parent.children.indexOf(view)
+          : -1;
+        if (idx >= 0 && idx < parentNode.children.length) {
+          parentNode.children.splice(idx, 0, node);
+        } else {
+          parentNode.children.push(node);
+        }
       }
       return;
     }
 
     // Update: reposition + patch props
-    const parentNode = view.parent?.renderRef as Maybe<JsonNode>;
-    if (parentNode) {
-      const oldIdx = parentNode.children.indexOf(existing);
-      if (oldIdx !== -1) {
-        const nextSibling = this.getNextSibling(view);
-        const nextNode = nextSibling?.renderRef as Maybe<JsonNode>;
-        const expectedIdx = nextNode
-          ? parentNode.children.indexOf(nextNode)
-          : parentNode.children.length;
-        if (oldIdx !== expectedIdx && oldIdx !== expectedIdx - 1) {
+    if (view.parent) {
+      const parentNode = view.parent.renderRef as Maybe<JsonNode>;
+      if (parentNode) {
+        const oldIdx = parentNode.children.indexOf(existing);
+        const targetIdx = view.parent.children
+          ? view.parent.children.indexOf(view)
+          : -1;
+        if (oldIdx !== -1 && targetIdx !== -1 && oldIdx !== targetIdx) {
           parentNode.children.splice(oldIdx, 1);
-          const insertIdx = nextNode
-            ? parentNode.children.indexOf(nextNode)
-            : parentNode.children.length;
-          parentNode.children.splice(insertIdx, 0, existing);
+          parentNode.children.splice(
+            Math.min(targetIdx, parentNode.children.length),
+            0,
+            existing,
+          );
         }
       }
     }
@@ -66,10 +79,11 @@ export class JsonRender implements IRender<JsonNode> {
       : { ...view.props };
   }
 
-  unmount(view: View): void {
+  unmount(view: ViewRecord): void {
     const childNode = view.renderRef as Maybe<JsonNode>;
-    const parentNode = view.parent?.renderRef as Maybe<JsonNode>;
-    if (parentNode && childNode) {
+    if (!childNode || !view.parent) return;
+    const parentNode = view.parent.renderRef as Maybe<JsonNode>;
+    if (parentNode) {
       const idx = parentNode.children.indexOf(childNode);
       if (idx !== -1) parentNode.children.splice(idx, 1);
     }
@@ -77,11 +91,7 @@ export class JsonRender implements IRender<JsonNode> {
 
   // -- Internal ---------------------------------------------------------------
 
-  private getNextSibling(view: View): Maybe<View> {
-    return view.parent?.virtualDom?.getNode(view)?.getNext()?.v;
-  }
-
-  private buildNode(view: View): JsonNode {
+  private buildNode(view: ViewRecord): JsonNode {
     const tag = view.viewFn[$primitive];
 
     const props = tag === "text"

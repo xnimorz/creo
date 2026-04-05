@@ -2,8 +2,8 @@ import type { Key } from "@/functional/key";
 import type { Maybe } from "@/functional/maybe";
 import { orchestrator } from "@/internal/orchestrator";
 import type { Use } from "./state";
-import type { PendingView } from "@/internal/internal_view";
 import type { $primitive } from "./primitive";
+import type { Wildcard } from "@/internal/wildcard";
 
 export type ViewBody<Props, Api> = Api extends void
   ? {
@@ -11,22 +11,19 @@ export type ViewBody<Props, Api> = Api extends void
       onMount?: () => void;
       shouldUpdate?: (nextProps: Props) => boolean;
       onUpdateBefore?: () => void;
-      onUpdateafter?: () => void;
+      onUpdateAfter?: () => void;
     }
   : {
       render: () => void;
       onMount?: () => void;
       shouldUpdate?: (nextProps: Props) => boolean;
       onUpdateBefore?: () => void;
-      onUpdateafter?: () => void;
+      onUpdateAfter?: () => void;
       api: Api;
     };
 
 /** Slot callback — passed by the caller at the call site. */
 export type Slot = () => void;
-
-/** Children — pre-collected PendingViews available inside the view. */
-export type Children = Maybe<PendingView[]>;
 
 export type ViewFn<Props, Api> = {
   (ctx: { props: () => Props; use: Use; slot: Slot }): ViewBody<Props, Api>;
@@ -43,12 +40,14 @@ export function view<Props = void, Api = void>(
     props: Props extends void ? { key?: Key } | void : Props & { key?: Key },
     slot?: Slot,
   ) => {
-    orchestrator.currentEngine()!.pendingView({
-      viewFn: body,
-      props,
-      slot,
-      userKey: maybeGetUserKey(props),
-    });
+    orchestrator
+      .currentEngine()!
+      .view(
+        body as ViewFn<Wildcard, Wildcard>,
+        props,
+        slot,
+        maybeGetUserKey(props),
+      );
   };
 }
 

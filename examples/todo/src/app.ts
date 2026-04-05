@@ -1,5 +1,6 @@
 import { view } from "@/public/view";
 import { _ } from "@/functional/maybe";
+import { store } from "@/public/store";
 import { div, text, button, input, span, h1 } from "@/public/primitives/primitives";
 import type {
   InputEventData,
@@ -22,6 +23,18 @@ type DragInfo = {
   /** Approximate item height in px */
   itemH: number;
 };
+
+// ---------------------------------------------------------------------------
+// Global store
+// ---------------------------------------------------------------------------
+
+let nextId = 4;
+
+const todosStore = store.new<Todo[]>([
+  { id: 1, text: "Learn Creo", done: false },
+  { id: 2, text: "Build a todo app", done: true },
+  { id: 3, text: "Ship it", done: false },
+]);
 
 // ---------------------------------------------------------------------------
 // Composite wrapper: Card with header + slotted body
@@ -171,16 +184,12 @@ const TodoEditor = view<{
 // ---------------------------------------------------------------------------
 
 export const App = view(({ use }) => {
-  const todos = use<Todo[]>([
-    { id: 1, text: "Learn Creo", done: false },
-    { id: 2, text: "Build a todo app", done: true },
-    { id: 3, text: "Ship it", done: false },
-  ]);
-  let nextId = 4;
+  const todos = use(todosStore);
   let draft = "";
 
   const editingId = use<number | null>(null);
   const drag = use<DragInfo | null>(null);
+  const hideCompleted = use(false);
 
   // -- Add ------------------------------------------------------------------
 
@@ -231,6 +240,10 @@ export const App = view(({ use }) => {
     editingId.set(null);
   };
 
+  const toggleHideCompleted = () => {
+    hideCompleted.update((v) => !v);
+  };
+
   // -- Drag & Drop ----------------------------------------------------------
 
   // Item height estimate (padding + font + border ≈ 41px).
@@ -238,6 +251,7 @@ export const App = view(({ use }) => {
   const ITEM_H = 41;
 
   const startDrag = (id: number, e: PointerEventData) => {
+    if (hideCompleted.get()) return;
     const idx = todos.get().findIndex((t) => t.id === id);
     drag.set({
       draggedId: id,
@@ -314,15 +328,29 @@ export const App = view(({ use }) => {
 
           const list = todos.get();
           const editing = editingId.get();
+          const hiding = hideCompleted.get();
+          const visibleList = hiding ? list.filter((t) => !t.done) : list;
 
-          Card({ header: `${list.length} item${list.length !== 1 ? "s" : ""}` }, () => {
-            if (list.length === 0) {
+          div({ class: "filter-bar" }, () => {
+            button(
+              { class: "btn btn-filter", onClick: toggleHideCompleted },
+              () => { text(hiding ? "Show completed" : "Hide completed"); },
+            );
+          });
+
+          const doneCount = list.filter((t) => t.done).length;
+          const headerText = hiding
+            ? `${visibleList.length} item${visibleList.length !== 1 ? "s" : ""} (${doneCount} hidden)`
+            : `${list.length} item${list.length !== 1 ? "s" : ""}`;
+
+          Card({ header: headerText }, () => {
+            if (visibleList.length === 0) {
               div({ class: "empty" }, () => {
-                text("Nothing to do!");
+                text(hiding ? "No active tasks!" : "Nothing to do!");
               });
             } else {
-              for (let i = 0; i < list.length; i++) {
-                const todo = list[i]!;
+              for (let i = 0; i < visibleList.length; i++) {
+                const todo = visibleList[i]!;
                 if (editing === todo.id) {
                   TodoEditor({
                     key: todo.id,

@@ -12,16 +12,16 @@ export function shallowEqual(a: Wildcard, b: Wildcard): boolean {
     return false;
   }
 
-  const keysA = Object.keys(a);
-  if (keysA.length !== Object.keys(b).length) return false;
-
-  for (let i = 0; i < keysA.length; i++) {
-    const key = keysA[i];
+  // Avoid Object.keys() allocations — use for...in instead
+  let countA = 0;
+  for (const key in a) {
+    countA++;
     // @ts-ignore
-    if (!Object.is(a[key], b[key])) {
-      return false;
-    }
+    if (!Object.is(a[key], b[key])) return false;
   }
 
-  return true;
+  let countB = 0;
+  for (const _ in b) countB++;
+
+  return countA === countB;
 }

@@ -9,7 +9,7 @@ export { createApp } from "@/public/app";
 // ---------------------------------------------------------------------------
 
 export { view } from "@/public/view";
-export type { ViewBody, ViewFn, Slot, Children, PublicView } from "@/public/view";
+export type { ViewBody, ViewFn, Slot, PublicView } from "@/public/view";
 export type { Reactive, Use } from "@/public/state";
 export { State } from "@/public/state";
 export { Store, store, isStore } from "@/public/store";

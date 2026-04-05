@@ -11,7 +11,7 @@ import type { Engine } from "@/internal/engine";
 class Orchestrator {
   #currentEngine: Maybe<Engine>;
 
-  setCurrentEngine(engine: Engine) {
+  setCurrentEngine(engine: Maybe<Engine>) {
     this.#currentEngine = engine;
   }
 

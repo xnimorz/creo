@@ -1,0 +1,19 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "todo",
+      "runtimeExecutable": "bun",
+      "runtimeArgs": ["vite", "--port", "5199"],
+      "port": 5199,
+      "cwd": "examples/todo"
+    },
+    {
+      "name": "router",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["vite", "--port", "5200"],
+      "port": 5200,
+      "cwd": "examples/router"
+    }
+  ]
+}

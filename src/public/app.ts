@@ -1,6 +1,4 @@
 import { Engine, type Scheduler } from "@/internal/engine";
-import { View } from "@/internal/internal_view";
-import { orchestrator } from "@/internal/orchestrator";
 import type { IRender } from "@/render/render_interface";
 import type { Wildcard } from "@/internal/wildcard";
 
@@ -25,16 +23,8 @@ export function createApp(
 ) {
   return {
     mount(props?: Wildcard): AppHandle {
-      const engine = new Engine(renderer, options?.scheduler);
-      orchestrator.setCurrentEngine(engine);
-      new View(
-        () => ({ render() { slot(); } }),
-        props ?? {},
-        null,
-        engine,
-        null,
-        null,
-      );
+      const engine = new Engine(renderer, options?.scheduler);      
+      engine.createRoot(slot, props ?? {});
       engine.render();
       return { engine };
     },

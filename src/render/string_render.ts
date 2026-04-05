@@ -1,7 +1,8 @@
-import type { View } from "@/internal/internal_view";
+import type { ViewRecord } from "@/internal/internal_view";
 import type { IRender } from "./render_interface";
 import { $primitive } from "@/public/primitive";
 import type { Maybe } from "@/functional/maybe";
+import type { Engine } from "@/internal/engine";
 
 // Self-closing HTML tags (no closing tag)
 const VOID_TAGS = new Set([
@@ -11,62 +12,63 @@ const VOID_TAGS = new Set([
 
 /**
  * Stateless string renderer — pull-based.
- * mount/unmount/update are no-ops. Call renderToString() to
+ * render/unmount are no-ops. Call renderToString() to
  * get the current HTML string from the VDOM.
  */
 export class StringRender implements IRender<string> {
-  private rootView: Maybe<View>;
+  private root: Maybe<ViewRecord> = null;
+
+  engine!: Engine;
 
   // -- IRender ----------------------------------------------------------------
 
-  render(view: View): void {
+  render(view: ViewRecord): void {
     if (!view.parent) {
-      this.rootView = view;
+      this.root = view;
     }
   }
 
-  unmount(_view: View): void {}
+  unmount(_view: ViewRecord): void {}
 
   // -- Public -----------------------------------------------------------------
 
   /** Build and return the current HTML string from the VDOM. */
   renderToString(): string {
-    if (!this.rootView) return "";
-    return this.buildString(this.rootView);
+    if (!this.root) return "";
+    return this.buildString(this.root);
   }
 
   // -- Internal ---------------------------------------------------------------
 
-  private buildString(view: View): string {
-    const tag = view.viewFn[$primitive];
+  private buildString(rec: ViewRecord): string {
+    const tag = rec.viewFn[$primitive];
 
     if (tag != null) {
       if (tag === "text") {
-        return `${view.props}`;
+        return `${rec.props}`;
       }
       if (VOID_TAGS.has(tag)) {
-        return this.buildVoidTag(tag, view);
+        return this.buildVoidTag(tag, rec);
       }
-      return `<${tag}>${this.buildChildren(view)}</${tag}>`;
+      return `<${tag}>${this.buildChildren(rec)}</${tag}>`;
     }
 
-    return this.buildChildren(view);
+    return this.buildChildren(rec);
   }
 
-  private buildVoidTag(tag: string, view: View): string {
-    const props = view.props as Record<string, unknown>;
+  private buildVoidTag(tag: string, rec: ViewRecord): string {
+    const props = rec.props as Record<string, unknown>;
     let attrs = "";
     if (props.src) attrs += ` src="${props.src}"`;
     if (props.alt) attrs += ` alt="${props.alt}"`;
     return `<${tag}${attrs} />`;
   }
 
-  private buildChildren(view: View): string {
+  private buildChildren(rec: ViewRecord): string {
+    if (!rec.children) return "";
     let result = "";
-    if (view.virtualDom) {
-      for (const child of view.virtualDom) {
-        result += this.buildString(child);
-      }
+    for (const child of rec.children) {
+      result += this.buildString(child);
     }
     return result;
   }

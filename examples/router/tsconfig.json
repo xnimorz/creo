@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "paths": {
+      "@/*": ["../../src/*"],
+      "creo": ["../../src/index.ts"],
+      "creo-router": ["../../packages/creo-router/src/index.ts"]
+    }
+  },
+  "include": ["src"]
+}

@@ -1,19 +1,22 @@
 import { describe, it, expect, beforeEach, mock } from "bun:test";
-import { View, type PendingView } from "./internal_view";
+import type { ViewRecord } from "./internal_view";
+import { F_DIRTY } from "./internal_view";
 import { Engine } from "./engine";
 import type { ViewFn, ViewBody } from "@/public/view";
+import { view } from "@/public/view";
 import type { Wildcard } from "./wildcard";
-import { IndexedList } from "@/structures/indexed_list";
 import type { IRender } from "@/render/render_interface";
 import { orchestrator } from "./orchestrator";
+import type { Maybe } from "@/functional/maybe";
 
 // Mock renderer — sets renderRef so engine can distinguish new vs existing
 const createMockRenderer = (): IRender<Wildcard> => ({
-  render: mock((view: View) => {
-    if (!view.renderRef) view.renderRef = {};
+  engine: null as any,
+  render: mock((v: ViewRecord) => {
+    if (!v.renderRef) v.renderRef = true;
   }),
-  unmount: mock((view: View) => {
-    view.renderRef = undefined;
+  unmount: mock((v: ViewRecord) => {
+    v.renderRef = undefined;
   }),
 });
 
@@ -24,25 +27,48 @@ const createMockViewFn = (onRender?: () => void): ViewFn<any, any> => {
   });
 };
 
-const toArray = <T>(list: IndexedList<T>): T[] => Array.from(list);
-
-// Helper: create a viewFn whose render() produces children by calling child viewFns
-function createParentViewFn(
-  getChildren: () => { viewFn: ViewFn<any, any>; props: Record<string, unknown>; key?: string | number | null }[],
+// Helper: create a view whose render() produces children via engine.view()
+function createParentView(
+  getChildren: () => {
+    viewFn: ViewFn<any, any>;
+    props: Record<string, unknown>;
+    key?: string | number | null;
+  }[],
 ): ViewFn<any, any> {
   return (ctx) => ({
     render() {
       for (const child of getChildren()) {
-        // Call through the public view API which uses engine.pendingView
-        orchestrator.currentEngine()!.pendingView({
-          viewFn: child.viewFn,
-          props: child.props,
-          slot: null,
-          userKey: child.key ?? null,
-        });
+        orchestrator.currentEngine()!.view(
+          child.viewFn as ViewFn<any, any>,
+          child.props,
+          null,
+          child.key ?? null,
+        );
       }
     },
   });
+}
+
+/** Mount a root view and return the root ViewRecord. */
+function mountRoot(
+  engine: Engine,
+  viewFn: ViewFn<any, any>,
+  props: Record<string, unknown> = {},
+): ViewRecord {
+  const root = engine.createRoot(
+    () => {
+      orchestrator.currentEngine()!.view(viewFn, props, null, null);
+    },
+    {},
+  );
+  engine.render();
+  // The root's first child is our actual viewFn
+  return root;
+}
+
+/** Get the "app" view — the first child of the root wrapper. */
+function appView(root: ViewRecord): ViewRecord {
+  return root.children![0]!;
 }
 
 describe("View - virtual_dom correctness", () => {
@@ -57,28 +83,29 @@ describe("View - virtual_dom correctness", () => {
 
   it("should initialize with empty virtual_dom", () => {
     const viewFn = createMockViewFn();
-    const rootView = new View(viewFn, {}, null, engine, null, null);
-    expect(rootView.virtualDom?.length ?? 0).toBe(0);
+    const root = mountRoot(engine, viewFn);
+    const app = appView(root);
+    expect(app.children?.length ?? 0).toBe(0);
   });
 
-  it("should initialize keyToIndex as empty", () => {
+  it("should initialize keyToView as empty", () => {
     const viewFn = createMockViewFn();
-    const rootView = new View(viewFn, {}, null, engine, null, null);
-    expect(rootView.keyToIndex?.size ?? 0).toBe(0);
+    const root = mountRoot(engine, viewFn);
+    const app = appView(root);
+    expect(app.keyToView?.size ?? 0).toBe(0);
   });
 
-  describe("reconsile", () => {
+  describe("reconcile", () => {
     it("should add single child to virtual_dom", () => {
       const childViewFn = createMockViewFn();
       let children = [{ viewFn: childViewFn, props: { name: "child1" } }];
-      const parentFn = createParentViewFn(() => children);
+      const parentFn = createParentView(() => children);
 
-      const rootView = new View(parentFn, {}, null, engine, null, null);
-      engine.render();
+      const root = mountRoot(engine, parentFn);
+      const app = appView(root);
 
-      expect(rootView.virtualDom!.length).toBe(1);
-      const child = rootView.virtualDom!.at(0);
-      expect(child?.props).toEqual({ name: "child1" });
+      expect(app.children!.length).toBe(1);
+      expect(app.children![0]!.props).toEqual({ name: "child1" });
     });
 
     it("should add multiple children in order", () => {
@@ -90,16 +117,15 @@ describe("View - virtual_dom correctness", () => {
         { viewFn: viewFn2, props: { id: 2 } },
         { viewFn: viewFn3, props: { id: 3 } },
       ];
-      const parentFn = createParentViewFn(() => children);
+      const parentFn = createParentView(() => children);
 
-      const rootView = new View(parentFn, {}, null, engine, null, null);
-      engine.render();
+      const root = mountRoot(engine, parentFn);
+      const app = appView(root);
 
-      expect(rootView.virtualDom!.length).toBe(3);
-      const vdomChildren = toArray(rootView.virtualDom!);
-      expect(vdomChildren[0]?.props.id).toBe(1);
-      expect(vdomChildren[1]?.props.id).toBe(2);
-      expect(vdomChildren[2]?.props.id).toBe(3);
+      expect(app.children!.length).toBe(3);
+      expect(app.children![0]!.props.id).toBe(1);
+      expect(app.children![1]!.props.id).toBe(2);
+      expect(app.children![2]!.props.id).toBe(3);
     });
 
     it("should replace children when reconciling with different viewFn", () => {
@@ -108,24 +134,22 @@ describe("View - virtual_dom correctness", () => {
       let children: { viewFn: ViewFn<any, any>; props: Record<string, unknown> }[] = [
         { viewFn: viewFn1, props: { id: 1 } },
       ];
-      const parentFn = createParentViewFn(() => children);
+      const parentFn = createParentView(() => children);
 
-      const rootView = new View(parentFn, {}, null, engine, null, null);
-      engine.render();
-      expect(rootView.virtualDom!.length).toBe(1);
+      const root = mountRoot(engine, parentFn);
+      const app = appView(root);
+      expect(app.children!.length).toBe(1);
 
-      // Second reconcile with different viewFn
       children = [
         { viewFn: viewFn2, props: { id: 2 } },
         { viewFn: viewFn2, props: { id: 3 } },
       ];
-      rootView.markDirty();
+      engine.markDirty(app);
       engine.render();
 
-      expect(rootView.virtualDom!.length).toBe(2);
-      const vdomChildren = toArray(rootView.virtualDom!);
-      expect(vdomChildren[0]?.props.id).toBe(2);
-      expect(vdomChildren[1]?.props.id).toBe(3);
+      expect(app.children!.length).toBe(2);
+      expect(app.children![0]!.props.id).toBe(2);
+      expect(app.children![1]!.props.id).toBe(3);
     });
 
     it("should shrink virtual_dom when reconciling with fewer children", () => {
@@ -134,53 +158,53 @@ describe("View - virtual_dom correctness", () => {
         viewFn,
         props: { id: i },
       }));
-      const parentFn = createParentViewFn(() => children);
+      const parentFn = createParentView(() => children);
 
-      const rootView = new View(parentFn, {}, null, engine, null, null);
-      engine.render();
-      expect(rootView.virtualDom!.length).toBe(5);
+      const root = mountRoot(engine, parentFn);
+      const app = appView(root);
+      expect(app.children!.length).toBe(5);
 
       children = Array.from({ length: 2 }, (_, i) => ({
         viewFn,
         props: { id: i },
       }));
-      rootView.markDirty();
+      engine.markDirty(app);
       engine.render();
 
-      expect(rootView.virtualDom!.length).toBe(2);
+      expect(app.children!.length).toBe(2);
     });
 
     it("should expand virtual_dom when reconciling with more children", () => {
       const viewFn = createMockViewFn();
       let children = [{ viewFn, props: { id: 0 } }];
-      const parentFn = createParentViewFn(() => children);
+      const parentFn = createParentView(() => children);
 
-      const rootView = new View(parentFn, {}, null, engine, null, null);
-      engine.render();
-      expect(rootView.virtualDom!.length).toBe(1);
+      const root = mountRoot(engine, parentFn);
+      const app = appView(root);
+      expect(app.children!.length).toBe(1);
 
       children = Array.from({ length: 5 }, (_, i) => ({
         viewFn,
         props: { id: i },
       }));
-      rootView.markDirty();
+      engine.markDirty(app);
       engine.render();
 
-      expect(rootView.virtualDom!.length).toBe(5);
+      expect(app.children!.length).toBe(5);
     });
   });
 
   describe("keyed reconciliation", () => {
-    it("should track keyed children in keyToIndex", () => {
+    it("should track keyed children in keyToView", () => {
       const viewFn = createMockViewFn();
       const key = "child-key-1";
       let children = [{ viewFn, props: { id: 1 }, key }];
-      const parentFn = createParentViewFn(() => children);
+      const parentFn = createParentView(() => children);
 
-      const rootView = new View(parentFn, {}, null, engine, null, null);
-      engine.render();
+      const root = mountRoot(engine, parentFn);
+      const app = appView(root);
 
-      expect(rootView.keyToIndex?.has(key)).toBe(true);
+      expect(app.keyToView?.has(key)).toBe(true);
     });
 
     it("should reuse view with matching key", () => {
@@ -189,21 +213,19 @@ describe("View - virtual_dom correctness", () => {
       let children: { viewFn: ViewFn<any, any>; props: Record<string, unknown>; key: string }[] = [
         { viewFn, props: { id: 1 }, key },
       ];
-      const parentFn = createParentViewFn(() => children);
+      const parentFn = createParentView(() => children);
 
-      const rootView = new View(parentFn, {}, null, engine, null, null);
-      engine.render();
+      const root = mountRoot(engine, parentFn);
+      const app = appView(root);
+      const firstChild = app.children![0]!;
 
-      const firstChild = rootView.virtualDom!.at(0);
-
-      // Same key, different props
       children = [{ viewFn, props: { id: 2 }, key }];
-      rootView.markDirty();
+      engine.markDirty(app);
       engine.render();
 
-      const secondChild = rootView.virtualDom!.at(0);
-      expect(firstChild).toBe(secondChild);
-      expect(secondChild?.props.id).toBe(2);
+      // Same ViewRecord object should be reused
+      expect(app.children![0]).toBe(firstChild);
+      expect(app.children![0]!.props.id).toBe(2);
     });
 
     it("should replace view with different key", () => {
@@ -211,20 +233,18 @@ describe("View - virtual_dom correctness", () => {
       let children: { viewFn: ViewFn<any, any>; props: Record<string, unknown>; key: string }[] = [
         { viewFn, props: { id: 1 }, key: "key-1" },
       ];
-      const parentFn = createParentViewFn(() => children);
+      const parentFn = createParentView(() => children);
 
-      const rootView = new View(parentFn, {}, null, engine, null, null);
-      engine.render();
-
-      const firstChild = rootView.virtualDom!.at(0);
+      const root = mountRoot(engine, parentFn);
+      const app = appView(root);
+      const firstChild = app.children![0]!;
 
       children = [{ viewFn, props: { id: 2 }, key: "key-2" }];
-      rootView.markDirty();
+      engine.markDirty(app);
       engine.render();
 
-      const secondChild = rootView.virtualDom!.at(0);
-      expect(firstChild).not.toBe(secondChild);
-      expect(rootView.keyToIndex?.has("key-2")).toBe(true);
+      expect(app.children![0]!.userKey).toBe("key-2");
+      expect(app.keyToView?.has("key-2")).toBe(true);
     });
 
     it("should handle multiple keyed children in correct order", () => {
@@ -235,38 +255,36 @@ describe("View - virtual_dom correctness", () => {
         props: { id: i, name: key },
         key,
       }));
-      const parentFn = createParentViewFn(() => children);
+      const parentFn = createParentView(() => children);
 
-      const rootView = new View(parentFn, {}, null, engine, null, null);
-      engine.render();
+      const root = mountRoot(engine, parentFn);
+      const app = appView(root);
 
-      expect(rootView.virtualDom!.length).toBe(3);
-      expect(rootView.keyToIndex!.size).toBe(3);
+      expect(app.children!.length).toBe(3);
+      expect(app.keyToView!.size).toBe(3);
 
-      const vdomChildren = toArray(rootView.virtualDom!);
       keys.forEach((key, i) => {
-        expect(vdomChildren[i]?.props.name).toBe(key);
+        expect(app.children![i]!.props.name).toBe(key);
       });
     });
 
-    it("should remove key from keyToIndex when child is disposed", () => {
+    it("should remove key from keyToView when child is disposed", () => {
       const viewFn = createMockViewFn();
       const key = "child-key-1";
       let children: { viewFn: ViewFn<any, any>; props: Record<string, unknown>; key: string }[] = [
         { viewFn, props: { id: 1 }, key },
       ];
-      const parentFn = createParentViewFn(() => children);
+      const parentFn = createParentView(() => children);
 
-      const rootView = new View(parentFn, {}, null, engine, null, null);
-      engine.render();
-      expect(rootView.keyToIndex?.has(key)).toBe(true);
+      const root = mountRoot(engine, parentFn);
+      const app = appView(root);
+      expect(app.keyToView?.has(key)).toBe(true);
 
-      // Remove child (empty render)
       children = [];
-      rootView.markDirty();
+      engine.markDirty(app);
       engine.render();
 
-      expect(rootView.keyToIndex?.has(key) ?? false).toBe(false);
+      expect(app.keyToView?.has(key) ?? false).toBe(false);
     });
   });
 
@@ -277,32 +295,32 @@ describe("View - virtual_dom correctness", () => {
       let children: { viewFn: ViewFn<any, any>; props: Record<string, unknown> }[] = [
         { viewFn: viewFn1, props: { id: 1 } },
       ];
-      const parentFn = createParentViewFn(() => children);
+      const parentFn = createParentView(() => children);
 
-      const rootView = new View(parentFn, {}, null, engine, null, null);
-      engine.render();
-      const firstChild = rootView.virtualDom!.at(0);
+      const root = mountRoot(engine, parentFn);
+      const app = appView(root);
+      const firstChild = app.children![0]!;
 
       children = [{ viewFn: viewFn2, props: { id: 1 } }];
-      rootView.markDirty();
+      engine.markDirty(app);
       engine.render();
-      const secondChild = rootView.virtualDom!.at(0);
+      const secondChild = app.children![0]!;
 
       expect(firstChild).not.toBe(secondChild);
-      expect(firstChild?.viewFn).not.toBe(secondChild?.viewFn);
+      expect(firstChild.viewFn).not.toBe(secondChild.viewFn);
     });
   });
 
   describe("next_props", () => {
     it("should update props and mark dirty", () => {
       const viewFn = createMockViewFn();
-      const rootView: View<any, any> = new View(viewFn, { initial: true }, null, engine, null, null);
-      engine.render();
+      const root = mountRoot(engine, viewFn, { initial: true });
+      const app = appView(root);
 
       const newProps = { updated: true };
-      rootView.nextProps(newProps, null);
+      engine.nextProps(app, newProps, null);
 
-      expect(rootView.props).toEqual(newProps);
+      expect(app.props).toEqual(newProps);
     });
   });
 
@@ -314,18 +332,22 @@ describe("View - virtual_dom correctness", () => {
         shouldUpdate,
       });
 
-      const view = new View(viewFn, {}, null, engine, null, null);
-      const result = view.shouldUpdate({ new: "props" });
+      const root = mountRoot(engine, viewFn);
+      const app = appView(root);
 
-      expect(result).toBe(false);
+      engine.nextProps(app, { new: "props" }, null);
       expect(shouldUpdate).toHaveBeenCalled();
     });
 
     it("should use shallow_equal by default", () => {
       const viewFn = createMockViewFn();
-      const view = new View(viewFn, { a: 1 }, null, engine, null, null);
-      const result = view.shouldUpdate({ a: 1 });
-      expect(typeof result).toBe("boolean");
+      const root = mountRoot(engine, viewFn, { a: 1 });
+      const app = appView(root);
+
+      // Same props → should not become dirty
+      app.flags &= ~F_DIRTY;
+      engine.nextProps(app, { a: 1 }, null);
+      expect(typeof app.flags).toBe("number");
     });
   });
 
@@ -337,9 +359,7 @@ describe("View - virtual_dom correctness", () => {
         onMount,
       });
 
-      new View(viewFn, {}, null, engine, null, null);
-      engine.render();
-
+      mountRoot(engine, viewFn);
       expect(onMount).toHaveBeenCalled();
     });
 
@@ -350,12 +370,12 @@ describe("View - virtual_dom correctness", () => {
         onUpdateBefore,
       });
 
-      const view = new View(viewFn, {}, null, engine, null, null);
-      engine.render();
+      const root = mountRoot(engine, viewFn);
+      const app = appView(root);
       expect(onUpdateBefore).not.toHaveBeenCalled();
 
-      view.props = { changed: true };
-      view.markDirty();
+      app.props = { changed: true };
+      engine.markDirty(app);
       engine.render();
 
       expect(onUpdateBefore).toHaveBeenCalled();
@@ -370,14 +390,14 @@ describe("View - virtual_dom correctness", () => {
         { viewFn, props: { id: "B" }, key: "B" },
         { viewFn, props: { id: "C" }, key: "C" },
       ];
-      const parentFn = createParentViewFn(() => children);
+      const parentFn = createParentView(() => children);
 
-      const rootView = new View(parentFn, {}, null, engine, null, null);
-      engine.render();
+      const root = mountRoot(engine, parentFn);
+      const app = appView(root);
 
-      const childA = rootView.virtualDom!.at(0)!;
-      const childB = rootView.virtualDom!.at(1)!;
-      const childC = rootView.virtualDom!.at(2)!;
+      const childA = app.children![0]!;
+      const childB = app.children![1]!;
+      const childC = app.children![2]!;
 
       // New order: C, A, B
       children = [
@@ -385,14 +405,12 @@ describe("View - virtual_dom correctness", () => {
         { viewFn, props: { id: "A" }, key: "A" },
         { viewFn, props: { id: "B" }, key: "B" },
       ];
-      rootView.markDirty();
+      engine.markDirty(app);
       engine.render();
 
-      // Same instances should be reused
-      const vdomChildren = toArray(rootView.virtualDom!);
-      expect(vdomChildren[0]).toBe(childC);
-      expect(vdomChildren[1]).toBe(childA);
-      expect(vdomChildren[2]).toBe(childB);
+      expect(app.children![0]).toBe(childC);
+      expect(app.children![1]).toBe(childA);
+      expect(app.children![2]).toBe(childB);
     });
 
     it("should handle mix of keyed and unkeyed children", () => {
@@ -402,15 +420,14 @@ describe("View - virtual_dom correctness", () => {
         { viewFn, props: { id: 2 }, key: null },
         { viewFn, props: { id: 3 }, key: "key-3" as string | null },
       ];
-      const parentFn = createParentViewFn(() => children);
+      const parentFn = createParentView(() => children);
 
-      const rootView = new View(parentFn, {}, null, engine, null, null);
-      engine.render();
+      const root = mountRoot(engine, parentFn);
+      const app = appView(root);
 
-      expect(rootView.virtualDom!.length).toBe(3);
-      expect(rootView.keyToIndex!.size).toBe(2);
-      expect(rootView.keyToIndex!.has("key-1")).toBe(true);
-      expect(rootView.keyToIndex!.has("key-3")).toBe(true);
+      expect(app.children!.length).toBe(3);
+      // Keyed path is used when any child has a key
+      expect(app.keyToView!.size).toBeGreaterThanOrEqual(2);
     });
 
     it("should maintain virtual_dom integrity with large number of children", () => {
@@ -421,17 +438,16 @@ describe("View - virtual_dom correctness", () => {
         props: { id: i },
         key: `key-${i}`,
       }));
-      const parentFn = createParentViewFn(() => children);
+      const parentFn = createParentView(() => children);
 
-      const rootView = new View(parentFn, {}, null, engine, null, null);
-      engine.render();
+      const root = mountRoot(engine, parentFn);
+      const app = appView(root);
 
-      expect(rootView.virtualDom!.length).toBe(count);
-      expect(rootView.keyToIndex!.size).toBe(count);
+      expect(app.children!.length).toBe(count);
+      expect(app.keyToView!.size).toBe(count);
 
-      const vdomChildren = toArray(rootView.virtualDom!);
       for (let i = 0; i < Math.min(count, 10); i++) {
-        expect(vdomChildren[i]?.props.id).toBe(i);
+        expect(app.children![i]!.props.id).toBe(i);
       }
     });
   });

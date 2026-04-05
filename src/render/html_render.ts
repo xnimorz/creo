@@ -1,49 +1,139 @@
-import type { View } from "@/internal/internal_view";
+import type { ViewRecord } from "@/internal/internal_view";
+import {
+  F_PRIMITIVE,
+  F_MOVED,
+  F_TEXT_CONTENT,
+} from "@/internal/internal_view";
 import type { IRender } from "./render_interface";
 import { $primitive } from "@/public/primitive";
 import type { Wildcard } from "@/internal/wildcard";
 import type { Maybe } from "@/functional/maybe";
+import type { Engine } from "@/internal/engine";
 
 // ---------------------------------------------------------------------------
 // Render refs — stored on view.renderRef
 // ---------------------------------------------------------------------------
 
+/**
+ * For primitives: { element, prevProps }
+ * For composites: renderRef is set to `true` (just a non-null marker)
+ *
+ * Discriminated via view.flags & F_PRIMITIVE — no `kind` field needed.
+ */
 type PrimitiveDomRef = {
-  kind: "primitive";
   element: HTMLElement | Text;
-  prevProps: Record<string, unknown> | null;
-  listeners: Map<string, EventListener> | null;
+  prevProps: Maybe<Record<string, unknown>>;
 };
 
-type CompositeDomRef = {
-  kind: "composite";
-  endComment: Comment;
-};
-
-type DomRef = PrimitiveDomRef | CompositeDomRef;
-
 // ---------------------------------------------------------------------------
-// Creo event name → DOM event name
+// Event delegation — Inferno-style: one listener per event type on container
 // ---------------------------------------------------------------------------
+
+function isEventProp(key: string): boolean {
+  return (
+    key.charCodeAt(0) === 111 && // 'o'
+    key.charCodeAt(1) === 110 && // 'n'
+    key.charCodeAt(2) >= 65 && // 'A'
+    key.charCodeAt(2) <= 90 // 'Z'
+  );
+}
 
 const DOM_EVENT: Record<string, string> = {
-  click: "click",
-  dblclick: "dblclick",
-  pointerDown: "pointerdown",
-  pointerUp: "pointerup",
-  pointerMove: "pointermove",
-  input: "input",
-  change: "change",
-  keyDown: "keydown",
-  keyUp: "keyup",
-  focus: "focus",
-  blur: "blur",
+  Click: "click",
+  Dblclick: "dblclick",
+  PointerDown: "pointerdown",
+  PointerUp: "pointerup",
+  PointerMove: "pointermove",
+  Input: "input",
+  Change: "change",
+  KeyDown: "keydown",
+  KeyUp: "keyup",
+  Focus: "focus",
+  Blur: "blur",
 };
 
-// Props that are framework-internal, not HTML attributes
-const SKIP_PROPS = new Set(["key"]);
+const $EV = Symbol.for("creo.ev");
 
-// DOM properties that must be set directly (not via setAttribute)
+const containerState = new WeakMap<
+  HTMLElement,
+  {
+    counts: Map<string, number>;
+    handler: (e: Event) => void;
+  }
+>();
+
+function getState(container: HTMLElement) {
+  let state = containerState.get(container);
+  if (!state) {
+    state = {
+      counts: new Map(),
+      handler(e: Event) {
+        const domEvent = e.type;
+        let dom = e.target as
+          | (HTMLElement & { [$EV]?: Record<string, Function> })
+          | null;
+        while (dom && dom !== container) {
+          const evObj = dom[$EV];
+          if (evObj) {
+            const handler = evObj[domEvent];
+            if (handler) {
+              handler(mapEventData(domEvent, e));
+              if (e.cancelBubble) return;
+            }
+          }
+          dom = dom.parentElement as typeof dom;
+        }
+      },
+    };
+    containerState.set(container, state);
+  }
+  return state;
+}
+
+function ensureDelegated(container: HTMLElement, domEvent: string): void {
+  const state = getState(container);
+  const count = state.counts.get(domEvent) ?? 0;
+  if (count === 0) {
+    container.addEventListener(domEvent, state.handler);
+  }
+  state.counts.set(domEvent, count + 1);
+}
+
+function removeDelegated(container: HTMLElement, domEvent: string): void {
+  const state = getState(container);
+  const count = state.counts.get(domEvent) ?? 0;
+  if (count <= 1) {
+    state.counts.delete(domEvent);
+    container.removeEventListener(domEvent, state.handler);
+  } else {
+    state.counts.set(domEvent, count - 1);
+  }
+}
+
+function mapEventData(domEvent: string, e: Event): Record<string, unknown> {
+  let data: Record<string, unknown>;
+  if (
+    domEvent === "click" ||
+    domEvent === "dblclick" ||
+    domEvent === "pointerdown" ||
+    domEvent === "pointerup" ||
+    domEvent === "pointermove"
+  ) {
+    const pe = e as PointerEvent;
+    data = { x: pe.clientX, y: pe.clientY };
+  } else if (domEvent === "input" || domEvent === "change") {
+    data = { value: (e.target as HTMLInputElement).value };
+  } else if (domEvent === "keydown" || domEvent === "keyup") {
+    const ke = e as KeyboardEvent;
+    data = { key: ke.key, code: ke.code };
+  } else {
+    data = {};
+  }
+  data.stopPropagation = () => e.stopPropagation();
+  data.preventDefault = () => e.preventDefault();
+  return data;
+}
+
 const DOM_PROPERTIES = new Set([
   "value",
   "checked",
@@ -56,65 +146,80 @@ const DOM_PROPERTIES = new Set([
 // ---------------------------------------------------------------------------
 
 export class HtmlRender implements IRender<HTMLElement | Text> {
+  engine!: Engine;
+
   constructor(private container: HTMLElement) {}
 
   // -- IRender ----------------------------------------------------------------
 
-  render(view: View): void {
-    const ref = view.renderRef as Maybe<DomRef>;
+  render(view: ViewRecord): void {
+    if (!view.renderRef) {
+      // --- Mount ---
+      if (view.flags & F_PRIMITIVE) {
+        const parentNode = this.findParentDom(view);
+        const refNode = this.findInsertionPoint(view);
+        const tag = view.viewFn[$primitive]!;
 
-    if (!ref) {
-      // --- Mount: create DOM and insert ---
-      const node = this.buildDom(view);
-      const parent = view.parent;
-      if (!parent) {
-        this.container.appendChild(node);
-      } else {
-        const parentNode = this.getParentDomNode(parent);
-        if (parentNode) {
-          parentNode.insertBefore(node, this.fastInsertionPoint(parent, view));
+        if (tag === "text") {
+          const textNode = document.createTextNode(String(view.props));
+          view.renderRef = { element: textNode, prevProps: null };
+          parentNode.insertBefore(textNode, refNode);
+        } else {
+          const element = document.createElement(tag);
+          const props = view.props as Record<string, unknown>;
+          const domRef: PrimitiveDomRef = { element, prevProps: null };
+          view.renderRef = domRef;
+          this.setAttributes(element, props);
+
+          // If single text child, use textContent directly
+          if (view.children?.length === 1) {
+            const child = view.children[0]!;
+            if (
+              child.flags & F_PRIMITIVE &&
+              child.viewFn[$primitive] === "text"
+            ) {
+              element.textContent = String(child.props);
+              child.renderRef = { element, prevProps: null };
+              child.flags |= F_TEXT_CONTENT;
+            }
+          }
+
+          parentNode.insertBefore(element, refNode);
         }
-      }
-      // Handle autofocus
-      const newRef = view.renderRef as Maybe<DomRef>;
-      if (
-        newRef?.kind === "primitive" &&
-        newRef.element instanceof HTMLElement &&
-        (view.props as Record<string, unknown>)?.autofocus
-      ) {
-        newRef.element.focus();
+      } else {
+        // Composite: no DOM — just mark as mounted
+        view.renderRef = true;
       }
       return;
     }
 
-    // --- Update: reposition (only if moved) + diff ---
+    // --- Update ---
 
-    if (view.moved) {
-      view.moved = false;
-      if (view.parent) {
-        const expectedStart = this.fastInsertionPoint(view.parent, view);
-        const firstDom = this.getFirstDomNode(view);
-
-        if (firstDom && firstDom !== expectedStart) {
-          const parentNode = this.getParentDomNode(view.parent);
-          if (parentNode) {
-            if (ref.kind === "primitive") {
-              parentNode.insertBefore(ref.element, expectedStart);
-            } else {
-              if (view.virtualDom) {
-                for (const child of view.virtualDom) {
-                  this.moveDomNodes(child, parentNode, expectedStart);
-                }
-              }
-              parentNode.insertBefore(ref.endComment, expectedStart);
-            }
-          }
-        }
+    if (view.flags & F_MOVED) {
+      const parentNode = this.findParentDom(view);
+      const refNode = this.findInsertionPoint(view);
+      if (view.flags & F_PRIMITIVE) {
+        const ref = view.renderRef as PrimitiveDomRef;
+        parentNode.insertBefore(ref.element, refNode);
+      } else {
+        this.moveDomNodes(view, parentNode, refNode);
       }
     }
 
-    // Diff attributes for primitives
-    if (ref.kind !== "primitive") return;
+    if (!(view.flags & F_PRIMITIVE)) return;
+
+    const ref = view.renderRef as PrimitiveDomRef;
+
+    // Text node in textContent mode — update parent's textContent
+    if (view.flags & F_TEXT_CONTENT) {
+      const parentEl = ref.element as HTMLElement;
+      const nextText = String(view.props);
+      if (parentEl.textContent !== nextText) {
+        parentEl.textContent = nextText;
+      }
+      return;
+    }
+
     if (ref.element instanceof Text) {
       const nextText = String(view.props);
       if (ref.element.textContent !== nextText) {
@@ -122,87 +227,74 @@ export class HtmlRender implements IRender<HTMLElement | Text> {
       }
       return;
     }
+
     const nextProps = view.props as Record<string, unknown>;
     if (!ref.prevProps) {
-      this.setAttributes(ref, ref.element, nextProps);
-    } else {
-      this.diffAttributes(ref, ref.element, ref.prevProps, nextProps);
+      this.setAttributes(ref.element, nextProps);
+    } else if (ref.prevProps !== nextProps) {
+      this.diffAttributes(ref.element, ref.prevProps, nextProps);
     }
-    ref.prevProps = { ...nextProps };
+    ref.prevProps = nextProps;
   }
 
-  unmount(view: View): void {
-    this.removeDomNodes(view);
+  unmount(view: ViewRecord): void {
+    if (view.flags & F_PRIMITIVE) {
+      this.removeDomNodes(view);
+    }
     view.renderRef = undefined;
   }
 
-  // -- Internal: DOM building -------------------------------------------------
+  // -- Internal: DOM tree navigation ------------------------------------------
 
-  private buildDom(view: View): Node {
-    const tag = view.viewFn[$primitive];
-
-    if (tag != null) {
-      if (tag === "text") {
-        const textNode = document.createTextNode(String(view.props));
-        const ref: PrimitiveDomRef = {
-          kind: "primitive",
-          element: textNode,
-          prevProps: null,
-          listeners: null,
-        };
-        view.renderRef = ref;
-        return textNode;
+  private findParentDom(view: ViewRecord): Node {
+    let parent = view.parent;
+    while (parent) {
+      if (parent.flags & F_PRIMITIVE) {
+        const ref = parent.renderRef as Maybe<PrimitiveDomRef>;
+        if (ref && ref.element instanceof HTMLElement) return ref.element;
       }
+      parent = parent.parent;
+    }
+    return this.container;
+  }
 
-      const element = document.createElement(tag);
-      const props = view.props as Record<string, unknown>;
-      const ref: PrimitiveDomRef = {
-        kind: "primitive",
-        element,
-        prevProps: null,
-        listeners: null,
-      };
-      view.renderRef = ref;
-      this.setAttributes(ref, element, props);
-      return element;
+  private findInsertionPoint(view: ViewRecord): Node | null {
+    const parent = view.parent;
+    if (!parent?.children) return null;
+
+    const children = parent.children;
+
+    // Fast path: last child
+    if (children[children.length - 1] === view) {
+      return this.#parentEndAnchor(parent);
     }
 
-    const endComment = document.createComment("");
-    view.renderRef = {
-      kind: "composite",
-      endComment,
-    } as CompositeDomRef;
+    const idx = children.indexOf(view);
+    for (let i = idx + 1; i < children.length; i++) {
+      const dom = this.getFirstDomNode(children[i]!);
+      if (dom) return dom;
+    }
 
-    return endComment;
+    return this.#parentEndAnchor(parent);
   }
 
-  // -- Internal: attributes + events ------------------------------------------
-
-  private isEventProp(key: string, value: unknown): boolean {
-    return (
-      key.length > 2 &&
-      key[0] === "o" &&
-      key[1] === "n" &&
-      key[2]! >= "A" &&
-      key[2]! <= "Z" &&
-      typeof value === "function"
-    );
+  #parentEndAnchor(parent: ViewRecord): Node | null {
+    if (parent.flags & F_PRIMITIVE) return null; // append to element
+    // Composite: walk up
+    return this.findInsertionPoint(parent);
   }
 
-  private eventPropToCreoName(prop: string): string {
-    return prop[2]!.toLowerCase() + prop.slice(3);
-  }
+  // -- Internal: attributes + delegated events --------------------------------
 
   private setAttributes(
-    ref: PrimitiveDomRef,
     element: HTMLElement,
     props: Record<string, unknown>,
   ) {
     for (const key in props) {
       const value = props[key];
-      if (SKIP_PROPS.has(key) || value == null) continue;
-      if (this.isEventProp(key, value)) {
-        this.bindEvent(ref, element, key, value as Function);
+      if (key === "key" || value == null) continue;
+      if (isEventProp(key)) {
+        this.bindEvent(element, key, value as Function);
         continue;
       }
       this.setAttribute(element, key, value);
@@ -210,31 +302,36 @@ export class HtmlRender implements IRender<HTMLElement | Text> {
   }
 
   private diffAttributes(
-    ref: PrimitiveDomRef,
     element: HTMLElement,
     prev: Record<string, unknown>,
     next: Record<string, unknown>,
   ) {
-    // Remove attrs/events that existed before but are gone or null now
-    for (const key of Object.keys(prev)) {
-      if (SKIP_PROPS.has(key)) continue;
+    for (const key in prev) {
+      if (key === "key") continue;
       if (!(key in next) || next[key] == null) {
-        if (this.isEventProp(key, prev[key])) {
-          this.unbindEvent(ref, element, key);
+        if (isEventProp(key)) {
+          this.unbindEvent(element, key);
         } else {
           this.removeAttribute(element, key);
         }
       }
     }
 
-    // Set attrs/events that are new or changed
     for (const key in next) {
       const value = next[key];
-      if (SKIP_PROPS.has(key) || value == null) continue;
+      if (key === "key" || value == null) continue;
       if (prev[key] === value) continue;
-      if (this.isEventProp(key, value)) {
-        this.unbindEvent(ref, element, key);
-        this.bindEvent(ref, element, key, value as Function);
+      if (isEventProp(key)) {
+        const creoName = key.slice(2);
+        const domEvent = DOM_EVENT[creoName] ?? creoName.toLowerCase();
+        const evObj = (element as any)[$EV] as
+          | Record<string, Function>
+          | undefined;
+        if (evObj) {
+          evObj[domEvent] = value as Function;
+        } else {
+          this.bindEvent(element, key, value as Function);
+        }
       } else {
         this.setAttribute(element, key, value);
       }
@@ -242,54 +339,26 @@ export class HtmlRender implements IRender<HTMLElement | Text> {
   }
 
   private bindEvent(
-    ref: PrimitiveDomRef,
     element: HTMLElement,
     prop: string,
     handler: Function,
-  ) {
-    const creoEvent = this.eventPropToCreoName(prop);
-    const domEvent = DOM_EVENT[creoEvent] ?? creoEvent.toLowerCase();
-    const wrapped: EventListener = (e: Event) => {
-      const data = this.mapEventData(creoEvent, e) as Record<string, unknown>;
-      data.stopPropagation = () => e.stopPropagation();
-      data.preventDefault = () => e.preventDefault();
-      handler(data);
-    };
-    if (!ref.listeners) ref.listeners = new Map();
-    ref.listeners.set(prop, wrapped);
-    element.addEventListener(domEvent, wrapped);
+  ): void {
+    const creoName = prop.slice(2);
+    const domEvent = DOM_EVENT[creoName] ?? creoName.toLowerCase();
+    const evObj: Record<string, Function> =
+      (element as any)[$EV] ?? ((element as any)[$EV] = {});
+    evObj[domEvent] = handler;
+    ensureDelegated(this.container, domEvent);
   }
 
-  private unbindEvent(
-    ref: PrimitiveDomRef,
-    element: HTMLElement,
-    prop: string,
-  ) {
-    const wrapped = ref.listeners?.get(prop);
-    if (!wrapped) return;
-    const creoEvent = this.eventPropToCreoName(prop);
-    const domEvent = DOM_EVENT[creoEvent] ?? creoEvent.toLowerCase();
-    element.removeEventListener(domEvent, wrapped);
-    ref.listeners!.delete(prop);
-  }
-
-  private mapEventData(creoEvent: string, e: Event): unknown {
-    if (
-      creoEvent === "click" ||
-      creoEvent === "dblclick" ||
-      creoEvent.startsWith("pointer")
-    ) {
-      const pe = e as PointerEvent;
-      return { x: pe.clientX, y: pe.clientY };
+  private unbindEvent(element: HTMLElement, prop: string): void {
+    const creoName = prop.slice(2);
+    const domEvent = DOM_EVENT[creoName] ?? creoName.toLowerCase();
+    const evObj = (element as any)[$EV] as Record<string, Function> | undefined;
+    if (evObj) {
+      delete evObj[domEvent];
     }
-    if (creoEvent === "input" || creoEvent === "change") {
-      return { value: (e.target as HTMLInputElement).value };
-    }
-    if (creoEvent.startsWith("key")) {
-      const ke = e as KeyboardEvent;
-      return { key: ke.key, code: ke.code };
-    }
-    return {};
+    removeDelegated(this.container, domEvent);
   }
 
   private setAttribute(element: HTMLElement, key: string, value: unknown) {
@@ -300,11 +369,8 @@ export class HtmlRender implements IRender<HTMLElement | Text> {
     } else if (DOM_PROPERTIES.has(key)) {
       (element as Wildcard)[key] = value;
     } else if (typeof value === "boolean") {
-      if (value) {
-        element.setAttribute(key, "");
-      } else {
-        element.removeAttribute(key);
-      }
+      if (value) element.setAttribute(key, "");
+      else element.removeAttribute(key);
     } else {
       element.setAttribute(key, String(value));
     }
@@ -324,118 +390,45 @@ export class HtmlRender implements IRender<HTMLElement | Text> {
 
   // -- Internal: DOM navigation -----------------------------------------------
 
-  /**
-   * Compute where a view's DOM node should be placed in its parent.
-   *
-   * Fast paths (O(1)):
-   *  - Last child → endComment (composite) or null/appendChild (primitive)
-   *  - Previous sibling rendered → nextSibling of prev's last DOM node
-   *
-   * Slow path (O(k)): walk backward through unrendered siblings.
-   *
-   * Composite parents always return endComment as fallback (never null),
-   * so insertBefore(node, result) is safe for all parent types.
-   */
-  private fastInsertionPoint(parent: View, view: View): Node | null {
-    const vdom = parent.virtualDom;
-    if (vdom && vdom.length > 0) {
-      const node = vdom.getNode(view);
-      if (node) {
-        // Fast path: last child → append at end of parent
-        if (node.isLast() || parent.quickRerender) {
-          const ref = parent.renderRef as Maybe<DomRef>;
-          if (ref?.kind === "composite") {
-            return ref.endComment;
-          } else {
-            return null;
-          }
-        }
-
-        // Fast path: immediate previous sibling is rendered
-        const prev = node.getPrev();
-        if (prev) {
-          const prevRef = prev.v.renderRef as Maybe<DomRef>;
-          if (prevRef) {
-            return (
-              prevRef.kind === "composite"
-                ? prevRef.endComment
-                : prevRef.element
-            ).nextSibling;
-          }
-          // Slow path: walk further back through unrendered siblings
-          let cur = prev.getPrev();
-          while (cur) {
-            const curRef = cur.v.renderRef as Maybe<DomRef>;
-            if (curRef) {
-              return (
-                curRef.kind === "composite" ? curRef.endComment : curRef.element
-              ).nextSibling;
-            }
-            cur = cur.getPrev();
-          }
-        }
+  private getFirstDomNode(view: ViewRecord): Node | null {
+    if (!view.renderRef) return null;
+    if (view.flags & F_PRIMITIVE) return (view.renderRef as PrimitiveDomRef).element;
+    if (view.children) {
+      for (const child of view.children) {
+        const dom = this.getFirstDomNode(child);
+        if (dom) return dom;
       }
     }
-
-    // First child (or no vdom): insert at start of parent
-    const ref = parent.renderRef as Maybe<DomRef>;
-    if (!ref) return null;
-    // Composite: endComment is both start and end anchor (children go before it)
-    // Primitive: firstChild (null if empty → appendChild)
-    return ref.kind === "composite" ? ref.endComment : ref.element.firstChild;
-  }
-
-  private getParentDomNode(parent: View): Maybe<Node> {
-    const ref = parent.renderRef as Maybe<DomRef>;
-    if (!ref) return null;
-
-    if (ref.kind === "primitive") {
-      return ref.element;
-    }
-    return ref.endComment.parentNode;
+    return null;
   }
 
   private moveDomNodes(
-    view: View,
+    view: ViewRecord,
     parentNode: Node,
     insertBefore: Node | null,
   ): void {
-    const ref = view.renderRef as Maybe<DomRef>;
-    if (!ref) return;
-    if (ref.kind === "primitive") {
-      parentNode.insertBefore(ref.element, insertBefore);
-    } else {
-      if (view.virtualDom) {
-        for (const child of view.virtualDom) {
-          this.moveDomNodes(child, parentNode, insertBefore);
-        }
+    if (!view.renderRef) return;
+    if (view.flags & F_PRIMITIVE) {
+      parentNode.insertBefore((view.renderRef as PrimitiveDomRef).element, insertBefore);
+    } else if (view.children) {
+      for (const child of view.children) {
+        this.moveDomNodes(child, parentNode, insertBefore);
       }
-      parentNode.insertBefore(ref.endComment, insertBefore);
     }
   }
 
-  private getFirstDomNode(view: View): Node | null {
-    const ref = view.renderRef as Maybe<DomRef>;
-    if (!ref) return null;
-    if (ref.kind === "primitive") return ref.element;
-    if (view.virtualDom) {
-      for (const child of view.virtualDom) {
-        const node = this.getFirstDomNode(child);
-        if (node) return node;
+  private removeDomNodes(view: ViewRecord) {
+    const ref = view.renderRef as Maybe<PrimitiveDomRef>;
+    if (!ref || !(view.flags & F_PRIMITIVE)) return;
+    const evObj = (ref.element as any)[$EV] as
+      | Record<string, Function>
+      | undefined;
+    if (evObj) {
+      for (const domEvent in evObj) {
+        removeDelegated(this.container, domEvent);
       }
+      delete (ref.element as any)[$EV];
     }
-    return ref.endComment;
-  }
-
-  private removeDomNodes(view: View) {
-    const ref = view.renderRef as Maybe<DomRef>;
-    if (!ref) return;
-
-    if (ref.kind === "primitive") {
-      ref.element.parentNode?.removeChild(ref.element);
-      return;
-    }
-
-    ref.endComment.parentNode?.removeChild(ref.endComment);
+    ref.element.parentNode?.removeChild(ref.element);
   }
 }
