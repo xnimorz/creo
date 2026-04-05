@@ -12,6 +12,7 @@ import { orchestrator } from "@/internal/orchestrator";
 import { HtmlRender } from "./html_render";
 import { HtmlStringRender } from "./string_render";
 import type { Wildcard } from "@/internal/wildcard";
+import { _ } from "@/functional/maybe";
 
 // ---------------------------------------------------------------------------
 // Happy-dom setup
@@ -87,7 +88,7 @@ describe("Renderer Parity — HtmlRender vs HtmlStringRender", () => {
 
     it("empty element", () => {
       const App = view(() => ({
-        render() { div({}); },
+        render() { div(_); },
       }));
       assertParity(App);
     });
@@ -95,7 +96,7 @@ describe("Renderer Parity — HtmlRender vs HtmlStringRender", () => {
     it("element with no props", () => {
       const App = view(() => ({
         render() {
-          div({}, () => { span({}, () => { text("test"); }); });
+          div(_, () => { span(_, "test"); });
         },
       }));
       assertParity(App);
@@ -139,7 +140,7 @@ describe("Renderer Parity — HtmlRender vs HtmlStringRender", () => {
     it("multiple text nodes as siblings", () => {
       const App = view(() => ({
         render() {
-          div({}, () => {
+          div(_, () => {
             text("one");
             text("two");
             text("three");
@@ -250,9 +251,7 @@ describe("Renderer Parity — HtmlRender vs HtmlStringRender", () => {
     it("event handlers are omitted from HTML output", () => {
       const App = view(() => ({
         render() {
-          button({ class: "btn", onClick: () => {} }, () => {
-            text("Click");
-          });
+          button({ class: "btn", onClick: () => {} }, "Click");
         },
       }));
       const html = assertParity(App);
@@ -303,7 +302,7 @@ describe("Renderer Parity — HtmlRender vs HtmlStringRender", () => {
     it("br element", () => {
       const App = view(() => ({
         render() {
-          div({}, () => { text("line1"); br({}); text("line2"); });
+          div(_, () => { text("line1"); br(_); text("line2"); });
         },
       }));
       assertParity(App);
@@ -311,7 +310,7 @@ describe("Renderer Parity — HtmlRender vs HtmlStringRender", () => {
 
     it("hr element", () => {
       const App = view(() => ({
-        render() { hr({}); },
+        render() { hr(_); },
       }));
       assertParity(App);
     });
@@ -322,7 +321,7 @@ describe("Renderer Parity — HtmlRender vs HtmlStringRender", () => {
   describe("composites", () => {
     it("composite is transparent in output", () => {
       const Inner = view(() => ({
-        render() { span({}, () => text("inner")); },
+        render() { span(_, "inner"); },
       }));
 
       const App = view(() => ({
@@ -337,8 +336,8 @@ describe("Renderer Parity — HtmlRender vs HtmlStringRender", () => {
 
     it("nested composites", () => {
       const C = view(() => ({ render() { text("deep"); } }));
-      const B = view(() => ({ render() { span({}, () => C()); } }));
-      const A = view(() => ({ render() { div({}, () => B()); } }));
+      const B = view(() => ({ render() { span(_, () => C()); } }));
+      const A = view(() => ({ render() { div(_, () => B()); } }));
       const App = view(() => ({ render() { A(); } }));
       assertParity(App);
     });
@@ -347,7 +346,7 @@ describe("Renderer Parity — HtmlRender vs HtmlStringRender", () => {
       const Card = view<{ title: string }>(({ props, slot }) => ({
         render() {
           div({ class: "card" }, () => {
-            h1({}, () => text(props().title));
+            h1(_, () => text(props().title));
             div({ class: "body" }, slot);
           });
         },
@@ -356,7 +355,7 @@ describe("Renderer Parity — HtmlRender vs HtmlStringRender", () => {
       const App = view(() => ({
         render() {
           Card({ title: "Hello" }, () => {
-            p({}, () => text("content"));
+            p(_, "content");
           });
         },
       }));
@@ -370,10 +369,10 @@ describe("Renderer Parity — HtmlRender vs HtmlStringRender", () => {
     it("unordered list", () => {
       const App = view(() => ({
         render() {
-          ul({}, () => {
-            li({}, () => text("one"));
-            li({}, () => text("two"));
-            li({}, () => text("three"));
+          ul(_, () => {
+            li(_, "one");
+            li(_, "two");
+            li(_, "three");
           });
         },
       }));
@@ -388,7 +387,7 @@ describe("Renderer Parity — HtmlRender vs HtmlStringRender", () => {
       ];
       const App = view(() => ({
         render() {
-          ul({}, () => {
+          ul(_, () => {
             for (const item of items) {
               li({ key: item.id }, () => text(item.label));
             }
@@ -401,21 +400,21 @@ describe("Renderer Parity — HtmlRender vs HtmlStringRender", () => {
     it("table with rows", () => {
       const App = view(() => ({
         render() {
-          table({}, () => {
-            thead({}, () => {
-              tr({}, () => {
-                th({}, () => text("Name"));
-                th({}, () => text("Age"));
+          table(_, () => {
+            thead(_, () => {
+              tr(_, () => {
+                th(_, "Name");
+                th(_, "Age");
               });
             });
-            tbody({}, () => {
-              tr({}, () => {
-                td({}, () => text("Alice"));
-                td({}, () => text("30"));
+            tbody(_, () => {
+              tr(_, () => {
+                td(_, "Alice");
+                td(_, "30");
               });
-              tr({}, () => {
-                td({}, () => text("Bob"));
-                td({}, () => text("25"));
+              tr(_, () => {
+                td(_, "Bob");
+                td(_, "25");
               });
             });
           });
@@ -432,8 +431,8 @@ describe("Renderer Parity — HtmlRender vs HtmlStringRender", () => {
       const App = view(() => ({
         render() {
           nav({ class: "main-nav" }, () => {
-            a({ href: "/" }, () => text("Home"));
-            a({ href: "/about" }, () => text("About"));
+            a({ href: "/" }, "Home");
+            a({ href: "/about" }, "About");
           });
         },
       }));
@@ -443,10 +442,10 @@ describe("Renderer Parity — HtmlRender vs HtmlStringRender", () => {
     it("article with header/footer", () => {
       const App = view(() => ({
         render() {
-          article({}, () => {
-            header({}, () => h1({}, () => text("Title")));
-            section({}, () => p({}, () => text("Body")));
-            footer({}, () => text("Footer"));
+          article(_, () => {
+            header(_, () => h1(_, "Title"));
+            section(_, () => p(_, "Body"));
+            footer(_, "Footer");
           });
         },
       }));
@@ -456,9 +455,9 @@ describe("Renderer Parity — HtmlRender vs HtmlStringRender", () => {
     it("definition list", () => {
       const App = view(() => ({
         render() {
-          dl({}, () => {
-            dt({}, () => text("Term"));
-            dd({}, () => text("Definition"));
+          dl(_, () => {
+            dt(_, "Term");
+            dd(_, "Definition");
           });
         },
       }));
@@ -472,8 +471,8 @@ describe("Renderer Parity — HtmlRender vs HtmlStringRender", () => {
     it("form with labeled input", () => {
       const App = view(() => ({
         render() {
-          form({}, () => {
-            label({}, () => text("Name:"));
+          form(_, () => {
+            label(_, "Name:");
             input({ type: "text", placeholder: "Enter name" });
           });
         },
@@ -491,9 +490,9 @@ describe("Renderer Parity — HtmlRender vs HtmlStringRender", () => {
     it.skip("select with options (happy-dom querySelectorAll bug)", () => {
       const App = view(() => ({
         render() {
-          select({}, () => {
-            option({ value: "a" }, () => text("Alpha"));
-            option({ value: "b" }, () => text("Beta"));
+          select(_, () => {
+            option({ value: "a" }, "Alpha");
+            option({ value: "b" }, "Beta");
           });
         },
       }));
@@ -514,11 +513,11 @@ describe("Renderer Parity — HtmlRender vs HtmlStringRender", () => {
     it("strong and em", () => {
       const App = view(() => ({
         render() {
-          p({}, () => {
+          p(_, () => {
             text("This is ");
-            strong({}, () => text("bold"));
+            strong(_, "bold");
             text(" and ");
-            em({}, () => text("italic"));
+            em(_, "italic");
           });
         },
       }));
@@ -528,8 +527,8 @@ describe("Renderer Parity — HtmlRender vs HtmlStringRender", () => {
     it("code and pre", () => {
       const App = view(() => ({
         render() {
-          pre({}, () => {
-            code({}, () => text("const x = 1;"));
+          pre(_, () => {
+            code(_, "const x = 1;");
           });
         },
       }));
@@ -548,7 +547,7 @@ describe("Renderer Parity — HtmlRender vs HtmlStringRender", () => {
               text(props().done ? "[x]" : "[ ]");
             });
             span({ class: "label" }, () => text(props().text));
-            button({ class: "delete", onClick: () => {} }, () => text("x"));
+            button({ class: "delete", onClick: () => {} }, "x");
           });
         },
       }));
@@ -556,7 +555,7 @@ describe("Renderer Parity — HtmlRender vs HtmlStringRender", () => {
       const App = view(() => ({
         render() {
           div({ class: "app" }, () => {
-            h1({}, () => text("Todos"));
+            h1(_, "Todos");
             div({ class: "list" }, () => {
               TodoItem({ key: "1", text: "Buy milk", done: false });
               TodoItem({ key: "2", text: "Walk dog", done: true });
@@ -578,9 +577,9 @@ describe("Renderer Parity — HtmlRender vs HtmlStringRender", () => {
       const App = view(() => ({
         render() {
           nav({ class: "navbar" }, () => {
-            Link({ href: "/", active: true }, () => text("Home"));
-            Link({ href: "/about", active: false }, () => text("About"));
-            Link({ href: "/users", active: false }, () => text("Users"));
+            Link({ href: "/", active: true }, "Home");
+            Link({ href: "/about", active: false }, "About");
+            Link({ href: "/users", active: false }, "Users");
           });
         },
       }));
@@ -590,12 +589,12 @@ describe("Renderer Parity — HtmlRender vs HtmlStringRender", () => {
     it("conditional rendering", () => {
       const App = view(() => ({
         render() {
-          div({}, () => {
+          div(_, () => {
             if (true) {
-              div({ class: "shown" }, () => text("visible"));
+              div({ class: "shown" }, "visible");
             }
             if (false) {
-              div({ class: "hidden" }, () => text("invisible"));
+              div({ class: "hidden" }, "invisible");
             }
           });
         },
@@ -632,19 +631,19 @@ describe("Renderer Parity — HtmlRender vs HtmlStringRender", () => {
       const App = view(() => ({
         render() {
           div({ class: "profile" }, () => {
-            h2({}, () => text("User Profile"));
-            p({}, () => {
+            h2(_, "User Profile");
+            p(_, () => {
               text("Name: ");
-              strong({}, () => text("Alice"));
+              strong(_, "Alice");
             });
-            p({}, () => {
+            p(_, () => {
               text("Tags: ");
               Badge({ label: "admin" });
               text(" ");
               Badge({ label: "active" });
             });
-            hr({});
-            p({}, () => text("Footer text"));
+            hr(_);
+            p(_, "Footer text");
           });
         },
       }));
@@ -685,7 +684,7 @@ describe("Renderer Parity — HtmlRender vs HtmlStringRender", () => {
       const Card = view<{ title: string }>(({ props, slot }) => ({
         render() {
           div({ class: "card" }, () => {
-            h1({}, () => text(props().title));
+            h1(_, () => text(props().title));
             div({ class: "body" }, slot);
           });
         },
@@ -706,7 +705,7 @@ describe("Renderer Parity — HtmlRender vs HtmlStringRender", () => {
         render() {
           div({ class: "a" }, "text slot");
           div({ class: "b" }, () => {
-            span({}, "nested");
+            span(_, "nested");
             text(" and more");
           });
         },

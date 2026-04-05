@@ -8,6 +8,7 @@ import { type ViewRecord } from "@/internal/internal_view";
 import { orchestrator } from "@/internal/orchestrator";
 import { HtmlRender } from "@/render/html_render";
 import { $primitive } from "@/public/primitive";
+import { _ } from "@/functional/maybe";
 
 const win = new Window({ url: "http://localhost" });
 Object.assign(globalThis, {
@@ -121,8 +122,8 @@ const appViewFn: ViewFn<any, any> = ({ use }) => {
   ls = list;
   return {
     render() {
-      table({}, () => {
-        tbody({}, () => {
+      table(_, () => {
+        tbody(_, () => {
           for (const item of list.get())
             Row({ key: item.id, item, selected: false, onSelect: () => {}, onRemove: () => {} });
         });

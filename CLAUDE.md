@@ -42,7 +42,7 @@ const Counter = view<{ initial: number }>(({ props, use }) => {
 | `React.memo(Component, areEqual)` | `shouldUpdate(nextProps)` on ViewBody |
 | `key={id}` | `{ key: id }` in props |
 | `useContext` | `store.new()` + `use(store)` (global shared state) |
-| `<div className="x">` | `div({ class: "x" }, () => { ... })` |
+| `<div className="x">` | `div({ class: "x" }, () => { ... })` — use `_` instead of `{}` when no props |
 | `ReactDOM.createRoot(el).render(<App/>)` | `createApp(() => App(), new HtmlRender(el)).mount()` |
 
 ### Children / Composition
@@ -63,13 +63,13 @@ const Card = view(({ slot }) => ({
   },
 }));
 
-// In parent render — slot is optional:
-Card({}, () => {
-  p({}, "hello");
+// In parent render — slot is optional; use _ when no props:
+Card(_, () => {
+  p(_, "hello");
 });
 
 // String slot — shorthand for () => text("..."):
-Card({}, "simple text content");
+Card(_, "simple text content");
 ```
 
 ### Event Handling
@@ -207,6 +207,7 @@ const MyView = view<{ value: number }>(({ props }) => ({
 7. **Slot is optional** — omit the second argument if no children needed.
 8. **Unified `use()`** — both local state and global store use the same `use()` function.
 9. **`text()` is typed** — `text(content: string | number)`, not a generic element.
+10. **`_` for empty props** — use `_` (from `@/functional/maybe`) instead of `{}` when no props are needed: `div(_, "hello")` not `div({}, "hello")`.
 
 ---
 
@@ -254,11 +255,11 @@ HeaderRow({ columns });
 // String slot — renders as a text node:
 button({ onClick: handler }, "Click me");
 span({ class: "label" }, title);
-li({}, "Item text");
+li(_, "Item text");
 
 // Function slot — for complex children:
 div({ class: "wrapper" }, () => {
-  span({}, "hello");
+  span(_, "hello");
   text(" world");
 });
 ```
@@ -280,13 +281,15 @@ const { routeStore, navigate, RouterView, Link } = createRouter({
 });
 
 // In a view's render():
-nav({}, () => {
+nav(_, () => {
   Link({ href: "/" }, "Home");
   Link({ href: "/about" }, "About");
 });
 div({ class: "content" }, () => {
   RouterView();
 });
+
+// _ (from @/functional/maybe) is used instead of {} when no props are needed
 
 // Read route params:
 const route = use(routeStore);

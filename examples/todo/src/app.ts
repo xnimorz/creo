@@ -305,7 +305,7 @@ export const App = view(({ use }) => {
           onPointerUp: cancelDrag,
         },
         () => {
-          h1({}, "Todo App");
+          h1(_, "Todo App");
 
           div({ class: "add-form" }, () => {
             input({

@@ -152,8 +152,8 @@ const appViewFn: ViewFn<any, any> = ({ use }) => {
   listState = list;
   return {
     render() {
-      table({}, () => {
-        tbody({}, () => {
+      table(_, () => {
+        tbody(_, () => {
           for (const item of list.get())
             Row({
               key: item.id,

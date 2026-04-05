@@ -215,7 +215,7 @@ export const App = view(({ use }) => {
         div({ class: "jumbotron" }, () => {
           div({ class: "row" }, () => {
             div({ class: "col-md-6" }, () => {
-              h1({}, () => {
+              h1(_, () => {
                 text("Creo keyed");
               });
             });
@@ -254,7 +254,7 @@ export const App = view(({ use }) => {
 
         // Table
         table({ class: "table table-hover table-striped test-data" }, () => {
-          tbody({}, () => {
+          tbody(_, () => {
             const data = list.get();
             const sel = selectedId.get();
             for (const item of data) {

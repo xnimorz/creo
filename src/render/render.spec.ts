@@ -676,9 +676,7 @@ describe("State", () => {
           } else {
             div(
               { class: "display", onClick: () => editing.set(true) },
-              () => {
-                text("click to edit");
-              },
+              "click to edit",
             );
           }
         },
@@ -769,9 +767,7 @@ describe("State", () => {
     const SlotApp = view<void>(() => ({
       render() {
         Card({ title: "Hello" }, () => {
-          span({ class: "child" }, () => {
-            text("child content");
-          });
+          span({ class: "child" }, "child content");
         });
       },
     }));

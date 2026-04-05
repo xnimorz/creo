@@ -33,16 +33,17 @@ export type ViewFn<Props, Api> = {
   [$primitive]?: string;
 };
 
+/** Resolves to the caller-facing props type. Allows `void` when Props is void or all-optional. */
+type ViewProps<Props> = Props extends void
+  ? { key?: Key } | void
+  : {} extends Props
+    ? (Props & { key?: Key }) | void
+    : Props & { key?: Key };
+
 export function view<Props = void, Api = void>(
   body: ViewFn<Props, Api>,
-): (
-  props: Props extends void ? { key?: Key } | void : Props & { key?: Key },
-  slot?: SlotContent,
-) => void {
-  return (
-    props: Props extends void ? { key?: Key } | void : Props & { key?: Key },
-    slot?: SlotContent,
-  ) => {
+): (props: ViewProps<Props>, slot?: SlotContent) => void {
+  return (props: ViewProps<Props>, slot?: SlotContent) => {
     orchestrator
       .currentEngine()!
       .view(

@@ -1,4 +1,5 @@
 import { view } from "@/public/view";
+import { _ } from "@/functional/maybe";
 import { div, text, nav, h1, h2, p, ul, li, dl, dt, dd, span, button } from "@/public/primitives/primitives";
 import { createRouter } from "creo-router";
 
@@ -19,24 +20,24 @@ const users = [
 
 const HomePage = view(() => ({
   render() {
-    h1({}, "Home");
-    p({}, "Welcome to the Creo Router example app.");
-    p({}, "Use the navigation above to browse pages. Try the Users section to see dynamic route params in action.");
+    h1(_, "Home");
+    p(_, "Welcome to the Creo Router example app.");
+    p(_, "Use the navigation above to browse pages. Try the Users section to see dynamic route params in action.");
   },
 }));
 
 const AboutPage = view(() => ({
   render() {
-    h1({}, "About");
-    p({}, "This example demonstrates creo-router — a lightweight, store-based hash router for the Creo UI framework.");
-    p({}, "Features:");
-    ul({}, () => {
-      li({}, "Hash-based navigation (#/path)");
-      li({}, "Dynamic route parameters (/users/:id)");
-      li({}, "Store-driven reactivity — views re-render on route change");
-      li({}, "Link component with click interception");
-      li({}, "Programmatic navigation via navigate()");
-      li({}, "Browser back/forward support");
+    h1(_, "About");
+    p(_, "This example demonstrates creo-router — a lightweight, store-based hash router for the Creo UI framework.");
+    p(_, "Features:");
+    ul(_, () => {
+      li(_, "Hash-based navigation (#/path)");
+      li(_, "Dynamic route parameters (/users/:id)");
+      li(_, "Store-driven reactivity — views re-render on route change");
+      li(_, "Link component with click interception");
+      li(_, "Programmatic navigation via navigate()");
+      li(_, "Browser back/forward support");
     });
   },
 }));
@@ -44,8 +45,8 @@ const AboutPage = view(() => ({
 const NotFoundPage = view(() => ({
   render() {
     div({ class: "not-found" }, () => {
-      h1({}, "404");
-      p({}, "Page not found.");
+      h1(_, "404");
+      p(_, "Page not found.");
     });
   },
 }));
@@ -70,13 +71,13 @@ const { routeStore, navigate, RouterView, Link } = createRouter({
 
 const UsersPage = view(() => ({
   render() {
-    h1({}, "Users");
-    p({}, "Click a user to view their profile:");
+    h1(_, "Users");
+    p(_, "Click a user to view their profile:");
     ul({ class: "user-list" }, () => {
       for (const user of users) {
         li({ key: user.id }, () => {
           Link({ href: `/users/${user.id}` }, user.name);
-          span({}, ` — ${user.role}`);
+          span(_, ` — ${user.role}`);
         });
       }
     });
@@ -94,20 +95,20 @@ const UserPage = view(({ use }) => {
       const user = users.find((u) => u.id === Number(id));
 
       if (!user) {
-        h1({}, "User not found");
-        p({}, `No user with ID "${id}".`);
+        h1(_, "User not found");
+        p(_, `No user with ID "${id}".`);
         Link({ href: "/users", class: "back-link" }, "← Back to users");
         return;
       }
 
-      h2({}, user.name);
+      h2(_, user.name);
       dl({ class: "profile-card" }, () => {
-        dt({}, "ID");
-        dd({}, String(user.id));
-        dt({}, "Name");
-        dd({}, user.name);
-        dt({}, "Role");
-        dd({}, user.role);
+        dt(_, "ID");
+        dd(_, String(user.id));
+        dt(_, "Name");
+        dd(_, user.name);
+        dt(_, "Role");
+        dd(_, user.role);
       });
 
       Link({ href: "/users", class: "back-link" }, "← Back to users");
