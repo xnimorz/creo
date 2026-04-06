@@ -54,8 +54,8 @@ Renders an `<a>` with `href="#/path"` for accessibility (right-click, hover prev
 // Props: { href: string; class?: string }
 // Accepts slot for children
 
-Link({ href: "/about" }, () => text("About"));
-Link({ href: "/users/42", class: "active" }, () => text("User 42"));
+Link({ href: "/about" }, "About");
+Link({ href: "/users/42", class: "active" }, "User 42");
 ```
 
 ## Route Params
@@ -97,9 +97,9 @@ const App = view(({ use }) => {
   return {
     render() {
       const path = route.get().path;
-      nav({}, () => {
-        Link({ href: "/", class: path === "/" ? "active" : "" }, () => text("Home"));
-        Link({ href: "/about", class: path === "/about" ? "active" : "" }, () => text("About"));
+      nav(_, () => {
+        Link({ href: "/", class: path === "/" ? "active" : "" }, "Home");
+        Link({ href: "/about", class: path === "/about" ? "active" : "" }, "About");
       });
       div({ class: "content" }, () => { RouterView(); });
     },
@@ -116,8 +116,8 @@ const { RouterView } = createRouter({
   routes: [...],
   fallback: () => {
     div({ class: "not-found" }, () => {
-      h1({}, () => text("404"));
-      p({}, () => text("Page not found."));
+      h1(_, "404");
+      p(_, "Page not found.");
     });
   },
 });

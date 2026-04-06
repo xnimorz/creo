@@ -7,6 +7,7 @@ import { Engine } from "@/internal/engine";
 import { type ViewRecord } from "@/internal/internal_view";
 import { orchestrator } from "@/internal/orchestrator";
 import { HtmlRender } from "@/render/html_render";
+import { _ } from "@/functional/maybe";
 
 const win = new Window({ url: "http://localhost" });
 Object.assign(globalThis, {
@@ -114,8 +115,8 @@ for (let run = 0; run < RUNS; run++) {
     ls = list;
     return {
       render() {
-        table({}, () => {
-          tbody({}, () => {
+        table(_, () => {
+          tbody(_, () => {
             for (const item of list.get())
               Row({ key: item.id, item, selected: false, onSelect: () => {}, onRemove: () => {} });
           });

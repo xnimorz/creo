@@ -1,5 +1,5 @@
 import type { Key } from "@/functional/key";
-import type { Slot, ViewBody, ViewFn } from "@/public/view";
+import type { SlotContent, ViewBody, ViewFn } from "@/public/view";
 import type { Maybe } from "@/functional/maybe";
 import type { Wildcard } from "./wildcard";
 
@@ -27,7 +27,7 @@ export type ViewRecord<
   viewFn: ViewFn<Props, Api>;
   userKey: Maybe<Key>;
   props: Props;
-  slot: Maybe<Slot>;
+  slot: Maybe<SlotContent>;
   // Once ViewRecord moves from Pending to Real state,
   // it will cache the body of the view, so that ViewFn is called once per View Lifecycle
   body: Maybe<ViewBody<Props, Api>>;

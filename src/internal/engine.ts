@@ -10,7 +10,8 @@ import {
 import type { Wildcard } from "./wildcard";
 import { isNone, type Maybe } from "@/functional/maybe";
 import type { Key } from "@/functional/key";
-import type { Slot, ViewFn } from "@/public/view";
+import type { Slot, SlotContent, ViewFn } from "@/public/view";
+import { textViewFn } from "@/public/primitives/primitives";
 import { $primitive } from "@/public/primitive";
 import { State, type Reactive } from "@/public/state";
 import { Store, isStore } from "@/public/store";
@@ -50,7 +51,7 @@ export class Engine {
     viewFn: ViewFn<Props, Api>,
     parent: Maybe<ViewRecord>,
     props: Props,
-    slot: Maybe<Slot>,
+    slot: Maybe<SlotContent>,
     userKey: Maybe<Key>,
   ): ViewRecord {
     const res: ViewRecord = {
@@ -75,7 +76,8 @@ export class Engine {
       scHost: null,
     };
     if (slot) {
-      res.sc = this.#collect(slot, [], res);
+      const slotFn = typeof slot === "string" ? this.#stringSlot(slot) : slot;
+      res.sc = this.#collect(slotFn, [], res);
     }
     return res;
   }
@@ -85,7 +87,7 @@ export class Engine {
   view<Props = Wildcard, Api = Wildcard, RenderRef = Wildcard>(
     viewFn: ViewFn<Props, Api>,
     props: Props,
-    slot: Maybe<Slot>,
+    slot: Maybe<SlotContent>,
     userKey: Maybe<Key>,
   ): ViewRecord<Props, Api, RenderRef> {
     const view = this.newView(viewFn, this.#collectFor, props, slot, userKey);
@@ -213,12 +215,19 @@ export class Engine {
     return collector;
   }
 
+  /** Convert a string slot into a callback that emits a text ViewRecord. */
+  #stringSlot(content: string): Slot {
+    return () => {
+      this.view(textViewFn as ViewFn<Wildcard, Wildcard>, content, null, null);
+    };
+  }
+
   // -- Props update -----------------------------------------------------------
 
   nextProps<Props = Wildcard, Api = Wildcard, RenderRef = Wildcard>(
     view: ViewRecord<Props, Api, RenderRef>,
     nextProps: Props,
-    nextSlot: Maybe<Slot>,
+    nextSlot: Maybe<SlotContent>,
     preCollectedSc?: Maybe<ViewRecord[]>,
   ): void {
     const prevSc = view.sc;
@@ -229,7 +238,15 @@ export class Engine {
       for (const child of preCollectedSc) child.parent = view;
       view.sc = preCollectedSc;
     } else {
-      view.sc = nextSlot ? this.#collect(nextSlot, [], view) : null;
+      if (nextSlot) {
+        const slotFn =
+          typeof nextSlot === "string"
+            ? this.#stringSlot(nextSlot)
+            : nextSlot;
+        view.sc = this.#collect(slotFn, [], view);
+      } else {
+        view.sc = null;
+      }
     }
 
     const structChanged = hasScStructuralChange(prevSc, view.sc);

@@ -94,7 +94,7 @@ export function html<
 // Text node — typed as (content: string | number) => void
 // ---------------------------------------------------------------------------
 
-const textViewFn: ViewFn<string | number, void> = Object.assign(
+export const textViewFn: ViewFn<string | number, void> = Object.assign(
   (() => ({ render() {} })) as ViewFn<string | number, void>,
   { [$primitive]: "text" as string },
 );

@@ -34,7 +34,7 @@ const Counter = view<{ initial: number }>(({ props, use }) => {
 |-------|------|
 | `function Component(props)` | `view<Props>(({ props }) => ({ render() {} }))` — `props` is a function: call `props()` |
 | `useState(initial)` | `use(initial)` → `.get()` / `.set()` / `.update()` |
-| `props.children` | `slot` — called as `slot?.()` inside render |
+| `props.children` | `slot` — called as `slot?.()` inside render; callers can pass a string or `() => void` |
 | `onClick={handler}` | `onClick: handler` in primitive props |
 | `useEffect(() => {}, [])` (mount) | `onMount()` on ViewBody |
 | `useEffect(() => {})` (update) | `onUpdateAfter()` on ViewBody |
@@ -42,7 +42,7 @@ const Counter = view<{ initial: number }>(({ props, use }) => {
 | `React.memo(Component, areEqual)` | `shouldUpdate(nextProps)` on ViewBody |
 | `key={id}` | `{ key: id }` in props |
 | `useContext` | `store.new()` + `use(store)` (global shared state) |
-| `<div className="x">` | `div({ class: "x" }, () => { ... })` |
+| `<div className="x">` | `div({ class: "x" }, () => { ... })` — use `_` instead of `{}` when no props |
 | `ReactDOM.createRoot(el).render(<App/>)` | `createApp(() => App(), new HtmlRender(el)).mount()` |
 
 ### Children / Composition
@@ -63,10 +63,13 @@ const Card = view(({ slot }) => ({
   },
 }));
 
-// In parent render — slot is optional:
-Card({}, () => {
-  p({}, () => { text("hello"); });
+// In parent render — slot is optional; use _ when no props:
+Card(_, () => {
+  p(_, "hello");
 });
+
+// String slot — shorthand for () => text("..."):
+Card(_, "simple text content");
 ```
 
 ### Event Handling
@@ -86,7 +89,7 @@ const MyView = view(({ use }) => {
 
   return {
     render() {
-      button({ onClick: handleClick }, () => { text("Click"); });
+      button({ onClick: handleClick }, "Click");
       input({ value: value.get(), onInput: handleInput });
     },
   };
@@ -204,6 +207,7 @@ const MyView = view<{ value: number }>(({ props }) => ({
 7. **Slot is optional** — omit the second argument if no children needed.
 8. **Unified `use()`** — both local state and global store use the same `use()` function.
 9. **`text()` is typed** — `text(content: string | number)`, not a generic element.
+10. **`_` for empty props** — use `_` (from `@/functional/maybe`) instead of `{}` when no props are needed: `div(_, "hello")` not `div({}, "hello")`.
 
 ---
 
@@ -226,9 +230,7 @@ const MyView = view(({ use }) => {
       button({ onClick: increment }, () => {
         text(count.get());
       });
-      button({ onClick: reset }, () => {
-        text("Reset");
-      });
+      button({ onClick: reset }, "Reset");
     },
   };
 });
@@ -243,16 +245,22 @@ const MyView = view(({ use }) => {
 
 ### Slot
 
-Slot is optional. Omit it when a component has no children:
+Slot accepts a function `() => void` or a `string`. A string slot is shorthand for `() => text("...")`. Omit it when a component has no children:
 
 ```ts
 // No children:
 button({ onClick: handler });
 HeaderRow({ columns });
 
-// With children:
+// String slot — renders as a text node:
+button({ onClick: handler }, "Click me");
+span({ class: "label" }, title);
+li(_, "Item text");
+
+// Function slot — for complex children:
 div({ class: "wrapper" }, () => {
-  text("hello");
+  span(_, "hello");
+  text(" world");
 });
 ```
 
@@ -273,13 +281,15 @@ const { routeStore, navigate, RouterView, Link } = createRouter({
 });
 
 // In a view's render():
-nav({}, () => {
-  Link({ href: "/" }, () => text("Home"));
-  Link({ href: "/about" }, () => text("About"));
+nav(_, () => {
+  Link({ href: "/" }, "Home");
+  Link({ href: "/about" }, "About");
 });
 div({ class: "content" }, () => {
   RouterView();
 });
+
+// _ (from @/functional/maybe) is used instead of {} when no props are needed
 
 // Read route params:
 const route = use(routeStore);
@@ -293,7 +303,7 @@ navigate("/users/42");
 
 - Use `Maybe<T>` from `@/functional/maybe` instead of `T | undefined`.
 - `text(content: string | number)` — typed scalar, not a generic element.
-- `view<Props, Api>` — returns `(props, slot?) => void`.
+- `view<Props, Api>` — returns `(props, slot?: SlotContent) => void`. `SlotContent = (() => void) | string`.
 - `store.new<T>(initial)` — creates `Store<T>` with `.get()`, `.set()`, `.update()`, `.subscribe()`.
 - `use(store)` returns the `Store<T>` itself (implements `Reactive<T>`).
 - `use(value)` returns a `Reactive<T>` (local `State<T>`).

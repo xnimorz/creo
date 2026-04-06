@@ -64,9 +64,9 @@ const DragGhost = view<{ label: string; done: boolean; x: number; y: number }>((
         style: `left:${x}px;top:${y}px`,
       },
       () => {
-        span({ class: "drag-handle" }, () => { text("⠿"); });
-        span({ class: "todo-check" }, () => { text(done ? "☑" : "☐"); });
-        span({ class: "todo-text" }, () => { text(label); });
+        span({ class: "drag-handle" }, "⠿");
+        span({ class: "todo-check" }, done ? "☑" : "☐");
+        span({ class: "todo-text" }, label);
       },
     );
   },
@@ -116,17 +116,13 @@ const TodoDisplay = view<{
         () => {
           span(
             { class: "drag-handle", onPointerDown: handleDragStart },
-            () => { text("⠿"); },
+            "⠿",
           );
-          span({ class: "todo-check", onClick: handleToggle }, () => {
-            text(todo.done ? "☑" : "☐");
-          });
-          span({ class: "todo-text", onClick: handleEdit }, () => {
-            text(todo.text);
-          });
-          span({ class: "todo-delete", onClick: handleDelete }, () => {
-            text("×");
-          });
+          span({ class: "todo-check", onClick: handleToggle },
+            todo.done ? "☑" : "☐",
+          );
+          span({ class: "todo-text", onClick: handleEdit }, todo.text);
+          span({ class: "todo-delete", onClick: handleDelete }, "×");
         },
       );
     },
@@ -309,9 +305,7 @@ export const App = view(({ use }) => {
           onPointerUp: cancelDrag,
         },
         () => {
-          h1({}, () => {
-            text("Todo App");
-          });
+          h1(_, "Todo App");
 
           div({ class: "add-form" }, () => {
             input({
@@ -321,9 +315,7 @@ export const App = view(({ use }) => {
               onInput: handleInput,
               onKeyDown: handleAddKeyDown,
             });
-            button({ class: "btn btn-primary", onClick: addTodo }, () => {
-              text("Add");
-            });
+            button({ class: "btn btn-primary", onClick: addTodo }, "Add");
           });
 
           const list = todos.get();
@@ -334,7 +326,7 @@ export const App = view(({ use }) => {
           div({ class: "filter-bar" }, () => {
             button(
               { class: "btn btn-filter", onClick: toggleHideCompleted },
-              () => { text(hiding ? "Show completed" : "Hide completed"); },
+              hiding ? "Show completed" : "Hide completed",
             );
           });
 
@@ -345,9 +337,7 @@ export const App = view(({ use }) => {
 
           Card({ header: headerText }, () => {
             if (visibleList.length === 0) {
-              div({ class: "empty" }, () => {
-                text(hiding ? "No active tasks!" : "Nothing to do!");
-              });
+              div({ class: "empty" }, hiding ? "No active tasks!" : "Nothing to do!");
             } else {
               for (let i = 0; i < visibleList.length; i++) {
                 const todo = visibleList[i]!;

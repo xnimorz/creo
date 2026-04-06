@@ -401,6 +401,107 @@ describe("HtmlRender", () => {
 });
 
 // ---------------------------------------------------------------------------
+// String slots
+// ---------------------------------------------------------------------------
+
+describe("String slots", () => {
+  function mountStateful(viewFn: (props?: any, slot?: any) => void) {
+    const container = document.createElement("div");
+    const renderer = new HtmlRender(container);
+    const engine = new Engine(renderer);
+    orchestrator.setCurrentEngine(engine);
+    engine.createRoot(() => { viewFn(); }, {});
+    engine.render();
+    return { container, engine };
+  }
+
+  it("should render a string slot on a primitive", () => {
+    const App = view<void>(() => ({
+      render() {
+        span({ class: "label" }, "hello");
+      },
+    }));
+
+    const { container } = mountStateful(App);
+    expect(container.textContent).toBe("hello");
+  });
+
+  it("should render a string slot on a composite view", () => {
+    const Card = view<{ title: string }>(({ props, slot }) => ({
+      render() {
+        div({ class: "card" }, () => {
+          div({ class: "title" }, () => { text(props().title); });
+          div({ class: "body" }, slot);
+        });
+      },
+    }));
+
+    const App = view<void>(() => ({
+      render() {
+        Card({ title: "Header" }, "body content");
+      },
+    }));
+
+    const { container } = mountStateful(App);
+    expect(container.textContent).toContain("Header");
+    expect(container.textContent).toContain("body content");
+  });
+
+  it("should update string slot on re-render", () => {
+    let labelState: Reactive<string>;
+
+    const App = view<void>(({ use }) => {
+      const label = use("initial");
+      labelState = label;
+      return {
+        render() {
+          span({ class: "label" }, label.get());
+        },
+      };
+    });
+
+    const { container, engine } = mountStateful(App);
+    expect(container.textContent).toBe("initial");
+
+    labelState!.set("updated");
+    engine.render();
+    expect(container.textContent).toBe("updated");
+  });
+
+  it("should produce same output as function slot with text()", () => {
+    const AppString = view<void>(() => ({
+      render() {
+        div({ class: "a" }, "hello");
+        span({ class: "b" }, "world");
+      },
+    }));
+
+    const AppFunc = view<void>(() => ({
+      render() {
+        div({ class: "a" }, () => { text("hello"); });
+        span({ class: "b" }, () => { text("world"); });
+      },
+    }));
+
+    const c1 = document.createElement("div");
+    const r1 = new HtmlRender(c1);
+    const e1 = new Engine(r1);
+    orchestrator.setCurrentEngine(e1);
+    e1.createRoot(() => { AppString(); }, {});
+    e1.render();
+
+    const c2 = document.createElement("div");
+    const r2 = new HtmlRender(c2);
+    const e2 = new Engine(r2);
+    orchestrator.setCurrentEngine(e2);
+    e2.createRoot(() => { AppFunc(); }, {});
+    e2.render();
+
+    expect(c1.innerHTML).toBe(c2.innerHTML);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // State-driven rendering
 // ---------------------------------------------------------------------------
 
@@ -575,9 +676,7 @@ describe("State", () => {
           } else {
             div(
               { class: "display", onClick: () => editing.set(true) },
-              () => {
-                text("click to edit");
-              },
+              "click to edit",
             );
           }
         },
@@ -668,9 +767,7 @@ describe("State", () => {
     const SlotApp = view<void>(() => ({
       render() {
         Card({ title: "Hello" }, () => {
-          span({ class: "child" }, () => {
-            text("child content");
-          });
+          span({ class: "child" }, "child content");
         });
       },
     }));

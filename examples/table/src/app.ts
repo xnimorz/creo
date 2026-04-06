@@ -16,7 +16,7 @@ const HeaderRow = view<{ columns: string[] }>((ctx) => ({
   render() {
     div({ class: "row header" }, () => {
       for (const col of ctx.props().columns) {
-        div({ class: "cell header-cell", key: col }, () => text(col));
+        div({ class: "cell header-cell", key: col }, col);
       }
     });
   },
@@ -74,9 +74,7 @@ const DisplayCell = view<{
         onClick: () => ctx.props().onEdit(),
         onDblclick: () => ctx.props().onEdit(),
       },
-      () => {
-        text(ctx.props().value || "\u00A0");
-      },
+      ctx.props().value || "\u00A0",
     );
   },
 }));
@@ -174,12 +172,8 @@ export const App = view(({ use }) => {
   return {
     render() {
       div({ class: "toolbar" }, () => {
-        button({ class: "btn", onClick: addRow }, () => {
-          text("Add Row");
-        });
-        button({ class: "btn", onClick: addCol }, () => {
-          text("Add Column");
-        });
+        button({ class: "btn", onClick: addRow }, "Add Row");
+        button({ class: "btn", onClick: addCol }, "Add Column");
       });
 
       div(
