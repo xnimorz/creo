@@ -50,14 +50,15 @@ export function view<Props = void, Api = void>(
         slot,
         maybeGetUserKey(props),
       );
-    // Return a lazy api proxy: when called, delegates to body.api.
-    // Follows record.alias to the live record (set during reconciliation
-    // when a pending record is matched to an existing one on re-render).
+    // Return a lazy api proxy that delegates to body.api.
+    // Uses a mutable apiRef cell so it stays valid across re-renders:
+    // reconciliation transfers the cell from pending → live record.
     // For void-api views this returns undefined (typed as void).
-    return ((...args: unknown[]) => {
-      const live = record.alias ?? record;
-      return (live.body as Wildcard)?.api?.(...args);
-    }) as Wildcard;
+    const apiRef: { current: Maybe<Function> } = {
+      current: (record.body as Wildcard)?.api ?? null,
+    };
+    record.apiRef = apiRef;
+    return ((...args: unknown[]) => apiRef.current?.(...args)) as Wildcard;
   }) as Wildcard;
 }
 

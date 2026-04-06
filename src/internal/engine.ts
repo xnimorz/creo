@@ -73,7 +73,7 @@ export class Engine {
       unsubscribe: null,
       parent,
       scHost: null,
-      alias: null,
+      apiRef: null,
     };
     if (slot) {
       res.sc = this.#collect(slot, [], res);
@@ -496,7 +496,12 @@ export class Engine {
     pendView: ViewRecord,
   ): void {
     if (oldView.viewFn === pendView.viewFn) {
-      pendView.alias = oldView;
+      // Transfer the api cell from the pending record to the live record
+      // so the proxy the parent captured stays valid.
+      if (pendView.apiRef) {
+        pendView.apiRef.current = (oldView.body as Wildcard)?.api ?? null;
+        oldView.apiRef = pendView.apiRef;
+      }
       this.nextProps(oldView, pendView.props, pendView.slot, pendView.sc);
     } else {
       this.dispose(oldView);
@@ -528,6 +533,7 @@ export class Engine {
       }
     }
     if (view.unsubscribe) for (const unsub of view.unsubscribe) unsub();
+    if (view.apiRef) { view.apiRef.current = null; view.apiRef = null; }
     if (view.userKey != null) view.parent?.keyToView?.delete(view.userKey);
     this.renderer.unmount(view);
     this.#dirtyQueue.delete(view);
@@ -539,6 +545,7 @@ export class Engine {
       for (const child of view.children) this.#disposeVirtual(child);
     }
     if (view.unsubscribe) for (const unsub of view.unsubscribe) unsub();
+    if (view.apiRef) { view.apiRef.current = null; view.apiRef = null; }
     if (view.userKey != null) view.parent?.keyToView?.delete(view.userKey);
     view.renderRef = undefined;
     this.#dirtyQueue.delete(view);
@@ -568,6 +575,11 @@ export class Engine {
           this.renderer.render(view);
           view.flags &= ~F_DIRTY;
           view.flags &= ~F_MOVED;
+
+          // Update the api cell so proxies see the live api after render
+          if (view.apiRef) {
+            view.apiRef.current = (view.body as Wildcard)?.api ?? null;
+          }
 
           if (isNew && view.body?.onMount) {
             const b = view.body;

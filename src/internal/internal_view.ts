@@ -48,8 +48,13 @@ export type ViewRecord<
   /** The primitive whose .children contains the live sc items after reconcile. */
   scHost: Maybe<ViewRecord>;
 
-  /** Set during reconciliation: points a pending record to the live record it was matched with. */
-  alias: Maybe<ViewRecord>;
+  /**
+   * Mutable cell for the api proxy. Holds a reference to the api function
+   * from the live ViewBody. The proxy returned to the parent captures this
+   * cell, so it stays valid across re-renders (reconciliation transfers the
+   * cell from pending → live). Nulled on dispose.
+   */
+  apiRef: Maybe<{ current: Maybe<Function> }>;
 };
 
 // ---------------------------------------------------------------------------
