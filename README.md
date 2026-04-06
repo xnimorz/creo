@@ -1,16 +1,30 @@
-# Creo
+# Creo: Lightweight UI framework
 
-> _"There is a point of no return"_
+> _"There are many UI framework but this one is mine!"_
 
-- A "streaming" UI framework.
-- No JSX, no templates, no compiler — views are function calls that flow top-down, rendered as they execute.
+- Lightweight, "Streaming" UI framework.
+- No JSX / templates / compiler
 - Simplicity over tons of features
+- Easy to start, easy to work with
+- Extendability by defining renderers
 
 ## Philosophy
 
 ### Streaming the UI
 
-Most frameworks build a tree and diff it. Creo streams it. When `render()` runs, each `div()`, `text()`, `span()` call immediately registers a child in sequence — there is no intermediate representation between your code and the virtual DOM. The render function IS the tree, read top to bottom. What you call is what you get, in the order you call it.
+> _"There is a point of no return"_
+
+Most frameworks are based on "returning" the data. Creo started back in (early 2025)[https://x.com/xnimorz/status/1876212381568905348] with the idea, that "return" is not the point. We can intersect the components during rendering cycle to handle it.
+
+It comes with some limitations, yes, like using VirtualDOM, instead of compiling it all and putting just renderer instructions but I believe VDOM is not the weakest point of modern software engineering.
+
+The weakest point is complexity. Every time I looked at "framework A/B/C" I always find myself struggling with remembering all "you should do X/Y/Z in order to make it work".
+
+And look.. I get it, it's important to follow the rules (e.g. I remember early svelte they experience problems with props, where incorrect usage de-optimised perfromance a lot). But after getting to the point where "a little bit too much" of the rules, I experience mental overload.
+
+This is why I want to have a framework which I enjoy using on daily basis. And one major thing I don't like is "too many DSLs" to remember.
+
+So... Why not just to use JAVASCRIPT?
 
 ```ts
 render() {
@@ -25,7 +39,10 @@ render() {
 
 ### Native control flow
 
-No `v-if`, no `{condition && <X/>}`, no `.map()` wrappers. Creo renders imperatively — use `if`, `for`, `while`, `switch`, or any JavaScript you want. The language IS the template language.
+No `v-if`, no `{condition && <X/>}`, no `.map()` wrappers.
+Creo renders imperatively: use `if`, `for`, `while`, `switch`, or any JavaScript you want.
+
+**The language is the template language on its own**:
 
 ```ts
 render() {
@@ -41,30 +58,21 @@ render() {
 }
 ```
 
-Say _NO_ to:
+It reduces mental load. We don't require people to learn:
 
-- special syntax to learn.
-- framework-specific iteration helpers.
-- ternary gymnastics.
+- Any specific templating syntax
+- Framework-specific iteration helpers.
+- Ternary gymnastics.
 
 ### Minimal model
 
 The entire reactivity model is three concepts:
 
-- **`use(value)`** — local state. Call `.get()`, `.set()`, `.update()`. That's it.
-- **`store.new(value)`** — global state. Same interface. Any view can subscribe with `use(store)`.
-- **`props()`** — read-only, passed by parent. A function call, not a magic object.
+- **`use(value)`**: local state. Call `.get()`, `.set()`, `.update()`;
+- **`store.new(value)`**: global store. Same interface. Any view can subscribe with `use(store)`, same to state mechanics. Library takes a shot to manage subscriptions;
+- **`props()`**: read-only, passed by parent;
 
-No:
-
-- Computed properties
-- Watchers
-- Dependency arrays
-- Selectors
-
-State is explicit: you set it, you read it, you control when things update via `shouldUpdate`.
-
-One of major ideas under the framework "if user can do it with same efficiency, let it outside framework zone"
+One of major ideas under the framework "if user can do it with same efficiency, let it outside framework zone". I want to keep the framework efficient, but with super limited API blast radius.
 
 ### Pluggable renderers
 
@@ -72,7 +80,7 @@ Creo allows any renderer overrides.
 
 - **`HtmlRender`** — DOM output for browsers
 - **`JsonRender`** — JSON AST for testing and serialization
-- **`StringRender`** — HTML strings for SSR
+- **`HtmlStringRenderer`** — HTML strings for SSR
 
 ```ts
 // Browser
@@ -120,9 +128,7 @@ Views are components. Define them with `view<Props>()`, which takes a setup func
 ```ts
 const Greeting = view<{ name: string }>(({ props }) => ({
   render() {
-    div({ class: "greeting" }, () => {
-      text(`Hello, ${props().name}!`);
-    });
+    div({ class: "greeting" }, `Hello, ${props().name}!`);
   },
 }));
 
