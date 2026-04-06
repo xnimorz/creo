@@ -28,11 +28,11 @@ So... Why not just to use JAVASCRIPT?
 
 ```ts
 render() {
-  h1({}, () => text("Title"));     // first child
-  p({}, () => text("Paragraph"));  // second child
-  ul({}, () => {                   // third child, with its own children streamed inside
-    li({}, () => text("One"));
-    li({}, () => text("Two"));
+  h1(_, "Title");                  // first child
+  p(_, "Paragraph");               // second child
+  ul(_, () => {                    // third child, with its own children streamed inside
+    li(_, "One");
+    li(_, "Two");
   });
 }
 ```
@@ -97,7 +97,7 @@ return renderer.renderToString();
 ## Quick Start
 
 ```ts
-import { createApp, view, div, text, button } from "creo";
+import { createApp, view, div, text, button, _ } from "creo";
 import { HtmlRender } from "creo";
 
 const Counter = view<{ initial: number }>(({ props, use }) => {
@@ -186,7 +186,7 @@ Pass children via a slot callback — the second argument to any view or primiti
 const Card = view<{ title: string }>(({ props, slot }) => ({
   render() {
     div({ class: "card" }, () => {
-      h1({}, () => text(props().title));
+      h1(_, () => text(props().title));
       div({ class: "card-body" }, slot);
     });
   },
@@ -194,7 +194,7 @@ const Card = view<{ title: string }>(({ props, slot }) => ({
 
 // Usage:
 Card({ title: "Hello" }, () => {
-  p({}, () => text("Card content here."));
+  p(_, "Card content here.");
 });
 ```
 
@@ -243,6 +243,28 @@ render() {
   }
 }
 ```
+
+## Conventions
+
+### `_` for Empty Props
+
+Use `_` (exported from `creo`) instead of `{}` when no props are needed:
+
+```ts
+h1(_, "Title");          // not h1({}, "Title")
+div(_, () => { ... });   // not div({}, () => { ... })
+```
+
+### Inline Strings
+
+Pass strings directly as slots instead of wrapping in `() => text(...)`:
+
+```ts
+button({ onClick: handler }, "Click me");   // not () => text("Click me")
+li(_, "Item text");                         // not () => text("Item text")
+```
+
+Use `text()` only for dynamic values or when mixing text with other elements in a function slot.
 
 ## Create App
 
@@ -298,7 +320,7 @@ const { routeStore, navigate, RouterView, Link } = createRouter({
 });
 
 // Navigation:
-Link({ href: "/users/42" }, () => text("User 42"));
+Link({ href: "/users/42" }, "User 42");
 navigate("/users/42"); // programmatic
 
 // Read params:

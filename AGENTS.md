@@ -127,6 +127,24 @@ Export from `src/index.ts`.
 - `findInsertionPoint(view)` scans siblings + recurses up for composites
 - After changes, verify with both todo and router examples
 
+## Conventions
+
+### `_` for Empty Props
+Always use `_` (from `@/functional/maybe`, re-exported by `creo`) instead of `{}` when a primitive or view needs no props:
+```ts
+div(_, () => { ... });   // not div({}, () => { ... })
+h1(_, "Title");          // not h1({}, "Title")
+```
+
+### Inline Strings
+Prefer passing strings directly as slots instead of wrapping in `() => text(...)`. The engine auto-wraps strings into text nodes:
+```ts
+button({ onClick: handler }, "Click me");   // not () => text("Click me")
+li(_, "Item text");                         // not () => text("Item text")
+span({ class: "label" }, title);            // string variable works too
+```
+Use `text()` only for dynamic values or when mixing text with other elements inside a function slot.
+
 ### Changing ViewRecord shape
 - Update type in `internal_view.ts`
 - Update `newView()` in `engine.ts` (initializes all fields)

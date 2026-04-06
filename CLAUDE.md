@@ -264,6 +264,56 @@ div({ class: "wrapper" }, () => {
 });
 ```
 
+### Inline Strings
+
+Prefer passing a string directly as a slot instead of wrapping in `() => text("...")`. The engine auto-wraps strings into text nodes:
+
+```ts
+// Preferred — inline string:
+button({ onClick: handler }, "Click me");
+h1(_, "Page Title");
+li(_, "Item text");
+span({ class: "label" }, userName);
+
+// Avoid — unnecessary text() wrapper:
+button({ onClick: handler }, () => text("Click me"));
+h1(_, () => text("Page Title"));
+```
+
+Use `text()` only when you need to mix text with other elements inside a function slot:
+
+```ts
+div({ class: "wrapper" }, () => {
+  span(_, "hello");
+  text(" world");  // text() needed here — mixed content in function slot
+});
+```
+
+### `_` for Empty Props
+
+Always use `_` (imported from `@/functional/maybe`) instead of `{}` when a primitive or view needs no props:
+
+```ts
+import { _ } from "@/functional/maybe";
+
+// Preferred:
+div(_, () => { ... });
+h1(_, "Title");
+li(_, "Item");
+
+// Avoid:
+div({}, () => { ... });
+h1({}, "Title");
+li({}, "Item");
+```
+
+When props are needed, pass the object as normal — `_` is only for the no-props case:
+
+```ts
+div({ class: "card" }, () => { ... });  // props needed — use object
+div(_, () => { ... });                  // no props — use _
+```
+
 ### Router (creo-router)
 
 Hash-based router available as a separate package (`packages/creo-router`):
