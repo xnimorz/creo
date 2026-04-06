@@ -32,5 +32,7 @@
       "creo-create-app": ["./packages/creo-create-app/src/index.ts"],
       "creo-create-tauri-app": ["./packages/creo-create-tauri-app/src/index.ts"]
     }
-  }
+  },
+  "include": ["packages/*/src/**/*.ts", "scripts/**/*.ts"],
+  "exclude": ["**/node_modules", "**/dist"]
 }

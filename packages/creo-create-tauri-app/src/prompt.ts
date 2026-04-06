@@ -27,7 +27,7 @@ export async function askMultiSelect(
 ): Promise<string[]> {
   console.log(`\n${question}\n`);
   for (let i = 0; i < options.length; i++) {
-    const opt = options[i];
+    const opt = options[i]!;
     const marker = opt.default ? "*" : " ";
     console.log(`  [${marker}] ${i + 1}. ${opt.label}`);
   }
@@ -51,5 +51,5 @@ export async function askMultiSelect(
     return options.filter((o) => o.default).map((o) => o.value);
   }
 
-  return indices.map((i) => options[i].value);
+  return indices.map((i) => options[i]!.value);
 }
