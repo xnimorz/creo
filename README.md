@@ -238,6 +238,27 @@ render() {
 }
 ```
 
+## Create App
+
+Scaffold a new Creo project with one command:
+
+```bash
+bunx creo-create-app my-app
+cd my-app
+bun install
+bun run dev
+```
+
+The CLI prompts whether to include a **Hono server**. When enabled, the generated project includes:
+
+- A Hono backend (`src/server.ts`) serving static files from `dist/` by default
+- Vite dev server with `/api` proxy to Hono
+- Scripts for both dev (`dev:server` + `dev`) and production (`build` + `start`)
+
+Without a server, you get a pure client-side Vite + Creo setup.
+
+See [`packages/creo-create-app/`](./packages/creo-create-app/) for full details.
+
 ## Router
 
 Hash-based router available as `creo-router` (separate package):
