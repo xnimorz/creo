@@ -1,0 +1,22 @@
+{
+  "name": "creo-create-tauri-app",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "creo-create-tauri-app": "./dist/index.js"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "bun run build.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "typescript": "^5",
+    "@types/bun": "latest",
+    "@types/node": "^22"
+  }
+}
