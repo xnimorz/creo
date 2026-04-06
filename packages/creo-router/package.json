@@ -22,7 +22,7 @@
     "creo": "*"
   },
   "devDependencies": {
-    "creo": "link:../creo",
+    "creo": "workspace:*",
     "typescript": "^5",
     "@types/bun": "latest"
   }
