@@ -11,8 +11,8 @@
     "strict": true,
     "skipLibCheck": true,
     "paths": {
-      "@/*": ["../../src/*"]
+      "@/*": ["../../packages/creo/src/*"]
     }
   },
-  "include": ["src", "../../src", "../perf_profiler/profile.ts"]
+  "include": ["src", "../../packages/creo/src", "../perf_profiler/profile.ts"]
 }

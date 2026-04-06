@@ -5,7 +5,7 @@
     "moduleResolution": "bundler",
     "strict": true,
     "paths": {
-      "@/*": ["../../src/*"]
+      "@/*": ["../../packages/creo/src/*"]
     }
   },
   "include": ["src"]

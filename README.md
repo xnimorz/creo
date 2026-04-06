@@ -332,11 +332,19 @@ route.get().params.id; // "42"
 
 ```bash
 bun install
-bun test src/          # Run tests
-bun tsc      # Type-check
-bun run build          # Build to dist/
+bun test packages/creo/src/    # Run tests
+bun run build                  # Build all packages
+bun run typecheck              # Type-check
 
 # Run examples:
 cd examples/todo && bun install && bun run dev
 cd examples/router && bun install && bun run dev
+
+# Version management:
+bun run version:patch          # Bump patch version across all packages
+bun run version:minor          # Bump minor version
+bun run version:major          # Bump major version
+
+# Publishing:
+bun run publish:all            # Dry-run publish (pass --no-dry-run to publish for real)
 ```

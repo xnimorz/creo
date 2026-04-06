@@ -1,36 +1,25 @@
 {
   "compilerOptions": {
-    // Environment setup & latest features
     "lib": ["ESNext", "DOM"],
     "target": "ESNext",
     "module": "ESNext",
     "moduleDetection": "force",
     "jsx": "react-jsx",
     "allowJs": true,
-
-    // Bundler mode
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
     "noEmit": true,
-
-    // Best practices
     "strict": true,
     "skipLibCheck": true,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedIndexedAccess": true,
-
-    // Some stricter flags (disabled by default)
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noPropertyAccessFromIndexSignature": false,
-
     "paths": {
-      "@/*": ["./packages/creo/src/*"],
-      "creo": ["./packages/creo/src/index.ts"],
-      "creo-router": ["./packages/creo-router/src/index.ts"],
-      "creo-create-app": ["./packages/creo-create-app/src/index.ts"],
-      "creo-create-tauri-app": ["./packages/creo-create-tauri-app/src/index.ts"]
+      "@/*": ["./src/*"]
     }
-  }
+  },
+  "include": ["src"]
 }

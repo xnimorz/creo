@@ -25,7 +25,7 @@ if (!result.success) {
 }
 
 // 2. Emit .d.ts via tsc
-await $`npx tsc -p tsconfig.build.json`;
+await $`bunx tsc -p tsconfig.build.json`;
 
 console.log("\n✓ Build complete → dist/");
 const stat = Bun.file(resolve(outDir, "index.js"));

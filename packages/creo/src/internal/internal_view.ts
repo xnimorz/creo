@@ -11,9 +11,8 @@ export type BitFlags = number;
 export const F_PENDING = 1;
 export const F_DIRTY = 1 << 1;
 export const F_MOVED = 1 << 2;
-export const F_QUICK_RERENDER = 1 << 3;
-export const F_PRIMITIVE = 1 << 4;
-export const F_TEXT_CONTENT = 1 << 5;
+export const F_PRIMITIVE = 1 << 3;
+export const F_TEXT_CONTENT = 1 << 4;
 
 // ---------------------------------------------------------------------------
 // ViewRecord — pure data, no methods

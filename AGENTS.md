@@ -7,22 +7,27 @@ Creo is an imperative UI framework with virtual DOM. No JSX — views are functi
 ## Project Layout
 
 ```
-src/internal/engine.ts        — Core: reconciler, dirty queue, render loop
-src/internal/internal_view.ts  — ViewRecord type, flags, structural comparison
-src/internal/orchestrator.ts   — Tracks current active engine
-src/public/view.ts             — view() factory, ViewBody, Slot types
-src/public/state.ts            — State, Reactive, Use types
-src/public/store.ts            — Store (global reactive state)
-src/public/app.ts              — createApp() entry point
-src/public/primitives/         — HTML element factories (div, span, text, etc.)
-src/public/primitive.ts        — $primitive symbol, EventHandlerProps
-src/render/html_render.ts      — DOM renderer (event delegation, attribute diffing)
-src/render/json_render.ts      — JSON AST renderer (testing)
-src/render/string_render.ts    — HTML string renderer (SSR)
-src/render/render_interface.ts — IRender<Output> interface
-src/functional/lis.ts          — Longest Increasing Subsequence (keyed reconciliation)
-src/functional/shallow_equal.ts — Object comparison (no Object.keys allocation)
-packages/creo-router/          — Hash-based router (separate package)
+packages/creo/                   — Core creo framework
+  src/internal/engine.ts         — Core: reconciler, dirty queue, render loop
+  src/internal/internal_view.ts  — ViewRecord type, flags, structural comparison
+  src/internal/orchestrator.ts   — Tracks current active engine
+  src/public/view.ts             — view() factory, ViewBody, Slot types
+  src/public/state.ts            — State, Reactive, Use types
+  src/public/store.ts            — Store (global reactive state)
+  src/public/app.ts              — createApp() entry point
+  src/public/primitives/         — HTML element factories (div, span, text, etc.)
+  src/public/primitive.ts        — $primitive symbol, EventHandlerProps
+  src/render/html_render.ts      — DOM renderer (event delegation, attribute diffing)
+  src/render/json_render.ts      — JSON AST renderer (testing)
+  src/render/string_render.ts    — HTML string renderer (SSR)
+  src/render/render_interface.ts — IRender<Output> interface
+  src/functional/lis.ts          — Longest Increasing Subsequence (keyed reconciliation)
+  src/functional/shallow_equal.ts — Object comparison (no Object.keys allocation)
+packages/creo-router/            — Hash-based router (separate package)
+packages/creo-create-app/        — CLI scaffolding tool
+packages/creo-create-tauri-app/  — CLI scaffolding tool (Tauri)
+scripts/version.ts               — Version bump orchestrator
+scripts/publish.ts               — Build + publish orchestrator
 ```
 
 ## Key Architecture Decisions
@@ -60,9 +65,8 @@ When a primitive with DOM is disposed, its children go through `#disposeVirtual`
 F_PENDING      = 1      — View not yet initialized (body is null)
 F_DIRTY        = 1 << 1 — Needs reconcile + render
 F_MOVED        = 1 << 2 — Position changed, needs DOM repositioning
-F_QUICK_RERENDER = 1 << 3 — (reserved)
-F_PRIMITIVE    = 1 << 4 — Is an HTML element/text, not a composite
-F_TEXT_CONTENT = 1 << 5 — Text rendered via parent's textContent
+F_PRIMITIVE    = 1 << 3 — Is an HTML element/text, not a composite
+F_TEXT_CONTENT = 1 << 4 — Text rendered via parent's textContent
 ```
 
 ## Render Loop Flow
@@ -99,10 +103,10 @@ Position-based: `old[i]` paired with `pending[i]`. Same viewFn → `nextProps`. 
 ## Testing
 
 ```bash
-bun test src/                    # All tests (100)
-bun test src/render/render.spec.ts   # Renderer + state tests (35)
-bun test src/internal/           # Virtual DOM correctness (21)
-bun test src/render/benchmark.spec.ts # Performance benchmarks (8)
+bun test packages/creo/src/                          # All tests
+bun test packages/creo/src/render/render.spec.ts     # Renderer + state tests
+bun test packages/creo/src/internal/                 # Virtual DOM correctness
+bun test packages/creo/src/render/benchmark.spec.ts  # Performance benchmarks
 ```
 
 Tests use happy-dom for DOM simulation. The benchmark tests validate correctness of create/update/swap/select/remove/clear/replace operations on 1000-row tables.
@@ -110,15 +114,15 @@ Tests use happy-dom for DOM simulation. The benchmark tests validate correctness
 ## Common Patterns When Modifying
 
 ### Adding a new primitive
-Add to `src/public/primitives/primitives.ts`:
+Add to `packages/creo/src/public/primitives/primitives.ts`:
 ```ts
 export const myTag = html<HtmlAttrs & { myProp?: string }, ContainerEvents>("my-tag");
 ```
-Export from `src/index.ts`.
+Export from `packages/creo/src/index.ts`.
 
 ### Changing the engine
-- `engine.ts` is the core — reconciler, dirty queue, render loop
-- After changes, run `bun test src/` (all 100 tests must pass)
+- `packages/creo/src/internal/engine.ts` is the core — reconciler, dirty queue, render loop
+- After changes, run `bun test packages/creo/src/` (all tests must pass)
 - Test with `cd examples/todo && bun run dev` for visual verification
 
 ### Changing the HTML renderer

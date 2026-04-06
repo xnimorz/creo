@@ -5,8 +5,8 @@
     "moduleResolution": "bundler",
     "strict": true,
     "paths": {
-      "@/*": ["../../src/*"],
-      "creo": ["../../src/index.ts"],
+      "@/*": ["../../packages/creo/src/*"],
+      "creo": ["../../packages/creo/src/index.ts"],
       "creo-router": ["../../packages/creo-router/src/index.ts"]
     }
   },
