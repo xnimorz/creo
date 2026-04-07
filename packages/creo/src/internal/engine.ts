@@ -8,7 +8,7 @@ import {
   F_PENDING,
 } from "./internal_view";
 import type { Wildcard } from "./wildcard";
-import { isNone, type Maybe } from "@/functional/maybe";
+import { type Maybe } from "@/functional/maybe";
 import type { Key } from "@/functional/key";
 import type { Slot, SlotContent, ViewFn } from "@/public/view";
 import { textViewFn } from "@/public/primitives/primitives";
@@ -23,14 +23,6 @@ export type Scheduler = (callback: () => void) => void;
 
 export class Engine {
   #dirtyQueue = new Set<ViewRecord>();
-
-  // Collector struct-of-arrays buffer (shared, reused)
-  // #pvViewFns: ViewFn<any, any>[] = [];
-  // #pvProps: any[] = [];
-  // #pvSlots: ((() => void) | null)[] = [];
-  // #pvKeys: (Key | null)[] = [];
-  // #pvLen = 0;
-  // #collectStack: number[] = [];
   #collector: Maybe<ViewRecord[]>;
   #collectFor: Maybe<ViewRecord>;
 
@@ -240,9 +232,7 @@ export class Engine {
     } else {
       if (nextSlot) {
         const slotFn =
-          typeof nextSlot === "string"
-            ? this.#stringSlot(nextSlot)
-            : nextSlot;
+          typeof nextSlot === "string" ? this.#stringSlot(nextSlot) : nextSlot;
         view.sc = this.#collect(slotFn, [], view);
       } else {
         view.sc = null;
