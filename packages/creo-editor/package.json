@@ -1,0 +1,41 @@
+{
+  "name": "creo-editor",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./test-utils": {
+      "import": "./dist/test-utils/index.js",
+      "types": "./dist/test-utils/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "bun run build.ts",
+    "test": "bun test src/",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "peerDependencies": {
+    "creo": "*"
+  },
+  "dependencies": {
+    "unified": "^11",
+    "remark-parse": "^11",
+    "remark-gfm": "^4",
+    "mdast-util-gfm": "^3",
+    "mdast-util-to-string": "^4"
+  },
+  "devDependencies": {
+    "creo": "workspace:*",
+    "typescript": "^5",
+    "@types/bun": "latest"
+  }
+}

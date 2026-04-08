@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Creo Editor — Demo</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      padding: 32px;
+      background: #f5f5f5;
+      color: #1a1a1a;
+      display: flex;
+      justify-content: center;
+    }
+
+    .app {
+      max-width: 800px;
+      width: 100%;
+    }
+
+    h1 { font-size: 24px; margin-bottom: 8px; }
+    .subtitle { font-size: 14px; color: #666; margin-bottom: 24px; }
+
+    /* ── Editor chrome ─────────────────────────────────────── */
+
+    .creo-editor {
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+
+    .creo-editor-toolbar {
+      display: flex;
+      align-items: center;
+      padding: 6px 12px;
+      background: #fafafa;
+      border-bottom: 1px solid #ddd;
+      gap: 4px;
+    }
+
+    .creo-editor-toolbar-group {
+      display: flex;
+      gap: 2px;
+    }
+
+    .creo-editor-toolbar-spacer {
+      flex: 1;
+    }
+
+    .creo-editor-btn {
+      padding: 4px 10px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      background: #fff;
+      cursor: pointer;
+      font-size: 13px;
+      font-family: inherit;
+      line-height: 1.4;
+    }
+    .creo-editor-btn:hover { background: #eee; }
+    .creo-editor-btn-italic { font-style: italic; }
+
+    /* ── Editing surface ───────────────────────────────────── */
+
+    .creo-editor-content {
+      min-height: 300px;
+    }
+
+    .creo-editor-surface {
+      padding: 16px 20px;
+      min-height: 300px;
+      outline: none;
+      font-size: 15px;
+      line-height: 1.7;
+    }
+
+    .creo-editor-surface:focus {
+      background: #fefefe;
+    }
+
+    /* Block styles inside contenteditable */
+    .creo-editor-surface p { margin-bottom: 0.8em; }
+    .creo-editor-surface h1 { font-size: 1.8em; margin-bottom: 0.5em; font-weight: 700; }
+    .creo-editor-surface h2 { font-size: 1.5em; margin-bottom: 0.5em; font-weight: 600; }
+    .creo-editor-surface h3 { font-size: 1.25em; margin-bottom: 0.5em; font-weight: 600; }
+    .creo-editor-surface h4,
+    .creo-editor-surface h5,
+    .creo-editor-surface h6 { font-size: 1.1em; margin-bottom: 0.5em; font-weight: 600; }
+    .creo-editor-surface blockquote {
+      border-left: 3px solid #ddd;
+      padding-left: 16px;
+      margin: 0.8em 0;
+      color: #555;
+    }
+    .creo-editor-surface pre {
+      background: #f4f4f4;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 12px 16px;
+      margin: 0.8em 0;
+      overflow-x: auto;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.9em;
+    }
+    .creo-editor-surface code {
+      background: #f0f0f0;
+      padding: 1px 4px;
+      border-radius: 3px;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.9em;
+    }
+    .creo-editor-surface pre code {
+      background: none;
+      padding: 0;
+    }
+    .creo-editor-surface ul, .creo-editor-surface ol {
+      margin: 0.8em 0;
+      padding-left: 24px;
+    }
+    .creo-editor-surface li { margin-bottom: 0.3em; }
+    .creo-editor-surface hr {
+      border: none;
+      border-top: 2px solid #ddd;
+      margin: 1.5em 0;
+    }
+    .creo-editor-surface table {
+      border-collapse: collapse;
+      margin: 0.8em 0;
+      width: 100%;
+    }
+    .creo-editor-surface th, .creo-editor-surface td {
+      border: 1px solid #ddd;
+      padding: 6px 12px;
+      text-align: left;
+    }
+    .creo-editor-surface th { background: #f4f4f4; font-weight: 600; }
+    .creo-editor-surface a { color: #4a90d9; text-decoration: underline; }
+    .creo-editor-surface strong { font-weight: 700; }
+    .creo-editor-surface em { font-style: italic; }
+    .creo-editor-surface del { text-decoration: line-through; }
+
+    .creo-editor-surface [data-node-type="html_block"],
+    .creo-editor-surface [data-node-type="atomic_block"] {
+      background: #f8f8f8;
+      border: 1px dashed #ccc;
+      border-radius: 4px;
+      padding: 12px;
+      margin: 0.8em 0;
+    }
+    .creo-editor-surface .creo-editor-atomic {
+      color: #888;
+      font-style: italic;
+    }
+
+    /* ── Source mode ────────────────────────────────────────── */
+
+    .creo-editor-source-textarea {
+      width: 100%;
+      min-height: 300px;
+      padding: 16px 20px;
+      border: none;
+      resize: vertical;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      outline: none;
+      background: #fafafa;
+    }
+
+    /* ── Output panel ──────────────────────────────────────── */
+
+    .output-panel {
+      margin-top: 24px;
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .output-header {
+      padding: 10px 16px;
+      font-weight: 600;
+      font-size: 14px;
+      background: #f9f9f9;
+      border-bottom: 1px solid #ddd;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .output-body {
+      padding: 12px 16px;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 13px;
+      white-space: pre-wrap;
+      max-height: 200px;
+      overflow-y: auto;
+      color: #333;
+    }
+
+    .badge {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      background: #e8f4e8;
+      color: #2a7d2a;
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

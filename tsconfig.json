@@ -30,7 +30,8 @@
       "creo": ["./packages/creo/src/index.ts"],
       "creo-router": ["./packages/creo-router/src/index.ts"],
       "creo-create-app": ["./packages/creo-create-app/src/index.ts"],
-      "creo-create-tauri-app": ["./packages/creo-create-tauri-app/src/index.ts"]
+      "creo-create-tauri-app": ["./packages/creo-create-tauri-app/src/index.ts"],
+      "creo-editor": ["./packages/creo-editor/src/index.ts"]
     }
   },
   "include": ["packages/*/src/**/*.ts", "scripts/**/*.ts"],

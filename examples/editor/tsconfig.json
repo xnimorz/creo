@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "paths": {
+      "@/*": ["../../packages/creo/src/*"],
+      "creo": ["../../packages/creo/src/index.ts"],
+      "creo-editor": ["../../packages/creo-editor/src/index.ts"]
+    }
+  },
+  "include": ["src"]
+}
