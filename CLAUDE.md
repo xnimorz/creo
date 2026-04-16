@@ -1,4 +1,66 @@
-# Creo UI Framework
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Repository Overview
+
+Creo is a lightweight imperative UI framework with a virtual DOM, no JSX, and pluggable renderers. Runtime is Bun. The repo is a Bun workspace monorepo (`packages/*`). See `AGENTS.md` for deeper engine internals (flags, render loop flow, reconciliation algorithm) — that file is the authoritative reference when touching `packages/creo/src/internal/engine.ts` or the renderers.
+
+## Development Commands
+
+```bash
+bun install                                          # Install deps (workspace-wide)
+bun test packages/creo/src/                          # All tests (happy-dom)
+bun test packages/creo/src/render/render.spec.ts     # A single test file
+bun test packages/creo/src/render/benchmark.spec.ts  # Perf benchmarks (correctness-validating)
+bun run build                                        # Build all packages (per-package build.ts)
+bun run typecheck                                    # tsc --noEmit across workspace
+
+# Versioning & publishing (orchestrated across all packages):
+bun run version:patch | version:minor | version:major
+bun run publish:all                                  # Dry-run; pass --no-dry-run to publish
+
+# Run an example (hot reload via Vite):
+cd examples/todo && bun install && bun run dev
+cd examples/router && bun install && bun run dev
+```
+
+Tests use `happy-dom` for DOM simulation. The top-level `bun test` script only targets `packages/creo/src/` — other packages (router, scaffolds) don't have test suites routed through root.
+
+## Monorepo Layout
+
+- `packages/creo/` — core framework (engine, views, state, store, primitives, renderers)
+- `packages/creo-router/` — hash-based router (separate package, imports `creo`)
+- `packages/creo-create-app/` — `bunx creo-create-app` scaffolding CLI
+- `packages/creo-create-tauri-app/` — Tauri v2 scaffolding CLI
+- `examples/` — `todo`, `router`, `table`, `chess`, `benchmark`, `perf_profiler` (used for visual verification and perf validation)
+- `scripts/version.ts`, `scripts/publish.ts` — cross-package version/publish orchestration
+- `docs/` — user-facing markdown docs
+
+Path aliases (`tsconfig.json`): `@/*` → `packages/creo/src/*`, `creo` → core entry, `creo-router` → router entry. Use these in tests and internal code rather than relative `../../`.
+
+## Architecture (high level)
+
+- **Streaming render model** — `render()` returns `void` and calls primitives (`div`, `text`, …) imperatively. There is no returned tree; the engine intercepts calls during the render pass. All JS control flow (`if`/`for`/`while`) works directly.
+- **Views**: `view<Props>(setupFn)` returns a callable `(props, slot?) => void`. `setupFn` runs **once** per view lifecycle and returns a `ViewBody` with `render()` + optional `onMount` / `onUpdateBefore` / `onUpdateAfter` / `shouldUpdate`. `render()` runs on every update.
+- **Reactivity** has three primitives: `use(value)` (local `State`), `store.new(value)` (global `Store`), `use(store)` (subscribe). `.set()` / `.update()` write immediately and schedule a re-render async; `.get()` reads the committed value.
+- **Engine** (`packages/creo/src/internal/engine.ts`): dirty-queue based render loop. `markDirty` adds views to a `Set`, `schedule()` flushes. For each dirty view: `initViewBody` (if `F_PENDING`) → `reconcile` → `renderer.render` → clear flags → fire deferred `onMount`/`onUpdateAfter`.
+- **ViewRecord** (`internal_view.ts`) is a plain GC'd object with parent pointer + children array. Composites have **no DOM footprint** (they use a `renderRef = true` mounted marker); primitives store `{ element, prevProps }` as `renderRef`. Discriminate via `flags & F_PRIMITIVE`.
+- **Reconciliation** is Vue 3-style keyed diff: head sync → tail sync → pure insert/remove shortcut → middle diff with `newKeyToIndex` + LIS (`functional/lis.ts`) to minimize moves. Non-keyed is positional.
+- **Slots** are pre-collected: `newView()` eagerly evaluates the slot into `view.sc` so structural comparison works without re-running the slot. `scHost` + `#propagateScProps` short-circuits slot-prop-only updates without re-reconciling the composite. `#patchOrReplace` passes `pendView.sc` as `preCollectedSc` to avoid double evaluation.
+- **Renderers** implement `IRender<Output>` (`render/render_interface.ts`): `HtmlRender` (DOM, Inferno-style event delegation — one listener per event type on the container; handlers stored on elements via `Symbol.for("creo.ev")`), `JsonRender` (AST for tests), `StringRender` (SSR strings). `textContent` shortcut: single-text-child primitives set `element.textContent` directly and mark the child `F_TEXT_CONTENT`. Dispose of a DOM-bearing primitive routes descendants through `#disposeVirtual` (skips per-node unmount — parent removal handles it).
+- **Flags** (`internal_view.ts`): `F_PENDING=1`, `F_DIRTY=1<<1`, `F_MOVED=1<<2`, `F_PRIMITIVE=1<<3`, `F_TEXT_CONTENT=1<<4`.
+
+### When modifying the engine or renderer
+
+- Engine changes: run the full `bun test packages/creo/src/` suite (includes the 1000-row benchmark correctness tests) **and** spot-check `examples/todo` + `examples/router` visually (`bun run dev`).
+- HTML renderer changes: `findParentDom(view)` walks up to the nearest primitive; `findInsertionPoint(view)` scans siblings and recurses up through composites. Both examples must still render correctly.
+- Changing `ViewRecord` shape: update the type in `internal_view.ts`, field initialization in `newView()` (engine.ts), cleanup in `#disposeVirtual`, and verify JSON / String renderers don't read the old field.
+- Adding a primitive: add to `packages/creo/src/public/primitives/primitives.ts` using `html<Attrs, Events>("tag")` and re-export from `packages/creo/src/index.ts`.
+
+---
+
+# Creo Framework API (when writing views in this repo or examples)
 
 ## React → Creo Translation
 
