@@ -9,7 +9,14 @@ export { createApp } from "@/public/app";
 // ---------------------------------------------------------------------------
 
 export { view } from "@/public/view";
-export type { ViewBody, ViewFn, Slot, SlotContent, PublicView } from "@/public/view";
+export type { ViewBody, ViewFn, Slot, SlotContent, PublicView, RenderResult } from "@/public/view";
+
+// ---------------------------------------------------------------------------
+// JSX (optional) — `import { jsx, Fragment } from "creo"` or configure
+// `jsxImportSource: "creo"` to use <tsx/> syntax. See creo/jsx-runtime.
+// ---------------------------------------------------------------------------
+export { jsx, jsxs, jsxDEV, Fragment } from "@/public/jsx";
+export type { JsxNode, JsxChildren } from "@/public/jsx";
 export type { Reactive, Use } from "@/public/state";
 export { State } from "@/public/state";
 export { Store, store, isStore } from "@/public/store";

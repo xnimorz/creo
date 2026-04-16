@@ -130,6 +130,14 @@ export class Engine {
         }
       },
     });
+    // Unwrap JSX-returned thunks so render() always behaves as void from the
+    // engine's perspective. When JSX is used, the user's render returns a
+    // () => void which emits the tree; we invoke it here.
+    const userRender = view.body.render;
+    view.body.render = () => {
+      const result = userRender();
+      if (typeof result === "function") (result as () => void)();
+    };
   }
 
   createRoot(children: () => void, props: Wildcard): ViewRecord {

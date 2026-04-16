@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "moduleDetection": "force",
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "jsx": "react-jsx",
+    "jsxImportSource": "creo",
+    "baseUrl": ".",
+    "paths": {
+      "creo": ["../../packages/creo/src/index.ts"],
+      "creo/jsx-runtime": ["../../packages/creo/src/jsx-runtime.ts"],
+      "creo/jsx-dev-runtime": ["../../packages/creo/src/jsx-dev-runtime.ts"],
+      "@/*": ["../../packages/creo/src/*"]
+    }
+  },
+  "include": ["src"]
+}

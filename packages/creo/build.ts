@@ -9,7 +9,11 @@ await $`rm -rf ${outDir}`;
 
 // 1. Bundle JS (ESM) via Bun
 const result = await Bun.build({
-  entrypoints: [resolve(root, "src/index.ts")],
+  entrypoints: [
+    resolve(root, "src/index.ts"),
+    resolve(root, "src/jsx-runtime.ts"),
+    resolve(root, "src/jsx-dev-runtime.ts"),
+  ],
   outdir: outDir,
   target: "browser",
   format: "esm",

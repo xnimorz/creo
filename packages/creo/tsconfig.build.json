@@ -17,6 +17,6 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src/index.ts", "src/**/*.ts"],
+  "include": ["src/index.ts", "src/jsx-runtime.ts", "src/jsx-dev-runtime.ts", "src/**/*.ts"],
   "exclude": ["src/**/*.spec.ts", "src/_profile.ts"]
 }
