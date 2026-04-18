@@ -1,0 +1,22 @@
+{
+  "name": "creo-create-electron-app",
+  "version": "0.2.1",
+  "type": "module",
+  "bin": {
+    "creo-create-electron-app": "./dist/index.js"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "bun run build.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "typescript": "^5",
+    "@types/bun": "latest",
+    "@types/node": "^22"
+  }
+}
