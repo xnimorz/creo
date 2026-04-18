@@ -4,6 +4,7 @@ import type { ViewFn } from "@/public/view";
 import { view } from "@/public/view";
 import { div, span, text, button, input } from "@/public/primitives/primitives";
 import type { Reactive } from "@/public/state";
+import { store } from "@/public/store";
 import { Engine } from "@/internal/engine";
 import type { ViewRecord } from "@/internal/internal_view";
 import { orchestrator } from "@/internal/orchestrator";
@@ -696,6 +697,54 @@ describe("State", () => {
     engine.render();
     expect(findByClass(container, "display").length).toBe(1);
     expect(container.getElementsByTagName("input").length).toBe(0);
+  });
+
+  it("should not re-insert a disposed branch on unrelated parent re-render", () => {
+    const auth = store.new<{ user: number | null }>({ user: null });
+    const route = store.new("/");
+    const submitting = store.new(false);
+
+    const Login = view<void>(({ use }) => {
+      const s = use(submitting);
+      return {
+        render() {
+          div({ class: "login" }, s.get() ? "submitting" : "idle");
+        },
+      };
+    });
+    const Hub = view<void>(() => ({
+      render() { div({ class: "hub" }, "hub"); },
+    }));
+
+    const App = view<void>(({ use }) => {
+      const a = use(auth);
+      const r = use(route);
+      return {
+        render() {
+          div({ id: "router" }, () => {
+            void r.get();
+            if (!a.get().user) Login();
+            else Hub();
+          });
+        },
+      };
+    });
+
+    const { engine, container } = mountStateful(App);
+    expect(findByClass(container, "login").length).toBe(1);
+
+    // Simulate submit: mark submitting, switch auth, clear submitting — all in one batch.
+    submitting.set(true);
+    auth.set({ user: 1 });
+    submitting.set(false);
+    engine.render();
+    expect(findByClass(container, "login").length).toBe(0);
+    expect(findByClass(container, "hub").length).toBe(1);
+
+    route.set("/");
+    engine.render();
+    expect(findByClass(container, "login").length).toBe(0);
+    expect(findByClass(container, "hub").length).toBe(1);
   });
 
   it("should work with JSON renderer", () => {

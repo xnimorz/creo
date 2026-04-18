@@ -5,7 +5,7 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "bun run --filter '*' build",
+    "build": "bun run --filter creo build && bun run --filter '!creo' build",
     "test": "bun test packages/creo/src/",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "version:patch": "bun run scripts/version.ts patch",

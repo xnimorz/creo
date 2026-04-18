@@ -6,6 +6,7 @@ import {
   F_MOVED,
   F_PRIMITIVE,
   F_PENDING,
+  F_DISPOSED,
 } from "./internal_view";
 import type { Wildcard } from "./wildcard";
 import { type Maybe } from "@/functional/maybe";
@@ -154,6 +155,7 @@ export class Engine {
   markDirty<Props = Wildcard, Api = Wildcard, RenderRef = Wildcard>(
     view: ViewRecord<Props, Api, RenderRef>,
   ): void {
+    if (view.flags & F_DISPOSED) return;
     if (view.flags & F_DIRTY) {
       return;
     }
@@ -165,6 +167,7 @@ export class Engine {
   markMoved<Props = Wildcard, Api = Wildcard, RenderRef = Wildcard>(
     view: ViewRecord<Props, Api, RenderRef>,
   ): void {
+    if (view.flags & F_DISPOSED) return;
     if (view.flags & F_MOVED) {
       return;
     }
@@ -535,6 +538,8 @@ export class Engine {
     if (view.userKey != null) view.parent?.keyToView?.delete(view.userKey);
     this.renderer.unmount(view);
     this.#dirtyQueue.delete(view);
+    view.flags |= F_DISPOSED;
+    view.flags &= ~(F_DIRTY | F_MOVED);
   }
 
   /** Dispose without DOM removal — parent primitive handles DOM cleanup. */
@@ -546,6 +551,8 @@ export class Engine {
     if (view.userKey != null) view.parent?.keyToView?.delete(view.userKey);
     view.renderRef = undefined;
     this.#dirtyQueue.delete(view);
+    view.flags |= F_DISPOSED;
+    view.flags &= ~(F_DIRTY | F_MOVED);
   }
 
   // -- Render loop ------------------------------------------------------------
@@ -562,6 +569,7 @@ export class Engine {
     try {
       const cbs: (() => void)[] = [];
       for (const view of this.#dirtyQueue) {
+        if (view.flags & F_DISPOSED) continue;
         this.initViewBody(view);
         const isNew = !view.renderRef;
         if (!isNew) view.body?.onUpdateBefore?.();
