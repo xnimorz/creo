@@ -420,6 +420,14 @@ export class HtmlRender implements IRender<HTMLElement | Text> {
   private removeDomNodes(view: ViewRecord) {
     const ref = view.renderRef as Maybe<PrimitiveDomRef>;
     if (!ref || !(view.flags & F_PRIMITIVE)) return;
+    // F_TEXT_CONTENT: ref.element is the PARENT's element (optimization),
+    // not this text view's own node. Clear the parent's textContent so
+    // incoming siblings mount into an empty host, but never remove the
+    // parent — the parent owns its own lifecycle.
+    if (view.flags & F_TEXT_CONTENT) {
+      (ref.element as HTMLElement).textContent = "";
+      return;
+    }
     const evObj = (ref.element as any)[$EV] as
       | Record<string, Function>
       | undefined;

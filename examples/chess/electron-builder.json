@@ -1,0 +1,19 @@
+{
+  "appId": "com.creo.example.chess",
+  "productName": "Creo Chess",
+  "files": ["dist/**/*", "dist-electron/**/*"],
+  "directories": {
+    "output": "release",
+    "buildResources": "build"
+  },
+  "mac": {
+    "target": ["dmg", "zip"],
+    "category": "public.app-category.games"
+  },
+  "win": {
+    "target": ["nsis"]
+  },
+  "linux": {
+    "target": ["AppImage", "deb"]
+  }
+}

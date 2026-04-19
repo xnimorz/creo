@@ -747,6 +747,164 @@ describe("State", () => {
     expect(findByClass(container, "hub").length).toBe(1);
   });
 
+  it("should not remove parent DOM when disposing an F_TEXT_CONTENT text child", () => {
+    const phase = store.new<"loading" | "loaded">("loading");
+
+    const Panel = view<void>(({ use }) => {
+      const p = use(phase);
+      return {
+        render() {
+          // Same-viewFn at pos 0 both phases: div({class:"slot"}, ...).
+          // Phase A: single text child -> F_TEXT_CONTENT optimization engages.
+          // Phase B: replaces text child with a nested div -> dispose(text)
+          // would remove the parent <div class="slot"> via ref.element without
+          // the F_TEXT_CONTENT guard in removeDomNodes.
+          div({ class: "page" }, () => {
+            if (p.get() === "loading") {
+              div({ class: "slot" }, () => { text("Loading"); });
+            } else {
+              div({ class: "slot" }, () => {
+                div({ class: "inner" }, () => { text("HERO"); });
+              });
+            }
+            div({ class: "after" }, () => { text("AFTER"); });
+          });
+        },
+      };
+    });
+
+    const { engine, container } = mountStateful(Panel);
+    const page = findByClass(container, "page")[0]!;
+    expect(page.children.length).toBe(2);
+    expect((page.children[0] as HTMLElement).className).toBe("slot");
+    expect((page.children[1] as HTMLElement).className).toBe("after");
+
+    phase.set("loaded");
+    engine.render();
+
+    expect(page.children.length).toBe(2);
+    const slot = page.children[0] as HTMLElement;
+    const after = page.children[1] as HTMLElement;
+    expect(slot.className).toBe("slot");
+    expect(after.className).toBe("after");
+    // The new inner div must land inside .slot, not into a detached node.
+    expect(slot.children.length).toBe(1);
+    expect((slot.children[0] as HTMLElement).className).toBe("inner");
+    expect((slot.children[0] as HTMLElement).textContent).toBe("HERO");
+  });
+
+  it("growing children inside a view mounted by a parent switch, with onMount-driven state", async () => {
+    const authed = store.new(false);
+
+    const Hub = view<void>(({ use }) => {
+      const loading = use(true);
+      const items = use<string[]>([]);
+      return {
+        onMount() {
+          queueMicrotask(() => {
+            items.set(["a", "b", "c"]);
+            loading.set(false);
+          });
+        },
+        render() {
+          div({ class: "page" }, () => {
+            div({ class: "header" }, () => { text("HEADER"); });
+            if (loading.get()) {
+              div({ class: "spinner" }, () => { text("Loading"); });
+              return;
+            }
+            div({ class: "hero" }, () => { text("HERO"); });
+            div({ class: "eyebrow" }, () => { text("EYEBROW"); });
+            for (const it of items.get()) {
+              div({ class: "item" }, () => { text(it); });
+            }
+          });
+        },
+      };
+    });
+
+    const Login = view<void>(() => ({
+      render() { div({ class: "login" }, () => { text("LOGIN"); }); },
+    }));
+
+    const App = view<void>(({ use }) => {
+      const a = use(authed);
+      return {
+        render() {
+          div({ id: "router" }, () => {
+            if (!a.get()) Login();
+            else Hub();
+          });
+        },
+      };
+    });
+
+    const { engine, container } = mountStateful(App);
+    expect(findByClass(container, "login").length).toBe(1);
+    expect(findByClass(container, "page").length).toBe(0);
+
+    authed.set(true);
+    engine.render();
+    const page1 = findByClass(container, "page")[0]!;
+    expect(page1.children.length).toBe(2);
+
+    await Promise.resolve();
+    engine.render();
+
+    const page = findByClass(container, "page")[0]!;
+    expect(page.children.length).toBe(6);
+    expect((page.children[0] as HTMLElement).className).toBe("header");
+    expect((page.children[1] as HTMLElement).className).toBe("hero");
+    expect((page.children[2] as HTMLElement).className).toBe("eyebrow");
+    expect((page.children[3] as HTMLElement).className).toBe("item");
+    expect((page.children[4] as HTMLElement).className).toBe("item");
+    expect((page.children[5] as HTMLElement).className).toBe("item");
+  });
+
+  it("should grow non-keyed child list with in-place patch at middle index", () => {
+    const phase = store.new<"loading" | "loaded">("loading");
+
+    const App = view<void>(({ use }) => {
+      const p = use(phase);
+      return {
+        render() {
+          div({ class: "page" }, () => {
+            div({ class: "header" }, () => { text("HEADER"); });
+            if (p.get() === "loading") {
+              div({ class: "spinner" }, () => { text("Loading"); });
+              return;
+            }
+            div({ class: "hero" }, () => { text("HERO"); });
+            div({ class: "eyebrow" }, () => { text("EYEBROW"); });
+            div({ class: "empty" }, () => { text("EMPTY"); });
+          });
+        },
+      };
+    });
+
+    const { engine, container } = mountStateful(App);
+    const page = findByClass(container, "page")[0]!;
+    expect(page.children.length).toBe(2);
+    expect((page.children[0] as HTMLElement).className).toBe("header");
+    expect((page.children[1] as HTMLElement).className).toBe("spinner");
+
+    phase.set("loaded");
+    engine.render();
+
+    expect(page.children.length).toBe(4);
+    const c0 = page.children[0] as HTMLElement;
+    const c1 = page.children[1] as HTMLElement;
+    const c2 = page.children[2] as HTMLElement;
+    const c3 = page.children[3] as HTMLElement;
+    expect(c0.className).toBe("header");
+    expect(c1.className).toBe("hero");
+    expect(c1.textContent).toBe("HERO");
+    expect(c2.className).toBe("eyebrow");
+    expect(c2.textContent).toBe("EYEBROW");
+    expect(c3.className).toBe("empty");
+    expect(c3.textContent).toBe("EMPTY");
+  });
+
   it("should work with JSON renderer", () => {
     let countState: Reactive<number>;
 

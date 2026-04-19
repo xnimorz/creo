@@ -8,5 +8,5 @@
       "@/*": ["../../packages/creo/src/*"]
     }
   },
-  "include": ["src"]
+  "include": ["src", "electron"]
 }
