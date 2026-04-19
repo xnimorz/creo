@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "bun:test";
 import { Window } from "happy-dom";
 import type { ViewFn } from "@/public/view";
 import { view } from "@/public/view";
-import { div, span, text, button, input } from "@/public/primitives/primitives";
+import { div, span, text, button, input, svg, html } from "@/public/primitives/primitives";
 import type { Reactive } from "@/public/state";
 import { store } from "@/public/store";
 import { Engine } from "@/internal/engine";
@@ -745,6 +745,42 @@ describe("State", () => {
     engine.render();
     expect(findByClass(container, "login").length).toBe(0);
     expect(findByClass(container, "hub").length).toBe(1);
+  });
+
+  it("should create SVG elements in the SVG namespace", () => {
+    const path = html("path");
+    const circle = html("circle");
+
+    const App = view<void>(() => ({
+      render() {
+        div({ class: "wrap" }, () => {
+          svg({ viewBox: "0 0 24 24", width: 24, height: 24 }, () => {
+            path({ d: "M1 1 L10 10" });
+            circle({ cx: 5, cy: 5, r: 3 });
+          });
+        });
+      },
+    }));
+
+    const { container } = mountStateful(App);
+    const SVG_NS = "http://www.w3.org/2000/svg";
+    const wrap = findByClass(container, "wrap")[0]!;
+    const svgEl = wrap.children[0]!;
+    expect(svgEl.namespaceURI).toBe(SVG_NS);
+    expect(svgEl.tagName.toLowerCase()).toBe("svg");
+    expect(svgEl.getAttribute("viewBox")).toBe("0 0 24 24");
+
+    expect(svgEl.children.length).toBe(2);
+    const pathEl = svgEl.children[0]!;
+    const circleEl = svgEl.children[1]!;
+    expect(pathEl.namespaceURI).toBe(SVG_NS);
+    expect(pathEl.tagName.toLowerCase()).toBe("path");
+    expect(pathEl.getAttribute("d")).toBe("M1 1 L10 10");
+    expect(circleEl.namespaceURI).toBe(SVG_NS);
+    expect(circleEl.getAttribute("r")).toBe("3");
+
+    // The surrounding div stays in HTML namespace.
+    expect(wrap.namespaceURI).toBe("http://www.w3.org/1999/xhtml");
   });
 
   it("should not remove parent DOM when disposing an F_TEXT_CONTENT text child", () => {

@@ -21,7 +21,7 @@ import type { Engine } from "@/internal/engine";
  * Discriminated via view.flags & F_PRIMITIVE — no `kind` field needed.
  */
 type PrimitiveDomRef = {
-  element: HTMLElement | Text;
+  element: Element | Text;
   prevProps: Maybe<Record<string, unknown>>;
 };
 
@@ -134,6 +134,8 @@ function mapEventData(domEvent: string, e: Event): Record<string, unknown> {
   return data;
 }
 
+const SVG_NS = "http://www.w3.org/2000/svg";
+
 const DOM_PROPERTIES = new Set([
   "value",
   "checked",
@@ -165,7 +167,12 @@ export class HtmlRender implements IRender<HTMLElement | Text> {
           view.renderRef = { element: textNode, prevProps: null };
           parentNode.insertBefore(textNode, refNode);
         } else {
-          const element = document.createElement(tag);
+          const parentIsSvg =
+            (parentNode as Element).namespaceURI === SVG_NS;
+          const useSvg = tag === "svg" || parentIsSvg;
+          const element = useSvg
+            ? document.createElementNS(SVG_NS, tag)
+            : document.createElement(tag);
           const props = view.props as Record<string, unknown>;
           const domRef: PrimitiveDomRef = { element, prevProps: null };
           view.renderRef = domRef;
@@ -212,7 +219,7 @@ export class HtmlRender implements IRender<HTMLElement | Text> {
 
     // Text node in textContent mode — update parent's textContent
     if (view.flags & F_TEXT_CONTENT) {
-      const parentEl = ref.element as HTMLElement;
+      const parentEl = ref.element as Element;
       const nextText = String(view.props);
       if (parentEl.textContent !== nextText) {
         parentEl.textContent = nextText;
@@ -229,10 +236,11 @@ export class HtmlRender implements IRender<HTMLElement | Text> {
     }
 
     const nextProps = view.props as Record<string, unknown>;
+    const el = ref.element as Element;
     if (!ref.prevProps) {
-      this.setAttributes(ref.element, nextProps);
+      this.setAttributes(el, nextProps);
     } else if (ref.prevProps !== nextProps) {
-      this.diffAttributes(ref.element, ref.prevProps, nextProps);
+      this.diffAttributes(el, ref.prevProps, nextProps);
     }
     ref.prevProps = nextProps;
   }
@@ -251,7 +259,7 @@ export class HtmlRender implements IRender<HTMLElement | Text> {
     while (parent) {
       if (parent.flags & F_PRIMITIVE) {
         const ref = parent.renderRef as Maybe<PrimitiveDomRef>;
-        if (ref && ref.element instanceof HTMLElement) return ref.element;
+        if (ref && !(ref.element instanceof Text)) return ref.element;
       }
       parent = parent.parent;
     }
@@ -287,7 +295,7 @@ export class HtmlRender implements IRender<HTMLElement | Text> {
   // -- Internal: attributes + delegated events --------------------------------
 
   private setAttributes(
-    element: HTMLElement,
+    element: Element,
     props: Record<string, unknown>,
   ) {
     for (const key in props) {
@@ -302,7 +310,7 @@ export class HtmlRender implements IRender<HTMLElement | Text> {
   }
 
   private diffAttributes(
-    element: HTMLElement,
+    element: Element,
     prev: Record<string, unknown>,
     next: Record<string, unknown>,
   ) {
@@ -339,7 +347,7 @@ export class HtmlRender implements IRender<HTMLElement | Text> {
   }
 
   private bindEvent(
-    element: HTMLElement,
+    element: Element,
     prop: string,
     handler: Function,
   ): void {
@@ -351,7 +359,7 @@ export class HtmlRender implements IRender<HTMLElement | Text> {
     ensureDelegated(this.container, domEvent);
   }
 
-  private unbindEvent(element: HTMLElement, prop: string): void {
+  private unbindEvent(element: Element, prop: string): void {
     const creoName = prop.slice(2);
     const domEvent = DOM_EVENT[creoName] ?? creoName.toLowerCase();
     const evObj = (element as any)[$EV] as Record<string, Function> | undefined;
@@ -361,11 +369,13 @@ export class HtmlRender implements IRender<HTMLElement | Text> {
     removeDelegated(this.container, domEvent);
   }
 
-  private setAttribute(element: HTMLElement, key: string, value: unknown) {
+  private setAttribute(element: Element, key: string, value: unknown) {
     if (key === "class") {
-      element.className = String(value);
+      // className is a settable string on HTMLElement but readonly (SVGAnimatedString)
+      // on SVG — use setAttribute which works for both.
+      element.setAttribute("class", String(value));
     } else if (key === "style") {
-      element.style.cssText = String(value);
+      (element as HTMLElement).style.cssText = String(value);
     } else if (DOM_PROPERTIES.has(key)) {
       (element as Wildcard)[key] = value;
     } else if (typeof value === "boolean") {
@@ -376,11 +386,11 @@ export class HtmlRender implements IRender<HTMLElement | Text> {
     }
   }
 
-  private removeAttribute(element: HTMLElement, key: string) {
+  private removeAttribute(element: Element, key: string) {
     if (key === "class") {
-      element.className = "";
+      element.removeAttribute("class");
     } else if (key === "style") {
-      element.style.cssText = "";
+      (element as HTMLElement).style.cssText = "";
     } else if (DOM_PROPERTIES.has(key)) {
       (element as Wildcard)[key] = key === "value" ? "" : false;
     } else {
@@ -425,7 +435,7 @@ export class HtmlRender implements IRender<HTMLElement | Text> {
     // incoming siblings mount into an empty host, but never remove the
     // parent — the parent owns its own lifecycle.
     if (view.flags & F_TEXT_CONTENT) {
-      (ref.element as HTMLElement).textContent = "";
+      (ref.element as Element).textContent = "";
       return;
     }
     const evObj = (ref.element as any)[$EV] as
