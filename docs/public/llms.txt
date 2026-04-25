@@ -1,0 +1,29 @@
+# Creo
+
+> Creo is a lightweight, imperative UI framework for TypeScript. No JSX, no templates, no compiler — views are plain function calls, and the framework builds the virtual DOM from that stream.
+
+Creo uses `use()` for local state and `store` for global state. Lifecycle hooks (`onMount`, `onUpdateAfter`, `shouldUpdate`) are explicit. Renderers are pluggable (DOM, JSON AST, HTML string). Reconciliation is Vue 3-style keyed diffing with LIS.
+
+## Guides
+
+- [Overview](https://creo.dev/#/): what Creo is, why it exists
+- [Getting Started](https://creo.dev/#/getting-started): install, createApp, first view
+- [View](https://creo.dev/#/view): the `view()` factory, ViewBody, props
+- [State](https://creo.dev/#/state): `use()`, `.get/.set/.update`
+- [Store](https://creo.dev/#/store): `store.new()` for shared state
+- [Events](https://creo.dev/#/events): typed event handlers on primitives
+- [Lifecycle](https://creo.dev/#/lifecycle): `onMount`, `onUpdateBefore`, `onUpdateAfter`, `shouldUpdate`
+- [Primitives](https://creo.dev/#/primitives): HTML element factories, `HtmlAttrs`
+- [Renderers](https://creo.dev/#/renderers): DOM, JSON, HTML string; writing a custom `IRender`
+
+## How-to
+
+- [Router](https://creo.dev/#/how-to/router): hash-based routing via `creo-router`
+- [Data Fetching](https://creo.dev/#/how-to/data-fetching): async state patterns, caching in stores, cancellation
+- [Styles](https://creo.dev/#/how-to/styles): global CSS, CSS Modules, Tailwind, conditional classes
+- [Suspense Pattern](https://creo.dev/#/how-to/suspense): reusable loading/error/data helper view
+
+## Optional
+
+- [Playground](https://creo.dev/#/playground): live editor + iframe preview with canonical recipes
+- [GitHub](https://github.com/xnimorz/creo): source, issues, releases

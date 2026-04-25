@@ -1,4 +1,60 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 # Creo UI Framework
+
+Imperative UI framework with virtual DOM. No JSX — views are function calls (`div()`, `text()`). Reactivity via `use()` (local state) and `store` (global). Reconciler uses Vue 3-style keyed diffing with LIS. Runtime is Bun; workspaces layout.
+
+See [AGENTS.md](AGENTS.md) for deep architecture notes (engine internals, flags, reconciliation algorithm, render loop). Prefer reading it before modifying `packages/creo/src/internal/` or `packages/creo/src/render/`.
+
+## Commands
+
+```bash
+bun install
+bun test packages/creo/src/                          # all tests (happy-dom)
+bun test packages/creo/src/render/render.spec.ts    # single file
+bun test packages/creo/src/render/benchmark.spec.ts # perf benchmarks
+bun run typecheck                                    # tsc --noEmit
+bun run build                                        # build creo first, then dependents
+bun run version:patch|minor|major                    # bump all packages
+bun run publish:all                                  # dry-run (pass --no-dry-run to publish)
+
+# Run an example:
+cd examples/todo && bun install && bun run dev
+```
+
+Tests live only under `packages/creo/src/`. There is no lint command.
+
+## Repo Layout
+
+Monorepo with `packages/*` workspaces:
+
+- `packages/creo` — core framework (engine, renderers, primitives, view/state/store)
+- `packages/creo-router` — hash-based router (separate package)
+- `packages/creo-editor` — editor component
+- `packages/creo-create-app` — CLI scaffolder (Vite, optional Hono server)
+- `packages/creo-create-tauri-app` — CLI scaffolder (Tauri v2, desktop + mobile)
+- `packages/creo-create-electron-app` — CLI scaffolder (Electron)
+- `examples/` — todo, router, table, chess, editor, canvas-demo, benchmark, perf_profiler
+- `scripts/version.ts`, `scripts/publish.ts` — release orchestrators
+- `docs/` — user-facing docs (view, state, store, lifecycle, events, primitives, renderers)
+
+Core source map (see AGENTS.md for details):
+
+- `src/internal/engine.ts` — reconciler, dirty queue, render loop
+- `src/internal/internal_view.ts` — `ViewRecord`, flags (`F_PENDING`, `F_DIRTY`, `F_MOVED`, `F_PRIMITIVE`, `F_TEXT_CONTENT`)
+- `src/public/view.ts`, `state.ts`, `store.ts`, `app.ts` — public API surface
+- `src/render/{html,json,string}_render.ts` — renderer implementations behind `IRender<Output>`
+- `src/functional/lis.ts` — LIS for keyed reconciliation
+
+## Workflow Notes
+
+- After engine changes, run full `bun test packages/creo/src/` and visually verify with `examples/todo` and `examples/router`.
+- Build order matters: the root `build` script runs `creo` first, then everything else. Don't reorder.
+- Adding a primitive: edit `packages/creo/src/public/primitives/primitives.ts` and re-export from `packages/creo/src/index.ts`.
+
+---
 
 ## React → Creo Translation
 
@@ -266,18 +322,33 @@ div({ class: "wrapper" }, () => {
 
 ### Inline Strings
 
-Prefer passing a string directly as a slot instead of wrapping in `() => text("...")`. The engine auto-wraps strings into text nodes:
+Prefer passing a string directly as a slot instead of wrapping in `() => text("...")`. The engine auto-wraps strings into text nodes (detected via `typeof slot === "string"` in `engine.ts`):
 
 ```ts
-// Preferred — inline string:
+// Preferred — inline string (static or dynamic):
 button({ onClick: handler }, "Click me");
 h1(_, "Page Title");
 li(_, "Item text");
 span({ class: "label" }, userName);
+div({ class: "greeting" }, `Hello, ${props().name}!`);  // template literals are strings
+p(_, String(count.get()));
 
 // Avoid — unnecessary text() wrapper:
 button({ onClick: handler }, () => text("Click me"));
 h1(_, () => text("Page Title"));
+```
+
+**Gotcha — function slots do NOT auto-text their return value.** A function slot runs for side effects; any returned value is discarded. This means:
+
+```ts
+// ❌ Renders nothing — the returned string is discarded.
+div({ class: "greeting" }, () => `Hello, ${props().name}!`);
+
+// ✅ String slot (preferred for single dynamic string).
+div({ class: "greeting" }, `Hello, ${props().name}!`);
+
+// ✅ Function slot that calls text() explicitly.
+div({ class: "greeting" }, () => text(`Hello, ${props().name}!`));
 ```
 
 Use `text()` only when you need to mix text with other elements inside a function slot:
@@ -288,6 +359,16 @@ div({ class: "wrapper" }, () => {
   text(" world");  // text() needed here — mixed content in function slot
 });
 ```
+
+**When to use each slot form:**
+
+| Children | Use |
+|---|---|
+| None | omit second arg: `button({ onClick })` |
+| Single string (static or dynamic) | string slot: `h1(_, title)` |
+| Single child view | function slot: `section(_, () => UserCard({ id }))` |
+| Multiple children | function slot with primitives / views inside |
+| Mixed text + elements | function slot + explicit `text()` for the text parts |
 
 ### `_` for Empty Props
 

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 80" shape-rendering="geometricPrecision" font-family="Inter, system-ui, sans-serif">
+  <path d="M 20 10 L 10 10 L 10 70 L 20 70 L 20 63 L 17 63 L 17 17 L 20 17 Z" fill="#ffffff"/>
+  <path d="M 60 10 L 70 10 L 70 70 L 60 70 L 60 63 L 63 63 L 63 17 L 60 17 Z" fill="#ffffff"/>
+  <path d="M 54 20 L 54 28 L 35 28 L 35 52 L 54 52 L 54 60 L 26 60 L 26 20 Z" fill="#ff5a1f"/>
+  <text x="82" y="57" font-size="52" font-weight="500" letter-spacing="-1" fill="#ffffff">reo</text>
+</svg>

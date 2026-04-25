@@ -14,6 +14,20 @@
       "runtimeArgs": ["vite", "--port", "5200"],
       "port": 5200,
       "cwd": "examples/router"
+    },
+    {
+      "name": "docs",
+      "runtimeExecutable": "bun",
+      "runtimeArgs": ["vite", "--port", "5201"],
+      "port": 5201,
+      "cwd": "docs"
+    },
+    {
+      "name": "docs-preview",
+      "runtimeExecutable": "bun",
+      "runtimeArgs": ["vite", "preview", "--port", "5202"],
+      "port": 5202,
+      "cwd": "docs"
     }
   ]
 }

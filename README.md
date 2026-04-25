@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/public/creo-logo-dark.svg">
+    <img alt="creo" src="docs/public/creo-logo.svg" width="220">
+  </picture>
+</p>
+
 # Creo: Lightweight UI framework
 
 > _"There are many UI framework but this one is mine!"_

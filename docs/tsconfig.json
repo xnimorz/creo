@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "types": ["vite/client"],
+    "paths": {
+      "@/*": ["../packages/creo/src/*"],
+      "creo": ["../packages/creo/src/index.ts"],
+      "creo-router": ["../packages/creo-router/src/index.ts"]
+    }
+  },
+  "include": ["src"]
+}
