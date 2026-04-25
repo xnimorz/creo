@@ -81,6 +81,10 @@ export const Playground = view(({ use }) => {
 
   const run = () => {
     if (!editor) return;
+    if (debounceTimer !== null) {
+      clearTimeout(debounceTimer);
+      debounceTimer = null;
+    }
     const source = editor.state.doc.toString();
     const result = compile(source);
     if (!result.ok) {
