@@ -368,6 +368,7 @@ a:hover { color: var(--accent-hover); text-decoration: underline; }
 .btn-ghost { background: transparent; border-color: var(--border); color: var(--text); }
 .btn-ghost:hover { border-color: var(--accent); color: var(--accent); text-decoration: none; }
 
+.hero-code { min-width: 0; }
 .hero-code pre {
   background: #0f1524;
   color: #e3e8f0;
@@ -622,4 +623,16 @@ a:hover { color: var(--accent-hover); text-decoration: underline; }
   .content { padding: 24px 0; }
   .hero { padding: 48px 20px; }
   .hero-copy h1 { font-size: 32px; }
+}
+
+@media (max-width: 480px) {
+  .hero { padding: 32px 12px; }
+  .hero-copy h1 { font-size: 26px; }
+  .hero-tagline { font-size: 15px; }
+  .hero-code pre {
+    padding: 12px 14px;
+    font-size: 11px;
+    line-height: 1.5;
+    border-radius: 8px;
+  }
 }
