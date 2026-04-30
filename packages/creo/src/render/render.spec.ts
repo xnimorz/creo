@@ -20,6 +20,10 @@ import type { Wildcard } from "@/internal/wildcard";
 // ---------------------------------------------------------------------------
 
 const win = new Window({ url: "http://localhost" });
+// happy-dom 20.x leaves window.SyntaxError undefined, which makes its
+// querySelectorAll path throw on EVERY call (including internal calls like
+// the radio-group uncheck logic). Stub it so the error pipeline works.
+(win as Wildcard).SyntaxError = SyntaxError;
 Object.assign(globalThis, {
   document: win.document,
   HTMLElement: win.HTMLElement,
@@ -465,6 +469,85 @@ describe("HtmlRender", () => {
     checkedState!.set(true);
     e.render();
     expect(box.checked).toBe(true);
+  });
+
+  it("radio group: state-driven `checked` clears the previously selected option", () => {
+    let planState: Reactive<string>;
+
+    const Group = view<void>(({ use }) => {
+      const plan = use("a");
+      planState = plan;
+      return {
+        render() {
+          for (const id of ["a", "b", "c"]) {
+            input({
+              key: id,
+              type: "radio",
+              name: "plan",
+              checked: plan.get() === id,
+            });
+          }
+        },
+      };
+    });
+
+    const c = document.createElement("div");
+    document.body.appendChild(c);
+    try {
+      const r = new HtmlRender(c);
+      const e = new Engine(r);
+      orchestrator.setCurrentEngine(e);
+      e.createRoot(() => { Group(); }, {});
+      e.render();
+
+      const radios = Array.from(c.getElementsByTagName("input")) as HTMLInputElement[];
+      expect(radios.map((r) => r.checked)).toEqual([true, false, false]);
+
+      planState!.set("c");
+      e.render();
+      expect(radios.map((r) => r.checked)).toEqual([false, false, true]);
+
+      planState!.set("b");
+      e.render();
+      expect(radios.map((r) => r.checked)).toEqual([false, true, false]);
+    } finally {
+      document.body.removeChild(c);
+    }
+  });
+
+  it("radio onChange payload reports `checked: true` for the newly selected option", () => {
+    const events: { id: string; checked: boolean }[] = [];
+
+    const Group = view<void>(() => ({
+      render() {
+        for (const id of ["a", "b"]) {
+          input({
+            key: id,
+            type: "radio",
+            name: "plan2",
+            onChange: (ev) => events.push({ id, checked: ev.checked }),
+          });
+        }
+      },
+    }));
+
+    const c = document.createElement("div");
+    document.body.appendChild(c);
+    try {
+      const r = new HtmlRender(c);
+      const e = new Engine(r);
+      orchestrator.setCurrentEngine(e);
+      e.createRoot(() => { Group(); }, {});
+      e.render();
+
+      const [a, b] = Array.from(c.getElementsByTagName("input")) as HTMLInputElement[];
+      // Real radios fire a real change event when the user picks one.
+      b!.checked = true;
+      b!.dispatchEvent(new Event("change", { bubbles: true }));
+      expect(events).toEqual([{ id: "b", checked: true }]);
+    } finally {
+      document.body.removeChild(c);
+    }
   });
 
   it("controlled input restores DOM value when state stays equal across renders", () => {

@@ -56,7 +56,9 @@ body { font: 15px system-ui, sans-serif; padding: 24px; background: #f7f8fa; col
 .card h2 { margin: 0 0 12px; font-size: 13px; color: #666; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
 .row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
 .row:last-child { margin-bottom: 0; }
-.label { font-size: 14px; }
+.label { font-size: 14px; cursor: pointer; user-select: none; }
+label.label:hover { color: #4a90d9; }
+input[type="checkbox"], input[type="radio"] { cursor: pointer; }
 .tag { font-family: ui-monospace, monospace; font-size: 12px; padding: 3px 8px; background: #f0f6ff; border: 1px solid #c8dcf5; border-radius: 4px; color: #1a4480; }
 .tag.on { background: #e7f7ec; border-color: #b6e2c0; color: #146c2e; }
 .txt { padding: 6px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; width: 200px; }

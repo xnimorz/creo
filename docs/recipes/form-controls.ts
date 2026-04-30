@@ -5,6 +5,7 @@ import {
   h2,
   p,
   span,
+  label,
   button,
   input,
   audio,
@@ -14,12 +15,11 @@ import {
 } from "creo";
 import type { InputEventData } from "creo";
 
-const VIDEO_SRC =
-  "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4";
-const AUDIO_SRC =
-  "https://upload.wikimedia.org/wikipedia/en/4/45/ACDC_-_Back_In_Black-sample.ogg";
+// Public CC0 sample assets (CORS-enabled, small).
+const VIDEO_SRC = "https://samplelib.com/mp4/sample-5s.mp4";
+const AUDIO_SRC = "https://samplelib.com/mp3/sample-3s.mp3";
 
-// 1. Checkbox — onChange exposes e.checked; state drives the live property.
+// 1. Checkbox — `e.checked` carries the live state; <label for> clicks the box.
 const CheckboxDemo = view(({ use }) => {
   const accepted = use(false);
   const onChange = (e: InputEventData) => accepted.set(e.checked);
@@ -30,8 +30,8 @@ const CheckboxDemo = view(({ use }) => {
       div({ class: "card" }, () => {
         h2(_, "Checkbox");
         div({ class: "row" }, () => {
-          input({ type: "checkbox", checked: accepted.get(), onChange });
-          span({ class: "label" }, "I accept the terms");
+          input({ id: "tos", type: "checkbox", checked: accepted.get(), onChange });
+          label({ for: "tos", class: "label" }, "I accept the terms");
           span(
             { class: accepted.get() ? "tag on" : "tag" },
             `checked: ${accepted.get()}`,
@@ -40,13 +40,54 @@ const CheckboxDemo = view(({ use }) => {
         div({ class: "row" }, () => {
           button({ onClick: force }, "Toggle from state");
         });
-        p({ class: "note" }, "Click the box, then the button — both routes keep state and DOM in sync.");
+        p({ class: "note" }, "Click the label or the box — the <label for=tos> association forwards the click to the input.");
       });
     },
   };
 });
 
-// 2. Video / audio muted — prop hits el.muted, not the inert defaultMuted attribute.
+// 2. Radio group — `e.checked` is true on the newly selected option;
+// state.set drives the `checked` property on every radio so the unselected
+// ones get their live state cleared on the next render.
+type Plan = "free" | "pro" | "team";
+const PLANS: { id: Plan; label: string }[] = [
+  { id: "free", label: "Free" },
+  { id: "pro", label: "Pro — $9/mo" },
+  { id: "team", label: "Team — $29/mo" },
+];
+
+const RadioDemo = view(({ use }) => {
+  const plan = use<Plan>("free");
+  const onChange = (id: Plan) => (e: InputEventData) => {
+    if (e.checked) plan.set(id);
+  };
+
+  return {
+    render() {
+      div({ class: "card" }, () => {
+        h2(_, "Radio group");
+        for (const opt of PLANS) {
+          div({ class: "row" }, () => {
+            input({
+              id: `plan-${opt.id}`,
+              type: "radio",
+              name: "plan",
+              checked: plan.get() === opt.id,
+              onChange: onChange(opt.id),
+            });
+            label({ for: `plan-${opt.id}`, class: "label" }, opt.label);
+          });
+        }
+        div({ class: "row" }, () => {
+          span({ class: "tag on" }, `selected: ${plan.get()}`);
+        });
+        p({ class: "note" }, "Selecting a radio fires onChange with e.checked === true on the new choice. The next render writes el.checked = false on the others, even though the prop didn't change for this view.");
+      });
+    },
+  };
+});
+
+// 3. Video / audio muted — prop hits el.muted, not the inert defaultMuted attribute.
 const MediaDemo = view(({ use }) => {
   const videoMuted = use(true);
   const audioMuted = use(true);
@@ -57,7 +98,7 @@ const MediaDemo = view(({ use }) => {
     render() {
       div({ class: "card" }, () => {
         h2(_, "Video / audio muted");
-        video({ src: VIDEO_SRC, controls: true, autoplay: true, muted: videoMuted.get(), width: 320 });
+        video({ src: VIDEO_SRC, controls: true, muted: videoMuted.get(), width: 320 });
         div({ class: "row" }, () => {
           button({ onClick: toggleVideo }, "Toggle video mute");
           span({ class: videoMuted.get() ? "tag" : "tag on" }, `muted: ${videoMuted.get()}`);
@@ -67,13 +108,13 @@ const MediaDemo = view(({ use }) => {
           button({ onClick: toggleAudio }, "Toggle audio mute");
           span({ class: audioMuted.get() ? "tag" : "tag on" }, `muted: ${audioMuted.get()}`);
         });
-        p({ class: "note" }, "Re-rendering writes el.muted (the live property), not the inert defaultMuted attribute.");
+        p({ class: "note" }, "Press play, then toggle mute — re-rendering writes el.muted (live property), not the inert defaultMuted attribute.");
       });
     },
   };
 });
 
-// 3. Focus / blur — capture-phase delegation makes onFocus/onBlur fire.
+// 4. Focus / blur — capture-phase delegation makes onFocus/onBlur fire.
 const FocusDemo = view(({ use }) => {
   const focused = use<string | null>(null);
   const log = use<string[]>([]);
@@ -109,7 +150,7 @@ const FocusDemo = view(({ use }) => {
   };
 });
 
-// 4. Controlled input — re-asserting state restores DOM after live drift.
+// 5. Controlled input — re-asserting state restores DOM after live drift.
 const ControlledDemo = view(({ use }) => {
   const value = use("hello");
   const onInput = (e: InputEventData) => value.set(e.value);
@@ -136,6 +177,7 @@ const App = view(() => ({
   render() {
     div({ class: "form-controls" }, () => {
       CheckboxDemo();
+      RadioDemo();
       MediaDemo();
       FocusDemo();
       ControlledDemo();
