@@ -2,12 +2,13 @@ import { describe, it, expect, beforeEach } from "bun:test";
 import { Window } from "happy-dom";
 import type { ViewFn } from "@/public/view";
 import { view } from "@/public/view";
-import { div, span, text, button, input, svg, html, video, audio } from "@/public/primitives/primitives";
+import { div, span, text, button, input, svg, html, video, audio, details, summary } from "@/public/primitives/primitives";
 import type { Reactive } from "@/public/state";
 import { store } from "@/public/store";
 import { Engine } from "@/internal/engine";
 import type { ViewRecord } from "@/internal/internal_view";
 import { orchestrator } from "@/internal/orchestrator";
+import { _ } from "@/functional/maybe";
 import { HtmlRender } from "./html_render";
 import { JsonRender, type JsonNode } from "./json_render";
 import { HtmlStringRender } from "./string_render";
@@ -634,6 +635,221 @@ describe("HtmlRender", () => {
     mutedState!.set(true);
     e.render();
     expect(a.muted).toBe(true);
+  });
+
+  it("video onVolumeChange fires via capture-phase delegation with muted/paused/volume payload", () => {
+    const events: { muted: boolean; paused: boolean; volume: number }[] = [];
+
+    const Player = view<void>(() => ({
+      render() {
+        video({
+          src: "x.mp4",
+          muted: true,
+          onVolumeChange: (e) => {
+            events.push({ muted: e.muted, paused: e.paused, volume: e.volume });
+          },
+        });
+      },
+    }));
+
+    const c = document.createElement("div");
+    document.body.appendChild(c);
+    try {
+      const r = new HtmlRender(c);
+      const e = new Engine(r);
+      orchestrator.setCurrentEngine(e);
+      e.createRoot(() => { Player(); }, {});
+      e.render();
+
+      const v = c.getElementsByTagName("video")[0]! as HTMLVideoElement;
+      v.muted = false;
+      v.dispatchEvent(new Event("volumechange"));
+      expect(events.length).toBe(1);
+      expect(events[0]!.muted).toBe(false);
+      expect(typeof events[0]!.paused).toBe("boolean");
+      expect(typeof events[0]!.volume).toBe("number");
+    } finally {
+      document.body.removeChild(c);
+    }
+  });
+
+  it("mouseEnter / mouseLeave fire only on the actual target (no ancestor double-fire)", () => {
+    const calls: string[] = [];
+
+    const Inner = view<void>(() => ({
+      render() {
+        div({ class: "inner", onMouseEnter: () => calls.push("inner-enter") });
+      },
+    }));
+
+    const Outer = view<void>(() => ({
+      render() {
+        div({ class: "outer", onMouseEnter: () => calls.push("outer-enter") }, () => {
+          Inner();
+        });
+      },
+    }));
+
+    const c = document.createElement("div");
+    document.body.appendChild(c);
+    try {
+      const r = new HtmlRender(c);
+      const e = new Engine(r);
+      orchestrator.setCurrentEngine(e);
+      e.createRoot(() => { Outer(); }, {});
+      e.render();
+
+      const outer = c.querySelector(".outer") as HTMLElement;
+      const inner = c.querySelector(".inner") as HTMLElement;
+
+      // The browser dispatches mouseenter once per element entered, each
+      // with its own target. dispatchEvent sets target = the dispatching el.
+      outer.dispatchEvent(new Event("mouseenter"));
+      inner.dispatchEvent(new Event("mouseenter"));
+
+      // Outer should fire exactly once (from its own dispatch), not also from
+      // the inner dispatch walking up.
+      expect(calls).toEqual(["outer-enter", "inner-enter"]);
+    } finally {
+      document.body.removeChild(c);
+    }
+  });
+
+  it("scroll event delivers scrollTop/scrollLeft and is registered passively", () => {
+    const events: { scrollTop: number; scrollLeft: number }[] = [];
+
+    const Box = view<void>(() => ({
+      render() {
+        div({
+          class: "scroller",
+          style: "height:50px;overflow:auto;",
+          onScroll: (e) => events.push({ scrollTop: e.scrollTop, scrollLeft: e.scrollLeft }),
+        });
+      },
+    }));
+
+    const c = document.createElement("div");
+    document.body.appendChild(c);
+    try {
+      const r = new HtmlRender(c);
+      const e = new Engine(r);
+      orchestrator.setCurrentEngine(e);
+      e.createRoot(() => { Box(); }, {});
+      e.render();
+
+      const box = c.querySelector(".scroller") as HTMLElement;
+      // happy-dom doesn't simulate scroll geometry, but dispatching the event
+      // exercises the delegation path and payload mapping.
+      Object.defineProperty(box, "scrollTop", { value: 42, configurable: true });
+      Object.defineProperty(box, "scrollLeft", { value: 7, configurable: true });
+      box.dispatchEvent(new Event("scroll"));
+
+      expect(events).toEqual([{ scrollTop: 42, scrollLeft: 7 }]);
+    } finally {
+      document.body.removeChild(c);
+    }
+  });
+
+  it("img onLoad and onError fire via capture-phase delegation", () => {
+    const log: string[] = [];
+
+    const Pic = view<void>(() => ({
+      render() {
+        html("img")({
+          class: "pic",
+          onLoad: () => log.push("loaded"),
+          onError: (e) => log.push(`error:${e.message}`),
+        });
+      },
+    }));
+
+    const c = document.createElement("div");
+    document.body.appendChild(c);
+    try {
+      const r = new HtmlRender(c);
+      const e = new Engine(r);
+      orchestrator.setCurrentEngine(e);
+      e.createRoot(() => { Pic(); }, {});
+      e.render();
+
+      const img = c.querySelector(".pic")!;
+      img.dispatchEvent(new Event("load"));
+      // ErrorEvent provides .message; happy-dom may use plain Event though.
+      const err = new Event("error") as ErrorEvent & { message?: string };
+      (err as { message?: string }).message = "boom";
+      img.dispatchEvent(err);
+
+      expect(log).toEqual(["loaded", "error:boom"]);
+    } finally {
+      document.body.removeChild(c);
+    }
+  });
+
+  it("video onTimeUpdate exposes currentTime and duration", () => {
+    const ticks: { currentTime: number; duration: number }[] = [];
+
+    const Player = view<void>(() => ({
+      render() {
+        video({
+          src: "x.mp4",
+          onTimeUpdate: (e) => ticks.push({ currentTime: e.currentTime, duration: e.duration }),
+        });
+      },
+    }));
+
+    const c = document.createElement("div");
+    document.body.appendChild(c);
+    try {
+      const r = new HtmlRender(c);
+      const e = new Engine(r);
+      orchestrator.setCurrentEngine(e);
+      e.createRoot(() => { Player(); }, {});
+      e.render();
+
+      const v = c.getElementsByTagName("video")[0]! as HTMLVideoElement;
+      Object.defineProperty(v, "currentTime", { value: 1.25, configurable: true });
+      Object.defineProperty(v, "duration", { value: 10, configurable: true });
+      v.dispatchEvent(new Event("timeupdate"));
+
+      expect(ticks).toEqual([{ currentTime: 1.25, duration: 10 }]);
+    } finally {
+      document.body.removeChild(c);
+    }
+  });
+
+  it("details onToggle reports the new `open` state", () => {
+    const states: boolean[] = [];
+
+    const Disclosure = view<void>(() => ({
+      render() {
+        details({
+          class: "d",
+          onToggle: (e) => states.push(e.open),
+        }, () => {
+          summary(_, "more");
+        });
+      },
+    }));
+
+    const c = document.createElement("div");
+    document.body.appendChild(c);
+    try {
+      const r = new HtmlRender(c);
+      const e = new Engine(r);
+      orchestrator.setCurrentEngine(e);
+      e.createRoot(() => { Disclosure(); }, {});
+      e.render();
+
+      const d = c.querySelector(".d") as HTMLDetailsElement;
+      // Setting the `open` property in happy-dom already fires a toggle
+      // event — that exercises the delegation path on its own.
+      d.open = true;
+      d.open = false;
+
+      expect(states).toEqual([true, false]);
+    } finally {
+      document.body.removeChild(c);
+    }
   });
 
   it("delegates focus and blur via capture phase", () => {

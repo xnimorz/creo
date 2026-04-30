@@ -13,7 +13,7 @@ import {
   HtmlRender,
   _,
 } from "creo";
-import type { InputEventData } from "creo";
+import type { InputEventData, MediaEventData } from "creo";
 
 // Public CC0 sample assets (CORS-enabled, small).
 const VIDEO_SRC = "https://samplelib.com/mp4/sample-5s.mp4";
@@ -87,28 +87,42 @@ const RadioDemo = view(({ use }) => {
   };
 });
 
-// 3. Video / audio muted — prop hits el.muted, not the inert defaultMuted attribute.
+// 3. Video / audio muted — prop hits el.muted, not the inert defaultMuted
+// attribute. onVolumeChange syncs back when the user uses the native controls.
 const MediaDemo = view(({ use }) => {
   const videoMuted = use(true);
   const audioMuted = use(true);
   const toggleVideo = () => videoMuted.update((v) => !v);
   const toggleAudio = () => audioMuted.update((v) => !v);
+  const syncVideo = (e: MediaEventData) => videoMuted.set(e.muted);
+  const syncAudio = (e: MediaEventData) => audioMuted.set(e.muted);
 
   return {
     render() {
       div({ class: "card" }, () => {
         h2(_, "Video / audio muted");
-        video({ src: VIDEO_SRC, controls: true, muted: videoMuted.get(), width: 320 });
+        video({
+          src: VIDEO_SRC,
+          controls: true,
+          muted: videoMuted.get(),
+          width: 320,
+          onVolumeChange: syncVideo,
+        });
         div({ class: "row" }, () => {
           button({ onClick: toggleVideo }, "Toggle video mute");
           span({ class: videoMuted.get() ? "tag" : "tag on" }, `muted: ${videoMuted.get()}`);
         });
-        audio({ src: AUDIO_SRC, controls: true, muted: audioMuted.get() });
+        audio({
+          src: AUDIO_SRC,
+          controls: true,
+          muted: audioMuted.get(),
+          onVolumeChange: syncAudio,
+        });
         div({ class: "row" }, () => {
           button({ onClick: toggleAudio }, "Toggle audio mute");
           span({ class: audioMuted.get() ? "tag" : "tag on" }, `muted: ${audioMuted.get()}`);
         });
-        p({ class: "note" }, "Press play, then toggle mute — re-rendering writes el.muted (live property), not the inert defaultMuted attribute.");
+        p({ class: "note" }, "Toggle our button OR the native speaker icon — onVolumeChange syncs el.muted back into state, and the next render writes the live property (not the inert defaultMuted attribute).");
       });
     },
   };

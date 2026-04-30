@@ -35,6 +35,29 @@ export type InputEventData = BaseEventData & {
 
 export type FocusEventData = BaseEventData;
 
+export type ScrollEventData = BaseEventData & {
+  scrollTop: number;
+  scrollLeft: number;
+};
+
+export type LoadEventData = BaseEventData;
+
+export type ErrorEventData = BaseEventData & {
+  message: string;
+};
+
+export type ToggleEventData = BaseEventData & {
+  open: boolean;
+};
+
+export type MediaEventData = BaseEventData & {
+  muted: boolean;
+  paused: boolean;
+  volume: number;
+  currentTime: number;
+  duration: number;
+};
+
 // ---------------------------------------------------------------------------
 // Event maps
 // ---------------------------------------------------------------------------
@@ -45,10 +68,19 @@ export type ContainerEvents = {
   pointerDown: (e: PointerEventData) => void;
   pointerUp: (e: PointerEventData) => void;
   pointerMove: (e: PointerEventData) => void;
+  // Hover (capture-phase, per-target, not double-fired up the tree).
+  mouseEnter: (e: PointerEventData) => void;
+  mouseLeave: (e: PointerEventData) => void;
+  pointerEnter: (e: PointerEventData) => void;
+  pointerLeave: (e: PointerEventData) => void;
   keyDown: (e: KeyEventData) => void;
   keyUp: (e: KeyEventData) => void;
   focus: (e: FocusEventData) => void;
   blur: (e: FocusEventData) => void;
+  // Scroll fires passively at high frequency; preventDefault is a no-op.
+  scroll: (e: ScrollEventData) => void;
+  load: (e: LoadEventData) => void;
+  error: (e: ErrorEventData) => void;
 };
 
 export type FormEvents = ContainerEvents & {
@@ -56,6 +88,28 @@ export type FormEvents = ContainerEvents & {
   change: (e: InputEventData) => void;
   keyDown: (e: KeyEventData) => void;
   keyUp: (e: KeyEventData) => void;
+};
+
+export type MediaEvents = ContainerEvents & {
+  volumeChange: (e: MediaEventData) => void;
+  play: (e: MediaEventData) => void;
+  pause: (e: MediaEventData) => void;
+  ended: (e: MediaEventData) => void;
+  timeUpdate: (e: MediaEventData) => void;
+  loadedMetadata: (e: MediaEventData) => void;
+  loadedData: (e: MediaEventData) => void;
+  canPlay: (e: MediaEventData) => void;
+  canPlayThrough: (e: MediaEventData) => void;
+  durationChange: (e: MediaEventData) => void;
+  rateChange: (e: MediaEventData) => void;
+  seeking: (e: MediaEventData) => void;
+  seeked: (e: MediaEventData) => void;
+  stalled: (e: MediaEventData) => void;
+  waiting: (e: MediaEventData) => void;
+};
+
+export type DisclosureEvents = ContainerEvents & {
+  toggle: (e: ToggleEventData) => void;
 };
 
 // ---------------------------------------------------------------------------
@@ -259,7 +313,7 @@ export const video = html<
     width?: number;
     height?: number;
   },
-  ContainerEvents
+  MediaEvents
 >("video");
 
 export const audio = html<
@@ -270,7 +324,7 @@ export const audio = html<
     loop?: boolean;
     muted?: boolean;
   },
-  ContainerEvents
+  MediaEvents
 >("audio");
 
 export const canvas = html<
@@ -287,11 +341,11 @@ export const source = html<
 // Interactive
 // ---------------------------------------------------------------------------
 
-export const details = html<HtmlAttrs & { open?: boolean }, ContainerEvents>(
+export const details = html<HtmlAttrs & { open?: boolean }, DisclosureEvents>(
   "details",
 );
 export const summary = html("summary");
-export const dialog = html<HtmlAttrs & { open?: boolean }, ContainerEvents>(
+export const dialog = html<HtmlAttrs & { open?: boolean }, DisclosureEvents>(
   "dialog",
 );
 export const menu = html("menu");

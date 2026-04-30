@@ -64,8 +64,15 @@ export type {
   KeyEventData,
   InputEventData,
   FocusEventData,
+  MediaEventData,
+  ScrollEventData,
+  LoadEventData,
+  ErrorEventData,
+  ToggleEventData,
   ContainerEvents,
   FormEvents,
+  MediaEvents,
+  DisclosureEvents,
   HtmlAttrs,
 } from "@/public/primitives/primitives";
 

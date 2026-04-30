@@ -39,17 +39,48 @@ function isEventProp(key: string): boolean {
 }
 
 const DOM_EVENT: Record<string, string> = {
+  // Pointer / mouse — bubble.
   Click: "click",
   Dblclick: "dblclick",
   PointerDown: "pointerdown",
   PointerUp: "pointerup",
   PointerMove: "pointermove",
+  // Form — bubble.
   Input: "input",
   Change: "change",
+  // Keyboard — bubble.
   KeyDown: "keydown",
   KeyUp: "keyup",
+  // Focus / blur — don't bubble (capture-phase delegation).
   Focus: "focus",
   Blur: "blur",
+  // Hover — don't bubble; per-target only (no ancestor walk).
+  MouseEnter: "mouseenter",
+  MouseLeave: "mouseleave",
+  PointerEnter: "pointerenter",
+  PointerLeave: "pointerleave",
+  // Scroll / load / error — don't bubble.
+  Scroll: "scroll",
+  Load: "load",
+  Error: "error",
+  // Disclosure — don't bubble.
+  Toggle: "toggle",
+  // Media — don't bubble (capture-phase delegation).
+  VolumeChange: "volumechange",
+  Play: "play",
+  Pause: "pause",
+  Ended: "ended",
+  TimeUpdate: "timeupdate",
+  LoadedMetadata: "loadedmetadata",
+  LoadedData: "loadeddata",
+  CanPlay: "canplay",
+  CanPlayThrough: "canplaythrough",
+  DurationChange: "durationchange",
+  RateChange: "ratechange",
+  Seeking: "seeking",
+  Seeked: "seeked",
+  Stalled: "stalled",
+  Waiting: "waiting",
 };
 
 const $EV = Symbol.for("creo.ev");
@@ -69,6 +100,7 @@ function getState(container: HTMLElement) {
       counts: new Map(),
       handler(e: Event) {
         const domEvent = e.type;
+        const noWalk = NO_WALK_EVENTS.has(domEvent);
         let dom = e.target as
           | (HTMLElement & { [$EV]?: Record<string, Function> })
           | null;
@@ -81,6 +113,10 @@ function getState(container: HTMLElement) {
               if (e.cancelBubble) return;
             }
           }
+          // For mouseenter/leave-style events the browser already dispatches
+          // one event per ancestor newly entered — walking up here would
+          // double-fire ancestor handlers.
+          if (noWalk) return;
           dom = dom.parentElement as typeof dom;
         }
       },
@@ -90,14 +126,63 @@ function getState(container: HTMLElement) {
   return state;
 }
 
-// focus/blur don't bubble; listen in the capture phase so delegation works.
-const CAPTURE_EVENTS = new Set(["focus", "blur"]);
+// Events that don't bubble — register in the capture phase so delegation
+// at the container still receives them.
+const CAPTURE_EVENTS = new Set([
+  "focus",
+  "blur",
+  "mouseenter",
+  "mouseleave",
+  "pointerenter",
+  "pointerleave",
+  "scroll",
+  "load",
+  "error",
+  "toggle",
+  "volumechange",
+  "play",
+  "pause",
+  "ended",
+  "timeupdate",
+  "loadedmetadata",
+  "loadeddata",
+  "canplay",
+  "canplaythrough",
+  "durationchange",
+  "ratechange",
+  "seeking",
+  "seeked",
+  "stalled",
+  "waiting",
+]);
+
+// Events whose semantics are "this element specifically" — the browser
+// dispatches one event per ancestor newly entered, so walking up the tree
+// from target to container would double-fire ancestor handlers. For these,
+// only consult the actual target element.
+const NO_WALK_EVENTS = new Set([
+  "mouseenter",
+  "mouseleave",
+  "pointerenter",
+  "pointerleave",
+]);
+
+// Events fired at high frequency where we want passive listeners by default.
+const PASSIVE_EVENTS = new Set(["scroll"]);
+
+function listenerOptions(domEvent: string): boolean | AddEventListenerOptions {
+  const capture = CAPTURE_EVENTS.has(domEvent);
+  if (PASSIVE_EVENTS.has(domEvent)) {
+    return { capture, passive: true };
+  }
+  return capture;
+}
 
 function ensureDelegated(container: HTMLElement, domEvent: string): void {
   const state = getState(container);
   const count = state.counts.get(domEvent) ?? 0;
   if (count === 0) {
-    container.addEventListener(domEvent, state.handler, CAPTURE_EVENTS.has(domEvent));
+    container.addEventListener(domEvent, state.handler, listenerOptions(domEvent));
   }
   state.counts.set(domEvent, count + 1);
 }
@@ -107,26 +192,71 @@ function removeDelegated(container: HTMLElement, domEvent: string): void {
   const count = state.counts.get(domEvent) ?? 0;
   if (count <= 1) {
     state.counts.delete(domEvent);
-    container.removeEventListener(domEvent, state.handler, CAPTURE_EVENTS.has(domEvent));
+    container.removeEventListener(domEvent, state.handler, listenerOptions(domEvent));
   } else {
     state.counts.set(domEvent, count - 1);
   }
 }
 
+const POINTER_EVENTS = new Set([
+  "click",
+  "dblclick",
+  "pointerdown",
+  "pointerup",
+  "pointermove",
+  "mouseenter",
+  "mouseleave",
+  "pointerenter",
+  "pointerleave",
+]);
+
+const MEDIA_EVENTS = new Set([
+  "volumechange",
+  "play",
+  "pause",
+  "ended",
+  "timeupdate",
+  "loadedmetadata",
+  "loadeddata",
+  "canplay",
+  "canplaythrough",
+  "durationchange",
+  "ratechange",
+  "seeking",
+  "seeked",
+  "stalled",
+  "waiting",
+]);
+
 function mapEventData(domEvent: string, e: Event): Record<string, unknown> {
   let data: Record<string, unknown>;
-  if (
-    domEvent === "click" ||
-    domEvent === "dblclick" ||
-    domEvent === "pointerdown" ||
-    domEvent === "pointerup" ||
-    domEvent === "pointermove"
-  ) {
+  if (POINTER_EVENTS.has(domEvent)) {
     const pe = e as PointerEvent;
     data = { x: pe.clientX, y: pe.clientY };
   } else if (domEvent === "input" || domEvent === "change") {
     const target = e.target as HTMLInputElement;
     data = { value: target.value, checked: !!target.checked };
+  } else if (MEDIA_EVENTS.has(domEvent)) {
+    const target = e.target as HTMLMediaElement;
+    data = {
+      muted: !!target.muted,
+      paused: !!target.paused,
+      volume: target.volume,
+      currentTime: target.currentTime,
+      duration: Number.isFinite(target.duration) ? target.duration : 0,
+    };
+  } else if (domEvent === "scroll") {
+    const target = e.target as Element;
+    data = {
+      scrollTop: (target as HTMLElement).scrollTop ?? 0,
+      scrollLeft: (target as HTMLElement).scrollLeft ?? 0,
+    };
+  } else if (domEvent === "error") {
+    const ev = e as ErrorEvent;
+    data = { message: ev.message ?? "" };
+  } else if (domEvent === "toggle") {
+    const target = e.target as HTMLDetailsElement;
+    data = { open: !!target.open };
   } else if (domEvent === "keydown" || domEvent === "keyup") {
     const ke = e as KeyboardEvent;
     data = { key: ke.key, code: ke.code };
