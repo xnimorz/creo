@@ -1,6 +1,6 @@
 {
   "name": "creo-create-tauri-app",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "type": "module",
   "bin": {
     "creo-create-tauri-app": "./dist/index.js"

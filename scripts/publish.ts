@@ -13,13 +13,28 @@ interface PackageInfo {
   deps: string[];
 }
 
+function parseOtp(argv: string[]): string | null {
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i]!;
+    if (a === "--otp" && i + 1 < argv.length) return argv[i + 1]!;
+    if (a.startsWith("--otp=")) return a.slice("--otp=".length);
+  }
+  if (process.env.NPM_OTP) return process.env.NPM_OTP;
+  return null;
+}
+
+function promptOtp(): string {
+  // Bun supports the synchronous Web `prompt()` global.
+  const value = prompt("npm OTP (one-time password): ");
+  return (value ?? "").trim();
+}
+
 async function main() {
   const dryRun = !process.argv.includes("--no-dry-run");
+  let otp = parseOtp(process.argv);
 
   const entries = await readdir(packagesDir, { withFileTypes: true });
-  const packageDirs = entries
-    .filter((e) => e.isDirectory())
-    .map((e) => e.name);
+  const packageDirs = entries.filter((e) => e.isDirectory()).map((e) => e.name);
 
   const packages: PackageInfo[] = [];
   const nameSet = new Set<string>();
@@ -52,20 +67,36 @@ async function main() {
 
   while (remaining.length > 0) {
     const next = remaining.findIndex((p) =>
-      p.deps.every(
-        (d) => !nameSet.has(d) || sorted.some((s) => s.name === d),
-      ),
+      p.deps.every((d) => !nameSet.has(d) || sorted.some((s) => s.name === d)),
     );
 
     if (next === -1) {
-      console.error("Circular dependency detected among:", remaining.map((p) => p.name));
+      console.error(
+        "Circular dependency detected among:",
+        remaining.map((p) => p.name),
+      );
       process.exit(1);
     }
 
     sorted.push(remaining.splice(next, 1)[0]!);
   }
 
-  console.log(dryRun ? "\n🔍 DRY RUN (pass --no-dry-run to publish for real)\n" : "\n📦 Publishing packages\n");
+  console.log(
+    dryRun
+      ? "\n🔍 DRY RUN (pass --no-dry-run to publish for real)\n"
+      : "\n📦 Publishing packages\n",
+  );
+
+  // npm registry now requires an OTP for every `npm publish` of a public
+  // package on accounts with 2FA enabled. Prompt once and reuse for every
+  // package — the same code is valid for the whole 30s window.
+  if (!dryRun && !otp) {
+    otp = promptOtp();
+    if (!otp) {
+      console.error("No OTP provided. Pass --otp=<code>, set NPM_OTP, or enter when prompted.");
+      process.exit(1);
+    }
+  }
 
   // Build and publish in order
   for (const pkg of sorted) {
@@ -87,18 +118,22 @@ async function main() {
     console.log(`Publishing ${pkg.name}@${pkg.version}...`);
     try {
       if (dryRun) {
-        await $`cd ${pkgDir} && npm publish --dry-run`.quiet();
+        await $`cd ${pkgDir} && npm publish --dry-run`;
       } else {
-        await $`cd ${pkgDir} && npm publish --access public`.quiet();
+        await $`cd ${pkgDir} && npm publish --access public --otp=${otp!}`;
       }
-      console.log(`  ✓ ${dryRun ? "(dry-run) " : ""}Published ${pkg.name}@${pkg.version}`);
+      console.log(
+        `  ✓ ${dryRun ? "(dry-run) " : ""}Published ${pkg.name}@${pkg.version}`,
+      );
     } catch (e) {
       console.error(`  ✗ Publish failed for ${pkg.name}`);
       if (!dryRun) process.exit(1);
     }
   }
 
-  console.log(`\n✓ Done. ${sorted.length} package(s) ${dryRun ? "would be" : ""} published.\n`);
+  console.log(
+    `\n✓ Done. ${sorted.length} package(s) ${dryRun ? "would be" : ""} published.\n`,
+  );
 }
 
 main();
