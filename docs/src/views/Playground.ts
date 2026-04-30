@@ -5,11 +5,29 @@ import { oneDark } from "@codemirror/theme-one-dark";
 import { transform } from "sucrase";
 import { recipes, findRecipe } from "../recipes";
 import type { Recipe } from "../recipes";
+// Bundle-relative URLs to the locally built creo packages — used in dev so the
+// playground iframe runs the workspace build instead of the published version.
+import creoLocalUrl from "../../../packages/creo/dist/index.js?url";
+import creoRouterLocalUrl from "../../../packages/creo-router/dist/index.js?url";
 
-const CREO_VERSION = "0.2.3";
+const CREO_VERSION = "0.2.4";
+
+function importMap(): { creo: string; router: string } {
+  if (import.meta.env.DEV) {
+    return {
+      creo: new URL(creoLocalUrl, window.location.origin).href,
+      router: new URL(creoRouterLocalUrl, window.location.origin).href,
+    };
+  }
+  return {
+    creo: `https://esm.sh/creo@${CREO_VERSION}`,
+    router: `https://esm.sh/creo-router@${CREO_VERSION}`,
+  };
+}
 
 function buildIframeSrcDoc(compiledJs: string, css: string): string {
   const escaped = compiledJs.replace(/<\/script>/gi, "<\\/script>");
+  const map = importMap();
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -22,8 +40,8 @@ ${css}
 <script type="importmap">
 {
   "imports": {
-    "creo": "https://esm.sh/creo@${CREO_VERSION}",
-    "creo-router": "https://esm.sh/creo-router@${CREO_VERSION}"
+    "creo": "${map.creo}",
+    "creo-router": "${map.router}"
   }
 }
 </script>

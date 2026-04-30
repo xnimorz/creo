@@ -30,6 +30,7 @@ export type KeyEventData = BaseEventData & {
 
 export type InputEventData = BaseEventData & {
   value: string;
+  checked: boolean;
 };
 
 export type FocusEventData = BaseEventData;

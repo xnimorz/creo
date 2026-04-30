@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "bun:test";
 import { Window } from "happy-dom";
 import type { ViewFn } from "@/public/view";
 import { view } from "@/public/view";
-import { div, span, text, button, input, svg, html } from "@/public/primitives/primitives";
+import { div, span, text, button, input, svg, html, video, audio } from "@/public/primitives/primitives";
 import type { Reactive } from "@/public/state";
 import { store } from "@/public/store";
 import { Engine } from "@/internal/engine";
@@ -398,6 +398,192 @@ describe("HtmlRender", () => {
     expect(btn).toBeDefined();
     btn.click();
     expect(clicked).toBe(true);
+  });
+
+  it("checkbox onChange payload exposes the live `checked` state", () => {
+    let lastChecked: boolean | undefined;
+    let lastValue: string | undefined;
+
+    const Form = view<void>(() => ({
+      render() {
+        input({
+          type: "checkbox",
+          value: "yes",
+          onChange: (e) => {
+            lastChecked = e.checked;
+            lastValue = e.value;
+          },
+        });
+      },
+    }));
+
+    const c = document.createElement("div");
+    const r = new HtmlRender(c);
+    const e = new Engine(r);
+    orchestrator.setCurrentEngine(e);
+    e.createRoot(() => { Form(); }, {});
+    e.render();
+
+    const box = c.getElementsByTagName("input")[0]! as HTMLInputElement;
+    box.checked = true;
+    box.dispatchEvent(new Event("change", { bubbles: true }));
+    expect(lastChecked).toBe(true);
+    expect(lastValue).toBe("yes");
+
+    box.checked = false;
+    box.dispatchEvent(new Event("change", { bubbles: true }));
+    expect(lastChecked).toBe(false);
+  });
+
+  it("checkbox `checked` prop writes the live property, not just the attribute", () => {
+    let checkedState: Reactive<boolean>;
+
+    const Box = view<void>(({ use }) => {
+      const checked = use(true);
+      checkedState = checked;
+      return {
+        render() {
+          input({ type: "checkbox", checked: checked.get() });
+        },
+      };
+    });
+
+    const c = document.createElement("div");
+    const r = new HtmlRender(c);
+    const e = new Engine(r);
+    orchestrator.setCurrentEngine(e);
+    e.createRoot(() => { Box(); }, {});
+    e.render();
+
+    const box = c.getElementsByTagName("input")[0]! as HTMLInputElement;
+    expect(box.checked).toBe(true);
+
+    // Simulate user un-checking, then state forcing it back on.
+    box.checked = false;
+    expect(box.checked).toBe(false);
+
+    checkedState!.set(true);
+    e.render();
+    expect(box.checked).toBe(true);
+  });
+
+  it("controlled input restores DOM value when state stays equal across renders", () => {
+    let valueState: Reactive<string>;
+
+    const Field = view<void>(({ use }) => {
+      const value = use("hello");
+      valueState = value;
+      return {
+        render() {
+          input({ type: "text", value: value.get() });
+        },
+      };
+    });
+
+    const c = document.createElement("div");
+    const r = new HtmlRender(c);
+    const e = new Engine(r);
+    orchestrator.setCurrentEngine(e);
+    e.createRoot(() => { Field(); }, {});
+    e.render();
+
+    const el = c.getElementsByTagName("input")[0]! as HTMLInputElement;
+    expect(el.value).toBe("hello");
+
+    // User typed extra text; handler decided not to change state.
+    el.value = "helloworld";
+    valueState!.set("hello"); // same value — must still re-assert DOM
+    e.render();
+    expect(el.value).toBe("hello");
+  });
+
+  it("video `muted` prop writes the live property", () => {
+    let mutedState: Reactive<boolean>;
+
+    const Player = view<void>(({ use }) => {
+      const muted = use(true);
+      mutedState = muted;
+      return {
+        render() {
+          video({ src: "x.mp4", muted: muted.get() });
+        },
+      };
+    });
+
+    const c = document.createElement("div");
+    const r = new HtmlRender(c);
+    const e = new Engine(r);
+    orchestrator.setCurrentEngine(e);
+    e.createRoot(() => { Player(); }, {});
+    e.render();
+
+    const v = c.getElementsByTagName("video")[0]! as HTMLVideoElement;
+    expect(v.muted).toBe(true);
+
+    mutedState!.set(false);
+    e.render();
+    expect(v.muted).toBe(false);
+  });
+
+  it("audio `muted` prop writes the live property", () => {
+    let mutedState: Reactive<boolean>;
+
+    const Player = view<void>(({ use }) => {
+      const muted = use(false);
+      mutedState = muted;
+      return {
+        render() {
+          audio({ src: "x.mp3", muted: muted.get() });
+        },
+      };
+    });
+
+    const c = document.createElement("div");
+    const r = new HtmlRender(c);
+    const e = new Engine(r);
+    orchestrator.setCurrentEngine(e);
+    e.createRoot(() => { Player(); }, {});
+    e.render();
+
+    const a = c.getElementsByTagName("audio")[0]! as HTMLAudioElement;
+    expect(a.muted).toBe(false);
+
+    mutedState!.set(true);
+    e.render();
+    expect(a.muted).toBe(true);
+  });
+
+  it("delegates focus and blur via capture phase", () => {
+    let focused = 0;
+    let blurred = 0;
+
+    const Field = view<void>(() => ({
+      render() {
+        input({
+          type: "text",
+          onFocus: () => { focused++; },
+          onBlur: () => { blurred++; },
+        });
+      },
+    }));
+
+    const c = document.createElement("div");
+    document.body.appendChild(c);
+    try {
+      const r = new HtmlRender(c);
+      const e = new Engine(r);
+      orchestrator.setCurrentEngine(e);
+      e.createRoot(() => { Field(); }, {});
+      e.render();
+
+      const el = c.getElementsByTagName("input")[0]! as HTMLInputElement;
+      el.dispatchEvent(new Event("focus"));
+      expect(focused).toBe(1);
+      el.dispatchEvent(new Event("blur"));
+      expect(blurred).toBe(1);
+    } finally {
+      document.body.removeChild(c);
+    }
   });
 });
 

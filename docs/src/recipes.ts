@@ -3,6 +3,7 @@ import todo from "../recipes/todo.ts?raw";
 import storeDemo from "../recipes/store.ts?raw";
 import fetching from "../recipes/fetching.ts?raw";
 import suspense from "../recipes/suspense.ts?raw";
+import formControls from "../recipes/form-controls.ts?raw";
 
 export type Recipe = {
   id: string;
@@ -46,6 +47,26 @@ body { font: 15px system-ui, sans-serif; padding: 24px; background: #f7f8fa; col
 .controls { display: flex; gap: 8px; justify-content: center; }
 .controls button { padding: 8px 14px; border: 1px solid #ddd; background: #fff; border-radius: 6px; cursor: pointer; }
 .controls button:hover { border-color: #4a90d9; color: #4a90d9; }
+`;
+
+const formControlsCss = `
+body { font: 15px system-ui, sans-serif; padding: 24px; background: #f7f8fa; color: #1a1a1a; }
+.form-controls { max-width: 560px; margin: 20px auto; display: flex; flex-direction: column; gap: 16px; }
+.card { background: #fff; border-radius: 12px; padding: 16px; box-shadow: 0 4px 12px rgba(0,0,0,.05); }
+.card h2 { margin: 0 0 12px; font-size: 13px; color: #666; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
+.row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.row:last-child { margin-bottom: 0; }
+.label { font-size: 14px; }
+.tag { font-family: ui-monospace, monospace; font-size: 12px; padding: 3px 8px; background: #f0f6ff; border: 1px solid #c8dcf5; border-radius: 4px; color: #1a4480; }
+.tag.on { background: #e7f7ec; border-color: #b6e2c0; color: #146c2e; }
+.txt { padding: 6px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; width: 200px; }
+.txt:focus { outline: 2px solid #4a90d9; outline-offset: -1px; }
+.ring { padding: 6px; border-radius: 6px; transition: background .15s; }
+.ring.focused { background: #fff8d4; }
+.note { font-size: 12px; color: #777; margin: 4px 0 0; }
+button { padding: 6px 12px; border: 1px solid #ddd; background: #fff; border-radius: 6px; cursor: pointer; font-size: 13px; }
+button:hover { background: #f3f4f6; border-color: #4a90d9; color: #4a90d9; }
+audio, video { max-width: 100%; display: block; margin-bottom: 8px; }
 `;
 
 const fetchingCss = `
@@ -95,6 +116,13 @@ export const recipes: Recipe[] = [
     description: "Reusable Suspense view wrapping load/fallback/error.",
     source: suspense,
     css: fetchingCss,
+  },
+  {
+    id: "form-controls",
+    title: "Form controls",
+    description: "Checkbox, video/audio muted, focus/blur, controlled-input drift.",
+    source: formControls,
+    css: formControlsCss,
   },
 ];
 

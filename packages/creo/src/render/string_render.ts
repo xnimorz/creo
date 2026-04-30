@@ -12,7 +12,7 @@ const VOID_TAGS = new Set([
 ]);
 
 // Attributes that are set as DOM properties, not HTML attributes
-const DOM_PROPERTIES = new Set(["value", "checked", "selected", "indeterminate"]);
+const DOM_PROPERTIES = new Set(["value", "checked", "selected", "indeterminate", "muted"]);
 
 // Event handler prefix detection
 function isEventProp(key: string): boolean {

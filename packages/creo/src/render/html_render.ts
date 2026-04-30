@@ -90,11 +90,14 @@ function getState(container: HTMLElement) {
   return state;
 }
 
+// focus/blur don't bubble; listen in the capture phase so delegation works.
+const CAPTURE_EVENTS = new Set(["focus", "blur"]);
+
 function ensureDelegated(container: HTMLElement, domEvent: string): void {
   const state = getState(container);
   const count = state.counts.get(domEvent) ?? 0;
   if (count === 0) {
-    container.addEventListener(domEvent, state.handler);
+    container.addEventListener(domEvent, state.handler, CAPTURE_EVENTS.has(domEvent));
   }
   state.counts.set(domEvent, count + 1);
 }
@@ -104,7 +107,7 @@ function removeDelegated(container: HTMLElement, domEvent: string): void {
   const count = state.counts.get(domEvent) ?? 0;
   if (count <= 1) {
     state.counts.delete(domEvent);
-    container.removeEventListener(domEvent, state.handler);
+    container.removeEventListener(domEvent, state.handler, CAPTURE_EVENTS.has(domEvent));
   } else {
     state.counts.set(domEvent, count - 1);
   }
@@ -122,7 +125,8 @@ function mapEventData(domEvent: string, e: Event): Record<string, unknown> {
     const pe = e as PointerEvent;
     data = { x: pe.clientX, y: pe.clientY };
   } else if (domEvent === "input" || domEvent === "change") {
-    data = { value: (e.target as HTMLInputElement).value };
+    const target = e.target as HTMLInputElement;
+    data = { value: target.value, checked: !!target.checked };
   } else if (domEvent === "keydown" || domEvent === "keyup") {
     const ke = e as KeyboardEvent;
     data = { key: ke.key, code: ke.code };
@@ -141,6 +145,7 @@ const DOM_PROPERTIES = new Set([
   "checked",
   "selected",
   "indeterminate",
+  "muted",
 ]);
 
 // ---------------------------------------------------------------------------
@@ -328,7 +333,10 @@ export class HtmlRender implements IRender<HTMLElement | Text> {
     for (const key in next) {
       const value = next[key];
       if (key === "key" || value == null) continue;
-      if (prev[key] === value) continue;
+      // Re-assert DOM properties even if prevProps matches: the live DOM
+      // value can drift from prevProps via user input (typing in an input,
+      // toggling a checkbox) without our state ever changing.
+      if (prev[key] === value && !DOM_PROPERTIES.has(key)) continue;
       if (isEventProp(key)) {
         const creoName = key.slice(2);
         const domEvent = DOM_EVENT[creoName] ?? creoName.toLowerCase();
