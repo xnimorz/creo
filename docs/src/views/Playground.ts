@@ -5,23 +5,15 @@ import { oneDark } from "@codemirror/theme-one-dark";
 import { transform } from "sucrase";
 import { recipes, findRecipe } from "../recipes";
 import type { Recipe } from "../recipes";
-// Bundle-relative URLs to the locally built creo packages — used in dev so the
-// playground iframe runs the workspace build instead of the published version.
-import creoLocalUrl from "../../../packages/creo/dist/index.js?url";
-import creoRouterLocalUrl from "../../../packages/creo-router/dist/index.js?url";
-
-const CREO_VERSION = "0.2.4";
+// The playground iframe loads the workspace build that ships with the docs
+// site — same code in dev and on gh-pages, no esm.sh / publish dependency.
+import creoUrl from "../../../packages/creo/dist/index.js?url";
+import creoRouterUrl from "../../../packages/creo-router/dist/index.js?url";
 
 function importMap(): { creo: string; router: string } {
-  if (import.meta.env.DEV) {
-    return {
-      creo: new URL(creoLocalUrl, window.location.origin).href,
-      router: new URL(creoRouterLocalUrl, window.location.origin).href,
-    };
-  }
   return {
-    creo: `https://esm.sh/creo@${CREO_VERSION}`,
-    router: `https://esm.sh/creo-router@${CREO_VERSION}`,
+    creo: new URL(creoUrl, window.location.href).href,
+    router: new URL(creoRouterUrl, window.location.href).href,
   };
 }
 
