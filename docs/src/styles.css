@@ -546,6 +546,7 @@ a:hover { color: var(--accent-hover); text-decoration: underline; }
 .pg-editor-wrap {
   border-right: 1px solid var(--border);
   min-height: 0;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   position: relative;
@@ -573,6 +574,7 @@ a:hover { color: var(--accent-hover); text-decoration: underline; }
 .pg-preview-wrap {
   background: #fff;
   min-height: 0;
+  min-width: 0;
   display: flex;
 }
 .pg-preview {
