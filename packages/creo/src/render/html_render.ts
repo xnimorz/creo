@@ -327,6 +327,17 @@ export class HtmlRender implements IRender<HTMLElement | Text> {
           }
 
           parentNode.insertBefore(element, refNode);
+
+          // The HTML `autofocus` attribute only fires during initial document
+          // parse — for dynamically inserted elements browsers ignore it.
+          // Match React's behaviour by calling .focus() once after mount.
+          if (
+            props != null &&
+            (props as Record<string, unknown>).autofocus === true &&
+            typeof (element as HTMLElement).focus === "function"
+          ) {
+            (element as HTMLElement).focus();
+          }
         }
       } else {
         // Composite: no DOM — just mark as mounted

@@ -1,12 +1,17 @@
-import { view } from "@/public/view";
-import { _ } from "@/functional/maybe";
-import { store } from "@/public/store";
-import { div, text, button, input, span, h1 } from "@/public/primitives/primitives";
-import type {
-  InputEventData,
-  KeyEventData,
-  PointerEventData,
-} from "@/public/primitives/primitives";
+import {
+  createApp,
+  view,
+  store,
+  div,
+  text,
+  button,
+  input,
+  span,
+  h1,
+  HtmlRender,
+  _,
+} from "creo";
+import type { InputEventData, KeyEventData, PointerEventData } from "creo";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -104,23 +109,13 @@ const TodoDisplay = view<{
         isDragged ? "dragging" : "",
         dropEdge === "above" ? "drop-above" : "",
         dropEdge === "below" ? "drop-below" : "",
-      ]
-        .filter(Boolean)
-        .join(" ");
+      ].filter(Boolean).join(" ");
 
       div(
-        {
-          class: cls,
-          onPointerUp: handlePointerUp,
-        },
+        { class: cls, onPointerUp: handlePointerUp },
         () => {
-          span(
-            { class: "drag-handle", onPointerDown: handleDragStart },
-            "⠿",
-          );
-          span({ class: "todo-check", onClick: handleToggle },
-            todo.done ? "☑" : "☐",
-          );
+          span({ class: "drag-handle", onPointerDown: handleDragStart }, "⠿");
+          span({ class: "todo-check", onClick: handleToggle }, todo.done ? "☑" : "☐");
           span({ class: "todo-text", onClick: handleEdit }, todo.text);
           span({ class: "todo-delete", onClick: handleDelete }, "×");
         },
@@ -147,9 +142,7 @@ const TodoEditor = view<{
     props().onSave(draft);
   };
 
-  const handleInput = (e: InputEventData) => {
-    draft = e.value;
-  };
+  const handleInput = (e: InputEventData) => { draft = e.value; };
   const handleKeyDown = (e: KeyEventData) => {
     if (e.key === "Enter") commit();
     if (e.key === "Escape") {
@@ -179,7 +172,7 @@ const TodoEditor = view<{
 // App
 // ---------------------------------------------------------------------------
 
-export const App = view(({ use }) => {
+const App = view(({ use }) => {
   const todos = use(todosStore);
   let draft = "";
 
@@ -189,9 +182,7 @@ export const App = view(({ use }) => {
 
   // -- Add ------------------------------------------------------------------
 
-  const handleInput = (e: InputEventData) => {
-    draft = e.value;
-  };
+  const handleInput = (e: InputEventData) => { draft = e.value; };
 
   const addTodo = () => {
     const trimmed = draft.trim();
@@ -232,18 +223,12 @@ export const App = view(({ use }) => {
     editingId.set(null);
   };
 
-  const cancelEdit = () => {
-    editingId.set(null);
-  };
-
-  const toggleHideCompleted = () => {
-    hideCompleted.update((v) => !v);
-  };
+  const cancelEdit = () => editingId.set(null);
+  const toggleHideCompleted = () => hideCompleted.update((v) => !v);
 
   // -- Drag & Drop ----------------------------------------------------------
 
   // Item height estimate (padding + font + border ≈ 41px).
-  // Refined on first pointer-move from the actual drag delta.
   const ITEM_H = 41;
 
   const startDrag = (id: number, e: PointerEventData) => {
@@ -264,7 +249,6 @@ export const App = view(({ use }) => {
     if (!d) return;
     const count = todos.get().length;
     const fromIdx = todos.get().findIndex((t) => t.id === d.draggedId);
-    // How far the pointer moved from the grab point, in item-height units
     const delta = (e.y - d.originY) / d.itemH;
     let newIndex = Math.round(fromIdx + delta);
     if (newIndex < 0) newIndex = 0;
@@ -288,9 +272,7 @@ export const App = view(({ use }) => {
     drag.set(null);
   };
 
-  const cancelDrag = () => {
-    if (drag.get()) drag.set(null);
-  };
+  const cancelDrag = () => { if (drag.get()) drag.set(null); };
 
   // -- Render ---------------------------------------------------------------
 
@@ -370,16 +352,10 @@ export const App = view(({ use }) => {
             }
           });
 
-          // Floating ghost while dragging
           if (d) {
             const draggedTodo = list.find((t) => t.id === d.draggedId);
             if (draggedTodo) {
-              DragGhost({
-                label: draggedTodo.text,
-                done: draggedTodo.done,
-                x: d.x,
-                y: d.y,
-              });
+              DragGhost({ label: draggedTodo.text, done: draggedTodo.done, x: d.x, y: d.y });
             }
           }
         },
@@ -387,3 +363,5 @@ export const App = view(({ use }) => {
     },
   };
 });
+
+createApp(() => App(), new HtmlRender(document.getElementById("app")!)).mount();

@@ -20,8 +20,11 @@ bun run build                                        # build creo first, then de
 bun run version:patch|minor|major                    # bump all packages
 bun run publish:all                                  # dry-run (pass --no-dry-run to publish)
 
-# Run an example:
-cd examples/todo && bun install && bun run dev
+# Run the docs site (with the live recipe playground — simple-todo, advanced-todo, table, chess, etc.):
+cd docs && bun install && bun run dev
+
+# Run a standalone example (router / canvas-demo / editor / perf_profiler / benchmark):
+cd examples/router && bun install && bun run dev
 ```
 
 Tests live only under `packages/creo/src/`. There is no lint command.
@@ -36,7 +39,7 @@ Monorepo with `packages/*` workspaces:
 - `packages/creo-create-app` — CLI scaffolder (Vite, optional Hono server)
 - `packages/creo-create-tauri-app` — CLI scaffolder (Tauri v2, desktop + mobile)
 - `packages/creo-create-electron-app` — CLI scaffolder (Electron)
-- `examples/` — todo, router, table, chess, editor, canvas-demo, benchmark, perf_profiler
+- `examples/` — router, editor, canvas-demo, benchmark, perf_profiler (todo / chess / editable table now live as recipes under `docs/recipes/`)
 - `scripts/version.ts`, `scripts/publish.ts` — release orchestrators
 - `docs/` — user-facing docs (view, state, store, lifecycle, events, primitives, renderers)
 
@@ -50,7 +53,7 @@ Core source map (see AGENTS.md for details):
 
 ## Workflow Notes
 
-- After engine changes, run full `bun test packages/creo/src/` and visually verify with `examples/todo` and `examples/router`.
+- After engine changes, run full `bun test packages/creo/src/` and visually verify by running `cd docs && bun run dev` (open the playground recipes — simple-todo, advanced-todo, table, chess) and `examples/router`.
 - Build order matters: the root `build` script runs `creo` first, then everything else. Don't reorder.
 - Adding a primitive: edit `packages/creo/src/public/primitives/primitives.ts` and re-export from `packages/creo/src/index.ts`.
 

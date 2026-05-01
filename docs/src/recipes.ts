@@ -1,9 +1,12 @@
 import counter from "../recipes/counter.ts?raw";
-import todo from "../recipes/todo.ts?raw";
+import simpleTodo from "../recipes/simple-todo.ts?raw";
+import advancedTodo from "../recipes/advanced-todo.ts?raw";
 import storeDemo from "../recipes/store.ts?raw";
 import fetching from "../recipes/fetching.ts?raw";
 import suspense from "../recipes/suspense.ts?raw";
 import formControls from "../recipes/form-controls.ts?raw";
+import table from "../recipes/table.ts?raw";
+import chess from "../recipes/chess.ts?raw";
 
 export type Recipe = {
   id: string;
@@ -71,6 +74,104 @@ button:hover { background: #f3f4f6; border-color: #4a90d9; color: #4a90d9; }
 audio, video { max-width: 100%; display: block; margin-bottom: 8px; }
 `;
 
+// Advanced todo with drag-and-drop reordering — CSS lifted from
+// examples/todo/index.html.
+const advancedTodoCss = `
+body { font: 15px system-ui, sans-serif; padding: 24px; background: #f5f5f5; color: #1a1a1a; display: flex; justify-content: center; }
+.app { max-width: 480px; width: 100%; }
+h1 { font-size: 24px; margin-bottom: 16px; }
+.add-form { display: flex; gap: 8px; margin-bottom: 16px; }
+.add-input { flex: 1; padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
+.add-input:focus { outline: 2px solid #4a90d9; outline-offset: -1px; }
+.btn { padding: 8px 14px; border: 1px solid #ccc; border-radius: 4px; background: #fff; cursor: pointer; font-size: 14px; }
+.btn:hover { background: #eee; }
+.btn-primary { background: #4a90d9; color: #fff; border-color: #4a90d9; }
+.btn-primary:hover { background: #357abd; }
+.card { background: #fff; border: 1px solid #ddd; border-radius: 6px; overflow: hidden; }
+.card-header { padding: 12px 16px; font-weight: 600; font-size: 14px; background: #f9f9f9; border-bottom: 1px solid #ddd; }
+.card-body { padding: 0; }
+.todo-item { display: flex; align-items: center; gap: 10px; padding: 10px 16px; font-size: 14px; transition: background 0.1s; user-select: none; }
+.todo-item:not(:last-child) { border-bottom: 1px solid #eee; }
+.todo-item.done .todo-text { text-decoration: line-through; color: #999; }
+.todo-item.dragging { opacity: 0.25; }
+.todo-item.drop-above { box-shadow: inset 0 3px 0 #4a90d9; background: #f0f6ff; }
+.todo-item.drop-below { box-shadow: inset 0 -3px 0 #4a90d9; background: #f0f6ff; }
+.dragging-active { cursor: grabbing; }
+.dragging-active * { cursor: grabbing !important; }
+.drag-ghost { position: fixed; transform: translate(-16px, -50%); pointer-events: none; z-index: 1000; display: flex; align-items: center; gap: 10px; padding: 10px 16px; font-size: 14px; background: #fff; border: 1px solid #4a90d9; border-radius: 6px; box-shadow: 0 6px 20px rgba(0,0,0,0.15); opacity: 0.92; white-space: nowrap; max-width: 400px; }
+.todo-item.editing { padding: 6px 16px; }
+.drag-handle { cursor: grab; color: #aaa; font-size: 16px; line-height: 1; padding: 2px 0; }
+.drag-handle:hover { color: #666; }
+.todo-check { cursor: pointer; font-size: 16px; line-height: 1; }
+.todo-text { flex: 1; cursor: pointer; padding: 2px 0; border-radius: 3px; }
+.todo-text:hover { background: #f0f6ff; }
+.todo-delete { color: #c44; cursor: pointer; font-size: 16px; line-height: 1; opacity: 0; transition: opacity 0.1s; }
+.todo-item:hover .todo-delete { opacity: 1; }
+.todo-delete:hover { color: #a00; }
+.edit-input { flex: 1; padding: 6px 8px; border: 1px solid #4a90d9; border-radius: 4px; font-size: 14px; font-family: inherit; outline: none; width: 100%; }
+.filter-bar { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+.btn-filter { font-size: 12px; padding: 4px 10px; }
+.empty { padding: 24px 16px; text-align: center; color: #999; font-size: 14px; }
+`;
+
+// Editable table — CSS lifted from examples/table/index.html.
+const tableCss = `
+body { font: 15px system-ui, sans-serif; padding: 24px; background: #f5f5f5; color: #1a1a1a; }
+.toolbar { display: flex; gap: 8px; margin-bottom: 16px; }
+.btn { padding: 6px 14px; border: 1px solid #ccc; border-radius: 4px; background: #fff; cursor: pointer; font-size: 14px; }
+.btn:hover { background: #eee; }
+.table { display: inline-block; border: 1px solid #bbb; border-radius: 4px; overflow: hidden; background: #fff; outline: none; }
+.table:focus { border-color: #4a90d9; }
+.row { display: flex; }
+.row:not(:last-child) { border-bottom: 1px solid #ddd; }
+.cell { min-width: 120px; padding: 8px 12px; cursor: pointer; font-size: 14px; min-height: 36px; }
+.cell:not(:last-child) { border-right: 1px solid #ddd; }
+.cell:hover { background: #f0f6ff; }
+.cell.selected { outline: 2px solid #4a90d9; outline-offset: -2px; background: #e8f0fe; }
+.header-cell { font-weight: 600; background: #f9f9f9; cursor: default; }
+.header-cell:hover { background: #f9f9f9; }
+.cell-input { min-width: 120px; width: 120px; padding: 8px 12px; font-size: 14px; border: none; outline: 2px solid #4a90d9; outline-offset: -2px; min-height: 36px; font-family: inherit; background: #fff; }
+`;
+
+// Chess — CSS lifted from examples/chess/index.html.
+const chessCss = `
+body { font: 15px system-ui, -apple-system, sans-serif; padding: 32px; background: #1a1a2e; color: #eee; display: flex; justify-content: center; min-height: 100vh; margin: 0; }
+.chess-app { display: flex; flex-direction: column; align-items: center; gap: 12px; user-select: none; }
+.header { display: flex; align-items: center; gap: 16px; width: 512px; }
+.title { font-size: 22px; font-weight: 700; flex: 1; }
+.reset-btn { padding: 6px 14px; border: 1px solid #555; border-radius: 4px; background: #2a2a4a; color: #ccc; cursor: pointer; font-size: 13px; }
+.reset-btn:hover { background: #3a3a5a; }
+.status-bar { display: flex; align-items: center; gap: 10px; width: 512px; padding: 8px 12px; background: #2a2a4a; border-radius: 6px; font-size: 14px; }
+.turn-dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid #666; }
+.turn-dot.white { background: #fff; border-color: #999; }
+.turn-dot.black { background: #222; border-color: #666; }
+.status-text { flex: 1; }
+.board { display: grid; grid-template-columns: repeat(8, 64px); grid-template-rows: repeat(8, 64px); border: 3px solid #444; border-radius: 4px; overflow: hidden; }
+.square { width: 64px; height: 64px; display: flex; align-items: center; justify-content: center; position: relative; cursor: pointer; }
+.square.light { background: #f0d9b5; }
+.square.dark { background: #b58863; }
+.square.selected.light { background: #f7ec5a; }
+.square.selected.dark { background: #dbc34a; }
+.square.last-move.light { background: #e8d44d88; }
+.square.last-move.dark { background: #c8a43088; }
+.square.in-check.light, .square.in-check.dark { background: radial-gradient(ellipse at center, #ff4444 0%, #cc000088 60%, transparent 80%); }
+.square.valid-target { cursor: pointer; }
+.move-dot { width: 18px; height: 18px; border-radius: 50%; background: rgba(0,0,0,0.2); }
+.square.capture-target::after { content: ""; position: absolute; inset: 2px; border-radius: 50%; border: 3px solid rgba(0,0,0,0.25); }
+.piece { font-size: 46px; line-height: 1; pointer-events: none; text-shadow: 3px 4px 0px rgba(0,0,0,0.2); }
+.black-piece { color: #222; }
+.white-piece { color: #eee; }
+.file-labels { display: grid; grid-template-columns: repeat(8, 64px); width: 512px; }
+.file-label { text-align: center; font-size: 12px; color: #888; }
+.drag-ghost { position: fixed; transform: translate(-50%, -50%); pointer-events: none; z-index: 1000; font-size: 54px; line-height: 1; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.4)); opacity: 0.9; }
+.dragging-active { cursor: grabbing; }
+.dragging-active * { cursor: grabbing !important; }
+.promo-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 2000; }
+.promo-dialog { display: flex; gap: 8px; padding: 16px; background: #2a2a4a; border: 2px solid #555; border-radius: 10px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
+.promo-btn { width: 72px; height: 72px; font-size: 48px; line-height: 1; display: flex; align-items: center; justify-content: center; border: 2px solid #555; border-radius: 8px; background: #3a3a5a; cursor: pointer; transition: background 0.1s, border-color 0.1s; }
+.promo-btn:hover { background: #4a90d9; border-color: #4a90d9; }
+`;
+
 const fetchingCss = `
 body { font: 15px system-ui, sans-serif; padding: 24px; background: #f7f8fa; color: #1a1a1a; }
 .card { max-width: 420px; margin: 40px auto; background: #fff; padding: 24px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,.05); }
@@ -92,11 +193,18 @@ export const recipes: Recipe[] = [
     css: counterCss,
   },
   {
-    id: "todo",
-    title: "Todo list",
+    id: "simple-todo",
+    title: "Simple todo",
     description: "Keyed list reconciliation, inputs, events.",
-    source: todo,
+    source: simpleTodo,
     css: todoCss,
+  },
+  {
+    id: "advanced-todo",
+    title: "Advanced todo with drag-and-drop",
+    description: "Pointer-driven reordering, inline editing, hide/show filters.",
+    source: advancedTodo,
+    css: advancedTodoCss,
   },
   {
     id: "store",
@@ -125,6 +233,20 @@ export const recipes: Recipe[] = [
     description: "Checkbox, video/audio muted, focus/blur, controlled-input drift.",
     source: formControls,
     css: formControlsCss,
+  },
+  {
+    id: "table",
+    title: "Editable table",
+    description: "Keyed grid, inline cell editing, keyboard navigation.",
+    source: table,
+    css: tableCss,
+  },
+  {
+    id: "chess",
+    title: "Chess",
+    description: "Full chess engine: legal moves, check, mate, drag pieces, castling, en passant, promotion.",
+    source: chess,
+    css: chessCss,
   },
 ];
 

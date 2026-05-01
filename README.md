@@ -343,8 +343,10 @@ bun test packages/creo/src/    # Run tests
 bun run build                  # Build all packages
 bun run typecheck              # Type-check
 
-# Run examples:
-cd examples/todo && bun install && bun run dev
+# Run the docs site (with the live recipe playground — simple-todo, advanced-todo, table, chess, etc.):
+cd docs && bun install && bun run dev
+
+# Run a standalone example:
 cd examples/router && bun install && bun run dev
 
 # Version management:

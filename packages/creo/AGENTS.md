@@ -123,7 +123,7 @@ Export from `packages/creo/src/index.ts`.
 ### Changing the engine
 - `packages/creo/src/internal/engine.ts` is the core — reconciler, dirty queue, render loop
 - After changes, run `bun test packages/creo/src/` (all tests must pass)
-- Test with `cd examples/todo && bun run dev` for visual verification
+- Test with `cd docs && bun run dev` and open the playground recipes (simple-todo, advanced-todo, table, chess) for visual verification
 
 ### Changing the HTML renderer
 - `html_render.ts` — DOM operations, event delegation, attribute diffing

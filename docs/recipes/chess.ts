@@ -1,6 +1,12 @@
-import { view } from "@/public/view";
-import { div, text, span, button } from "@/public/primitives/primitives";
-import type { PointerEventData } from "@/public/primitives/primitives";
+import {
+  createApp,
+  view,
+  div,
+  span,
+  button,
+  HtmlRender,
+} from "creo";
+import type { PointerEventData } from "creo";
 
 // ===================================================================
 // Types
@@ -44,18 +50,8 @@ type DragState = {
 // ===================================================================
 
 const PIECE_CHAR: Record<string, string> = {
-  wK: "\u265A",
-  wQ: "\u265B",
-  wR: "\u265C",
-  wB: "\u265D",
-  wN: "\u265E",
-  wP: "\u265F",
-  bK: "\u265A",
-  bQ: "\u265B",
-  bR: "\u265C",
-  bB: "\u265D",
-  bN: "\u265E",
-  bP: "\u265F",
+  wK: "♚", wQ: "♛", wR: "♜", wB: "♝", wN: "♞", wP: "♟",
+  bK: "♚", bQ: "♛", bR: "♜", bB: "♝", bN: "♞", bP: "♟",
 };
 
 function pieceChar(p: Piece): string {
@@ -66,18 +62,10 @@ function pieceChar(p: Piece): string {
 // Position helpers
 // ===================================================================
 
-function pos(row: number, col: number): number {
-  return row * 8 + col;
-}
-function row(p: number): number {
-  return p >> 3;
-}
-function col(p: number): number {
-  return p & 7;
-}
-function onBoard(r: number, c: number): boolean {
-  return r >= 0 && r < 8 && c >= 0 && c < 8;
-}
+function pos(row: number, col: number): number { return row * 8 + col; }
+function row(p: number): number { return p >> 3; }
+function col(p: number): number { return p & 7; }
+function onBoard(r: number, c: number): boolean { return r >= 0 && r < 8 && c >= 0 && c < 8; }
 
 function findKing(board: Board, color: Color): number {
   for (let i = 0; i < 64; i++) {
@@ -88,52 +76,34 @@ function findKing(board: Board, color: Color): number {
 }
 
 // ===================================================================
-// Attack detection (from king outward — no move generation needed)
+// Attack detection
 // ===================================================================
 
 const SLIDE_DIRS: [number, number][] = [
-  [-1, 0],
-  [1, 0],
-  [0, -1],
-  [0, 1], // orthogonal
-  [-1, -1],
-  [-1, 1],
-  [1, -1],
-  [1, 1], // diagonal
+  [-1, 0], [1, 0], [0, -1], [0, 1],
+  [-1, -1], [-1, 1], [1, -1], [1, 1],
 ];
 
 const KNIGHT_OFFSETS: [number, number][] = [
-  [-2, -1],
-  [-2, 1],
-  [-1, -2],
-  [-1, 2],
-  [1, -2],
-  [1, 2],
-  [2, -1],
-  [2, 1],
+  [-2, -1], [-2, 1], [-1, -2], [-1, 2], [1, -2], [1, 2], [2, -1], [2, 1],
 ];
 
 function isAttacked(board: Board, target: number, byColor: Color): boolean {
-  const tr = row(target),
-    tc = col(target);
+  const tr = row(target), tc = col(target);
 
-  // Knight attacks
   for (const [dr, dc] of KNIGHT_OFFSETS) {
-    const r2 = tr + dr,
-      c2 = tc + dc;
+    const r2 = tr + dr, c2 = tc + dc;
     if (onBoard(r2, c2)) {
       const sq = board[pos(r2, c2)];
       if (sq && sq.color === byColor && sq.type === "N") return true;
     }
   }
 
-  // Sliding attacks (rook/bishop/queen) + adjacent king
   for (let d = 0; d < 8; d++) {
     const [dr, dc] = SLIDE_DIRS[d]!;
     const isDiag = dr !== 0 && dc !== 0;
     for (let dist = 1; dist < 8; dist++) {
-      const r2 = tr + dr * dist,
-        c2 = tc + dc * dist;
+      const r2 = tr + dr * dist, c2 = tc + dc * dist;
       if (!onBoard(r2, c2)) break;
       const sq = board[pos(r2, c2)];
       if (!sq) continue;
@@ -145,11 +115,9 @@ function isAttacked(board: Board, target: number, byColor: Color): boolean {
     }
   }
 
-  // Pawn attacks
-  const pawnDir = byColor === "w" ? 1 : -1; // pawns of byColor attack in this row direction relative to target
+  const pawnDir = byColor === "w" ? 1 : -1;
   for (const dc of [-1, 1]) {
-    const r2 = tr + pawnDir,
-      c2 = tc + dc;
+    const r2 = tr + pawnDir, c2 = tc + dc;
     if (onBoard(r2, c2)) {
       const sq = board[pos(r2, c2)];
       if (sq && sq.color === byColor && sq.type === "P") return true;
@@ -175,8 +143,7 @@ function pseudoLegalMoves(game: GameState, from: number): Move[] {
   if (!piece || piece.color !== game.turn) return [];
 
   const moves: Move[] = [];
-  const r = row(from),
-    c = col(from);
+  const r = row(from), c = col(from);
   const color = piece.color;
   const enemy = color === "w" ? "b" : "w";
 
@@ -191,8 +158,7 @@ function pseudoLegalMoves(game: GameState, from: number): Move[] {
   function slide(dirs: [number, number][]) {
     for (const [dr, dc] of dirs) {
       for (let dist = 1; dist < 8; dist++) {
-        const r2 = r + dr * dist,
-          c2 = c + dc * dist;
+        const r2 = r + dr * dist, c2 = c + dc * dist;
         if (!onBoard(r2, c2)) break;
         const to = pos(r2, c2);
         const target = board[to];
@@ -211,7 +177,6 @@ function pseudoLegalMoves(game: GameState, from: number): Move[] {
       const startRow = color === "w" ? 6 : 1;
       const promoRow = color === "w" ? 0 : 7;
 
-      // Forward
       const f1 = r + dir;
       if (onBoard(f1, c) && !board[pos(f1, c)]) {
         if (f1 === promoRow) {
@@ -220,13 +185,11 @@ function pseudoLegalMoves(game: GameState, from: number): Move[] {
         } else {
           moves.push({ from, to: pos(f1, c) });
         }
-        // Double push
         const f2 = r + dir * 2;
         if (r === startRow && !board[pos(f2, c)]) {
           moves.push({ from, to: pos(f2, c) });
         }
       }
-      // Captures
       for (const dc of [-1, 1]) {
         const cc = c + dc;
         if (!onBoard(f1, cc)) continue;
@@ -240,49 +203,26 @@ function pseudoLegalMoves(game: GameState, from: number): Move[] {
             moves.push({ from, to });
           }
         }
-        // En passant
-        if (to === game.enPassant) {
-          moves.push({ from, to, enPassant: true });
-        }
+        if (to === game.enPassant) moves.push({ from, to, enPassant: true });
       }
       break;
     }
     case "N":
       for (const [dr, dc] of KNIGHT_OFFSETS) addIfValid(r + dr, c + dc);
       break;
-    case "B":
-      slide(SLIDE_DIRS.slice(4));
-      break;
-    case "R":
-      slide(SLIDE_DIRS.slice(0, 4));
-      break;
-    case "Q":
-      slide(SLIDE_DIRS);
-      break;
+    case "B": slide(SLIDE_DIRS.slice(4)); break;
+    case "R": slide(SLIDE_DIRS.slice(0, 4)); break;
+    case "Q": slide(SLIDE_DIRS); break;
     case "K": {
       for (const [dr, dc] of SLIDE_DIRS) addIfValid(r + dr, c + dc);
-      // Castling
       const cr = color === "w" ? 7 : 0;
       if (r === cr && c === 4) {
-        // Kingside
         const canK = color === "w" ? game.castling.wK : game.castling.bK;
-        if (
-          canK &&
-          !board[pos(cr, 5)] &&
-          !board[pos(cr, 6)] &&
-          board[pos(cr, 7)]?.type === "R"
-        ) {
+        if (canK && !board[pos(cr, 5)] && !board[pos(cr, 6)] && board[pos(cr, 7)]?.type === "R") {
           moves.push({ from, to: pos(cr, 6), castle: "K" });
         }
-        // Queenside
         const canQ = color === "w" ? game.castling.wQ : game.castling.bQ;
-        if (
-          canQ &&
-          !board[pos(cr, 3)] &&
-          !board[pos(cr, 2)] &&
-          !board[pos(cr, 1)] &&
-          board[pos(cr, 0)]?.type === "R"
-        ) {
+        if (canQ && !board[pos(cr, 3)] && !board[pos(cr, 2)] && !board[pos(cr, 1)] && board[pos(cr, 0)]?.type === "R") {
           moves.push({ from, to: pos(cr, 2), castle: "Q" });
         }
       }
@@ -333,7 +273,6 @@ function legalMoves(game: GameState, from: number): Move[] {
   const enemy = color === "w" ? "b" : "w";
 
   return pseudo.filter((move) => {
-    // Castling: king must not be in check, and must not cross/land on attacked squares
     if (move.castle) {
       if (isInCheck(game.board, color)) return false;
       const cr = row(move.from);
@@ -351,9 +290,7 @@ function allLegalMoves(game: GameState): Move[] {
   const moves: Move[] = [];
   for (let i = 0; i < 64; i++) {
     const sq = game.board[i];
-    if (sq && sq.color === game.turn) {
-      moves.push(...legalMoves(game, i));
-    }
+    if (sq && sq.color === game.turn) moves.push(...legalMoves(game, i));
   }
   return moves;
 }
@@ -367,22 +304,14 @@ function applyMove(game: GameState, move: Move): GameState {
   const nextTurn: Color = color === "w" ? "b" : "w";
   const board = applyMoveRaw(game.board, move, color);
 
-  // Update castling rights
   const c = { ...game.castling };
-  if (move.from === pos(7, 4)) {
-    c.wK = false;
-    c.wQ = false;
-  } // white king moved
-  if (move.from === pos(0, 4)) {
-    c.bK = false;
-    c.bQ = false;
-  } // black king moved
+  if (move.from === pos(7, 4)) { c.wK = false; c.wQ = false; }
+  if (move.from === pos(0, 4)) { c.bK = false; c.bQ = false; }
   if (move.from === pos(7, 7) || move.to === pos(7, 7)) c.wK = false;
   if (move.from === pos(7, 0) || move.to === pos(7, 0)) c.wQ = false;
   if (move.from === pos(0, 7) || move.to === pos(0, 7)) c.bK = false;
   if (move.from === pos(0, 0) || move.to === pos(0, 0)) c.bQ = false;
 
-  // En passant target
   let ep: number | null = null;
   const piece = game.board[move.from]!;
   if (piece.type === "P" && Math.abs(row(move.to) - row(move.from)) === 2) {
@@ -390,14 +319,9 @@ function applyMove(game: GameState, move: Move): GameState {
   }
 
   const next: GameState = {
-    board,
-    turn: nextTurn,
-    castling: c,
-    enPassant: ep,
-    status: "playing",
+    board, turn: nextTurn, castling: c, enPassant: ep, status: "playing",
   };
 
-  // Compute status for the side that must now move
   const opponentMoves = allLegalMoves(next);
   const inCheck = isInCheck(board, nextTurn);
   if (opponentMoves.length === 0) {
@@ -437,18 +361,13 @@ function initialGame(): GameState {
 // Views
 // ===================================================================
 
-const SQ_SIZE = 64;
-
-// -- Status bar -------------------------------------------------------
-
 const StatusBar = view<{ game: GameState }>(({ props }) => ({
   render() {
     const g = props().game;
     const turnLabel = g.turn === "w" ? "White" : "Black";
     let msg = `${turnLabel} to move`;
     if (g.status === "check") msg = `${turnLabel} is in check`;
-    if (g.status === "checkmate")
-      msg = `Checkmate! ${g.turn === "w" ? "Black" : "White"} wins`;
+    if (g.status === "checkmate") msg = `Checkmate! ${g.turn === "w" ? "Black" : "White"} wins`;
     if (g.status === "stalemate") msg = "Stalemate — draw";
 
     div({ class: "status-bar" }, () => {
@@ -457,8 +376,6 @@ const StatusBar = view<{ game: GameState }>(({ props }) => ({
     });
   },
 }));
-
-// -- Promotion dialog -------------------------------------------------
 
 const PromotionDialog = view<{
   color: Color;
@@ -470,30 +387,19 @@ const PromotionDialog = view<{
       div({ class: "promo-dialog" }, () => {
         for (const t of ["Q", "R", "B", "N"] as PieceType[]) {
           button({ class: "promo-btn", onClick: () => onSelect(t) },
-            pieceChar({ color, type: t }),
-          );
+            pieceChar({ color, type: t }));
         }
       });
     });
   },
 }));
 
-// -- Drag ghost -------------------------------------------------------
-
 const DragGhost = view<{ piece: Piece; x: number; y: number }>(({ props }) => ({
   render() {
     const { piece, x, y } = props();
-    div(
-      {
-        class: "drag-ghost",
-        style: `left:${x}px;top:${y}px`,
-      },
-      pieceChar(piece),
-    );
+    div({ class: "drag-ghost", style: `left:${x}px;top:${y}px` }, pieceChar(piece));
   },
 }));
-
-// -- Square -----------------------------------------------------------
 
 const SquareView = view<{
   pos: number;
@@ -523,18 +429,14 @@ const SquareView = view<{
         p.isCheck ? "in-check" : "",
         p.isLastMove ? "last-move" : "",
         p.isValidTarget && p.piece ? "capture-target" : "",
-      ]
-        .filter(Boolean)
-        .join(" ");
+      ].filter(Boolean).join(" ");
 
       div(
         { class: cls, onPointerDown: handleDown, onPointerUp: handleUp },
         () => {
           if (p.piece) {
             span(
-              {
-                class: `piece ${p.piece.color === "w" ? "white-piece" : "black-piece"}`,
-              },
+              { class: `piece ${p.piece.color === "w" ? "white-piece" : "black-piece"}` },
               pieceChar(p.piece!),
             );
           }
@@ -547,9 +449,7 @@ const SquareView = view<{
   };
 });
 
-// -- App --------------------------------------------------------------
-
-export const App = view(({ use }) => {
+const App = view(({ use }) => {
   const game = use<GameState>(initialGame());
   const selected = use<number | null>(null);
   const validMovesState = use<Move[]>([]);
@@ -562,15 +462,12 @@ export const App = view(({ use }) => {
     return s === "checkmate" || s === "stalemate";
   };
 
-  // -- Selection / move -----------------------------------------------
-
   const selectSquare = (sqPos: number, e?: PointerEventData) => {
     if (isGameOver()) return;
     const g = game.get();
     const piece = g.board[sqPos];
     const sel = selected.get();
 
-    // If clicking a valid target, execute move
     if (sel !== null) {
       const moves = validMovesState.get();
       const move = moves.find((m) => m.to === sqPos);
@@ -580,19 +477,13 @@ export const App = view(({ use }) => {
       }
     }
 
-    // Select own piece
     if (piece && piece.color === g.turn) {
       selected.set(sqPos);
       const moves = legalMoves(g, sqPos);
       validMovesState.set(moves);
       if (e) {
         dragInfo.set({
-          from: sqPos,
-          piece,
-          x: e.x,
-          y: e.y,
-          originX: e.x,
-          originY: e.y,
+          from: sqPos, piece, x: e.x, y: e.y, originX: e.x, originY: e.y,
         });
       }
     } else {
@@ -602,9 +493,7 @@ export const App = view(({ use }) => {
   };
 
   const executeMove = (move: Move) => {
-    // Check if promotion choice needed
     if (move.promotion) {
-      // Find if there are multiple promotion options
       const moves = validMovesState.get();
       const promoMoves = moves.filter((m) => m.to === move.to && m.promotion);
       if (promoMoves.length > 1) {
@@ -632,8 +521,6 @@ export const App = view(({ use }) => {
     completeMove({ from: pp.from, to: pp.to, promotion: type });
   };
 
-  // -- Pointer handlers -----------------------------------------------
-
   const handleSquareDown = (sqPos: number, e: PointerEventData) => {
     selectSquare(sqPos, e);
   };
@@ -642,14 +529,13 @@ export const App = view(({ use }) => {
     if (isGameOver()) return;
     const d = dragInfo.get();
     if (!d) return;
-    if (d.from === sqPos) return; // released on same square — keep selected
+    if (d.from === sqPos) return;
 
     const moves = validMovesState.get();
     const move = moves.find((m) => m.to === sqPos);
     if (move) {
       executeMove(move);
     } else {
-      // Invalid drop — cancel drag but keep selection
       dragInfo.set(null);
     }
   };
@@ -674,8 +560,6 @@ export const App = view(({ use }) => {
     pendingPromotion.set(null);
     lastMove.set(null);
   };
-
-  // -- Render ---------------------------------------------------------
 
   return {
     render() {
@@ -704,11 +588,9 @@ export const App = view(({ use }) => {
 
           StatusBar({ game: g });
 
-          // Board
           div({ class: "board" }, () => {
             for (let p = 0; p < 64; p++) {
-              const r = row(p),
-                c = col(p);
+              const r = row(p), c = col(p);
               const isLight = (r + c) % 2 === 0;
               const piece = g.board[p] ?? null;
               const isDragged = d && d.from === p;
@@ -728,22 +610,16 @@ export const App = view(({ use }) => {
             }
           });
 
-          // File labels
           div({ class: "file-labels" }, () => {
             for (const f of ["a", "b", "c", "d", "e", "f", "g", "h"]) {
               span({ class: "file-label" }, f);
             }
           });
 
-          // Promotion dialog
           if (promo) {
-            PromotionDialog({
-              color: g.turn,
-              onSelect: handlePromotion,
-            });
+            PromotionDialog({ color: g.turn, onSelect: handlePromotion });
           }
 
-          // Drag ghost
           if (d) {
             DragGhost({ piece: d.piece, x: d.x, y: d.y });
           }
@@ -752,3 +628,5 @@ export const App = view(({ use }) => {
     },
   };
 });
+
+createApp(() => App(), new HtmlRender(document.getElementById("app")!)).mount();

@@ -1,5 +1,12 @@
-import { view } from "@/public/view";
-import { div, text, button, input } from "@/public/primitives/primitives";
+import {
+  createApp,
+  view,
+  div,
+  button,
+  input,
+  HtmlRender,
+} from "creo";
+import type { InputEventData, KeyEventData } from "creo";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -29,11 +36,11 @@ const EditableCell = view<{
 }>((ctx) => {
   let current = ctx.props().value;
 
-  const handleInput = (e: { value: string }) => {
+  const handleInput = (e: InputEventData) => {
     current = e.value;
   };
 
-  const handleKeyDown = (e: { key: string; stopPropagation: () => void }) => {
+  const handleKeyDown = (e: KeyEventData) => {
     if (e.key === "Enter") {
       e.stopPropagation();
       ctx.props().onSave(current);
@@ -74,7 +81,7 @@ const DisplayCell = view<{
         onClick: () => ctx.props().onEdit(),
         onDblclick: () => ctx.props().onEdit(),
       },
-      ctx.props().value || "\u00A0",
+      ctx.props().value || " ",
     );
   },
 }));
@@ -85,7 +92,7 @@ const DisplayCell = view<{
 
 let nextId = 1;
 
-export const App = view(({ use }) => {
+const App = view(({ use }) => {
   const columns = use<string[]>(["A", "B", "C"]);
   const rows = use<Row[]>([
     { id: String(nextId++), cells: { A: "", B: "", C: "" } },
@@ -93,8 +100,6 @@ export const App = view(({ use }) => {
   ]);
   const selected = use<CellPos | null>(null);
   const editing = use<CellPos | null>(null);
-
-  // -- Helpers --
 
   const addRow = () => {
     const id = String(nextId++);
@@ -109,8 +114,6 @@ export const App = view(({ use }) => {
     columns.set([...columns.get(), next]);
     rows.set([...rows.get()]);
   };
-
-  // -- Handlers --
 
   const refocusTable = () => {
     setTimeout(() => {
@@ -133,7 +136,7 @@ export const App = view(({ use }) => {
     refocusTable();
   };
 
-  const handleTableKeyDown = (e: { key: string }) => {
+  const handleTableKeyDown = (e: KeyEventData) => {
     if (editing.get()) return;
 
     const sel = selected.get() ?? { rowIdx: 0, colIdx: 0 };
@@ -147,9 +150,7 @@ export const App = view(({ use }) => {
         }
         break;
       case "ArrowDown":
-        if (sel.rowIdx >= maxRow) {
-          addRow();
-        }
+        if (sel.rowIdx >= maxRow) addRow();
         selected.set({ rowIdx: sel.rowIdx + 1, colIdx: sel.colIdx });
         break;
       case "ArrowLeft":
@@ -158,9 +159,7 @@ export const App = view(({ use }) => {
         }
         break;
       case "ArrowRight":
-        if (sel.colIdx >= maxCol) {
-          addCol();
-        }
+        if (sel.colIdx >= maxCol) addCol();
         selected.set({ rowIdx: sel.rowIdx, colIdx: sel.colIdx + 1 });
         break;
       case "Enter":
@@ -223,3 +222,5 @@ export const App = view(({ use }) => {
     },
   };
 });
+
+createApp(() => App(), new HtmlRender(document.getElementById("app")!)).mount();

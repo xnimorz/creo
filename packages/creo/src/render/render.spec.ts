@@ -852,6 +852,47 @@ describe("HtmlRender", () => {
     }
   });
 
+  it("autofocus on dynamically mounted input actually focuses the element", () => {
+    let toggle: Reactive<boolean>;
+
+    const Form = view<void>(({ use }) => {
+      const editing = use(false);
+      toggle = editing;
+      return {
+        render() {
+          if (editing.get()) {
+            input({ class: "edit", autofocus: true });
+          } else {
+            div({ class: "view" });
+          }
+        },
+      };
+    });
+
+    const c = document.createElement("div");
+    document.body.appendChild(c);
+    try {
+      const r = new HtmlRender(c);
+      const e = new Engine(r);
+      orchestrator.setCurrentEngine(e);
+      e.createRoot(() => { Form(); }, {});
+      e.render();
+
+      // Initially the input does not exist.
+      expect(c.querySelector(".edit")).toBeNull();
+
+      toggle!.set(true);
+      e.render();
+
+      const inputEl = c.querySelector(".edit") as HTMLInputElement;
+      expect(inputEl).not.toBeNull();
+      // Renderer should have called .focus() — same shape React uses.
+      expect(document.activeElement).toBe(inputEl);
+    } finally {
+      document.body.removeChild(c);
+    }
+  });
+
   it("delegates focus and blur via capture phase", () => {
     let focused = 0;
     let blurred = 0;
