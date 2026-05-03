@@ -1,0 +1,19 @@
+{
+  "name": "creo-example-editor",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "test:install": "playwright install --with-deps chromium webkit",
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:ui": "playwright test --ui"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0",
+    "@types/bun": "latest",
+    "typescript": "^5",
+    "vite": "^6.0.0"
+  }
+}

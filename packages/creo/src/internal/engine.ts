@@ -418,11 +418,13 @@ export class Engine {
           view.keyToView.set(pending[j]!.userKey!, pending[j]!);
         }
       }
-      // Rebuild children array
+      // Rebuild children: head (already patched) + new insertions + tail
+      // (already patched by Phase 2; lives in oldChildren at indices
+      // strictly greater than oldEnd).
       view.children = [
         ...oldChildren.slice(0, i),
         ...pending.slice(i, newEnd + 1),
-        ...oldChildren.slice(i, oldEnd + 1), // tail-synced portion is already patched
+        ...oldChildren.slice(oldEnd + 1),
       ];
       return;
     }

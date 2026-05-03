@@ -10,7 +10,7 @@
     },
     "packages/creo": {
       "name": "creo",
-      "version": "0.2.1",
+      "version": "0.2.5",
       "devDependencies": {
         "@types/bun": "latest",
         "happy-dom": "^20.8.4",
@@ -22,7 +22,7 @@
     },
     "packages/creo-create-app": {
       "name": "creo-create-app",
-      "version": "0.2.1",
+      "version": "0.2.5",
       "bin": {
         "creo-create-app": "./dist/index.js",
       },
@@ -34,7 +34,7 @@
     },
     "packages/creo-create-electron-app": {
       "name": "creo-create-electron-app",
-      "version": "0.2.1",
+      "version": "0.2.5",
       "bin": {
         "creo-create-electron-app": "./dist/index.js",
       },
@@ -46,7 +46,7 @@
     },
     "packages/creo-create-tauri-app": {
       "name": "creo-create-tauri-app",
-      "version": "0.2.1",
+      "version": "0.2.5",
       "bin": {
         "creo-create-tauri-app": "./dist/index.js",
       },
@@ -56,9 +56,22 @@
         "typescript": "^5",
       },
     },
+    "packages/creo-editor": {
+      "name": "creo-editor",
+      "version": "0.2.5",
+      "devDependencies": {
+        "@types/bun": "latest",
+        "creo": "workspace:*",
+        "happy-dom": "^20.8.4",
+        "typescript": "^5",
+      },
+      "peerDependencies": {
+        "creo": ">=0.2.5",
+      },
+    },
     "packages/creo-router": {
       "name": "creo-router",
-      "version": "0.2.1",
+      "version": "0.2.5",
       "devDependencies": {
         "@types/bun": "latest",
         "creo": "workspace:*",
@@ -105,6 +118,8 @@
     "creo-create-electron-app": ["creo-create-electron-app@workspace:packages/creo-create-electron-app"],
 
     "creo-create-tauri-app": ["creo-create-tauri-app@workspace:packages/creo-create-tauri-app"],
+
+    "creo-editor": ["creo-editor@workspace:packages/creo-editor"],
 
     "creo-router": ["creo-router@workspace:packages/creo-router"],
 
@@ -178,8 +193,16 @@
 
     "ws": ["ws@8.20.0", "", { "peerDependencies": { "bufferutil": "^4.0.1", "utf-8-validate": ">=5.0.2" }, "optionalPeers": ["bufferutil", "utf-8-validate"] }, "sha512-sAt8BhgNbzCtgGbt2OxmpuryO63ZoDk/sqaB/znQm94T4fCEsy/yV+7CdC1kJhOU9lboAEU7R3kquuycDoibVA=="],
 
+    "creo/@types/bun": ["@types/bun@1.3.13", "", { "dependencies": { "bun-types": "1.3.13" } }, "sha512-9fqXWk5YIHGGnUau9TEi+qdlTYDAnOj+xLCmSTwXfAIqXr2x4tytJb43E9uCvt09zJURKXwAtkoH4nLQfzeTXw=="],
+
     "creo-create-electron-app/@types/bun": ["@types/bun@1.3.12", "", { "dependencies": { "bun-types": "1.3.12" } }, "sha512-DBv81elK+/VSwXHDlnH3Qduw+KxkTIWi7TXkAeh24zpi5l0B2kUg9Ga3tb4nJaPcOFswflgi/yAvMVBPrxMB+A=="],
 
+    "creo-editor/@types/bun": ["@types/bun@1.3.13", "", { "dependencies": { "bun-types": "1.3.13" } }, "sha512-9fqXWk5YIHGGnUau9TEi+qdlTYDAnOj+xLCmSTwXfAIqXr2x4tytJb43E9uCvt09zJURKXwAtkoH4nLQfzeTXw=="],
+
     "creo-create-electron-app/@types/bun/bun-types": ["bun-types@1.3.12", "", { "dependencies": { "@types/node": "*" } }, "sha512-HqOLj5PoFajAQciOMRiIZGNoKxDJSr6qigAttOX40vJuSp6DN/CxWp9s3C1Xwm4oH7ybueITwiaOcWXoYVoRkA=="],
+
+    "creo-editor/@types/bun/bun-types": ["bun-types@1.3.13", "", { "dependencies": { "@types/node": "*" } }, "sha512-QXKeHLlOLqQX9LgYaHJfzdBaV21T63HhFJnvuRCcjZiaUDpbs5ED1MgxbMra71CsryN/1dAoXuJJJwIv/2drVA=="],
+
+    "creo/@types/bun/bun-types": ["bun-types@1.3.13", "", { "dependencies": { "@types/node": "*" } }, "sha512-QXKeHLlOLqQX9LgYaHJfzdBaV21T63HhFJnvuRCcjZiaUDpbs5ED1MgxbMra71CsryN/1dAoXuJJJwIv/2drVA=="],
   }
 }

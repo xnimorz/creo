@@ -21,6 +21,13 @@
       "runtimeArgs": ["vite", "preview", "--port", "5202"],
       "port": 5202,
       "cwd": "docs"
+    },
+    {
+      "name": "editor",
+      "runtimeExecutable": "bun",
+      "runtimeArgs": ["vite", "--port", "5203"],
+      "port": 5203,
+      "cwd": "examples/editor"
     }
   ]
 }

@@ -10,6 +10,7 @@ export default defineConfig({
       "@": path.resolve(__dirname, "../packages/creo/src"),
       creo: path.resolve(__dirname, "../packages/creo/src/index.ts"),
       "creo-router": path.resolve(__dirname, "../packages/creo-router/src/index.ts"),
+      "creo-editor": path.resolve(__dirname, "../packages/creo-editor/src/index.ts"),
     },
   },
   server: {
