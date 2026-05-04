@@ -74,13 +74,11 @@ const Row = view<{
   onSelect: () => void;
   onRemove: () => void;
 }>((ctx) => ({
-  update: {
-    should(next: { item: RowData; selected: boolean; onSelect: () => void; onRemove: () => void }) {
-      return (
-        next.item.label !== ctx.props().item.label ||
-        next.selected !== ctx.props().selected
-      );
-    },
+  shouldUpdate(next) {
+    return (
+      next.item.label !== ctx.props().item.label ||
+      next.selected !== ctx.props().selected
+    );
   },
   render() {
     tr({ class: ctx.props().selected ? "danger" : "" }, () => {
