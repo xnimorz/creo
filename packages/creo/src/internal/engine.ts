@@ -81,6 +81,7 @@ export class Engine {
       unsubscribe: null,
       parent,
       scHost: null,
+      pos: -1,
     };
     if (slot) {
       const slotFn = typeof slot === "string" ? this.#stringSlot(slot) : slot;
@@ -325,7 +326,9 @@ export class Engine {
     // We do not have any previous children. In this case, we just insert new items and that's it
     if (view.children == null) {
       view.children = pendingChildren;
-      for (const child of pendingChildren) {
+      for (let i = 0; i < pendingChildren.length; i++) {
+        const child = pendingChildren[i]!;
+        child.pos = i;
         this.initViewBody(child);
         this.markDirty(child);
         if (child.userKey != null) {
@@ -361,11 +364,13 @@ export class Engine {
       const old = oldChildren[i]!;
       const pend = pending[i]!;
       this.#patchOrReplace(view, oldChildren, i, old, pend);
+      oldChildren[i]!.pos = i;
     }
 
     // Mount new children
     for (let i = oldLen; i < newLen; i++) {
       oldChildren[i] = pending[i]!;
+      pending[i]!.pos = i;
       this.initViewBody(pending[i]!);
       this.markDirty(pending[i]!);
     }
@@ -424,9 +429,21 @@ export class Engine {
       const tailLen = oldChildren.length - tailStart;
       const insertCount = newEnd - i + 1;
       const out = new Array<ViewRecord>(i + insertCount + tailLen);
-      for (let j = 0; j < i; j++) out[j] = oldChildren[j]!;
-      for (let j = 0; j < insertCount; j++) out[i + j] = pending[i + j]!;
-      for (let j = 0; j < tailLen; j++) out[i + insertCount + j] = oldChildren[tailStart + j]!;
+      for (let j = 0; j < i; j++) {
+        const c = oldChildren[j]!;
+        c.pos = j;
+        out[j] = c;
+      }
+      for (let j = 0; j < insertCount; j++) {
+        const c = pending[i + j]!;
+        c.pos = i + j;
+        out[i + j] = c;
+      }
+      for (let j = 0; j < tailLen; j++) {
+        const c = oldChildren[tailStart + j]!;
+        c.pos = i + insertCount + j;
+        out[i + insertCount + j] = c;
+      }
       view.children = out;
       return;
     }
@@ -440,8 +457,16 @@ export class Engine {
       const tailStart = oldEnd + 1;
       const tailLen = oldChildren.length - tailStart;
       const out = new Array<ViewRecord>(i + tailLen);
-      for (let j = 0; j < i; j++) out[j] = oldChildren[j]!;
-      for (let j = 0; j < tailLen; j++) out[i + j] = oldChildren[tailStart + j]!;
+      for (let j = 0; j < i; j++) {
+        const c = oldChildren[j]!;
+        c.pos = j;
+        out[j] = c;
+      }
+      for (let j = 0; j < tailLen; j++) {
+        const c = oldChildren[tailStart + j]!;
+        c.pos = i + j;
+        out[i + j] = c;
+      }
       view.children = out;
       return;
     }
@@ -485,7 +510,11 @@ export class Engine {
     const tailStart = oldEnd + 1;
     const tailLen = oldChildren.length - tailStart;
     const out = new Array<ViewRecord>(i + middleLen + tailLen);
-    for (let j = 0; j < i; j++) out[j] = oldChildren[j]!;
+    for (let j = 0; j < i; j++) {
+      const c = oldChildren[j]!;
+      c.pos = j;
+      out[j] = c;
+    }
     for (let j = middleLen - 1; j >= 0; j--) {
       const newIdx = i + j;
       const pendView = pending[newIdx]!;
@@ -498,6 +527,7 @@ export class Engine {
           if (!view.keyToView) view.keyToView = new Map();
           view.keyToView.set(pendView.userKey, pendView);
         }
+        pendView.pos = i + j;
         out[i + j] = pendView;
       } else {
         // Matched child — reuse the old view
@@ -512,10 +542,18 @@ export class Engine {
         if (!stable.has(j)) {
           this.markMoved(oldView);
         }
-        out[i + j] = oldView;
+        // Use whatever ended up in oldChildren after the patch (may be
+        // pendView if viewFn changed and #patchOrReplace replaced it).
+        const placed = oldChildren[newIdxToOldIdx[j]!]!;
+        placed.pos = i + j;
+        out[i + j] = placed;
       }
     }
-    for (let j = 0; j < tailLen; j++) out[i + middleLen + j] = oldChildren[tailStart + j]!;
+    for (let j = 0; j < tailLen; j++) {
+      const c = oldChildren[tailStart + j]!;
+      c.pos = i + middleLen + j;
+      out[i + middleLen + j] = c;
+    }
     view.children = out;
   }
 

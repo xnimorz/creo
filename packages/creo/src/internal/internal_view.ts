@@ -40,6 +40,11 @@ export type ViewRecord<
 
   children: Maybe<ViewRecord[]>;
 
+  /** Position in `parent.children`. Maintained by the reconciler so the
+   * renderer can find the next-sibling insertion anchor without an O(n)
+   * `indexOf` scan. -1 means "not yet placed by a reconcile pass". */
+  pos: number;
+
   keyToView: Maybe<Map<Key, ViewRecord>>;
   unsubscribe: Maybe<(() => void)[]>;
 

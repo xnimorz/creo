@@ -427,7 +427,10 @@ export class HtmlRender implements IRender<HTMLElement | Text> {
       return this.#parentEndAnchor(parent);
     }
 
-    const idx = children.indexOf(view);
+    // view.pos is maintained by the reconciler — avoid the O(n) indexOf scan.
+    // Fall back to indexOf if pos is unset (-1) or stale (defensive).
+    let idx = view.pos;
+    if (idx < 0 || children[idx] !== view) idx = children.indexOf(view);
     for (let i = idx + 1; i < children.length; i++) {
       const dom = this.getFirstDomNode(children[i]!);
       if (dom) return dom;
