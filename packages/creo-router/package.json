@@ -1,6 +1,6 @@
 {
   "name": "creo-router",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "type": "module",
   "main": "dist/index.js",
   "module": "dist/index.js",
@@ -19,7 +19,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "peerDependencies": {
-    "creo": ">=0.2.5"
+    "creo": ">=0.2.6"
   },
   "devDependencies": {
     "creo": "workspace:*",
