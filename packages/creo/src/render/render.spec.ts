@@ -925,6 +925,60 @@ describe("HtmlRender", () => {
       document.body.removeChild(c);
     }
   });
+
+  it("re-bound event handler still fires after being temporarily removed", () => {
+    // When an event handler is bound, then unbound (which removes the
+    // container's delegated listener once its refcount hits zero), then
+    // re-bound, the renderer must re-register the container listener.
+    // Otherwise the handler is written into the element's evObj but the
+    // container has no listener for that event type, so dispatch never
+    // reaches it.
+    let clickCount = 0;
+    let toggle!: Reactive<boolean>;
+
+    const Btn = view<void>(({ use }) => {
+      const show = use(true);
+      toggle = show;
+      return {
+        render() {
+          button(
+            show.get()
+              ? { class: "btn", onClick: () => { clickCount++; } }
+              : { class: "btn" },
+            "click me",
+          );
+        },
+      };
+    });
+
+    const c = document.createElement("div");
+    const r = new HtmlRender(c);
+    const e = new Engine(r);
+    orchestrator.setCurrentEngine(e);
+    e.createRoot(() => { Btn(); }, {});
+    e.render();
+
+    const btn = c.getElementsByTagName("button")[0]!;
+
+    // 1) Initial bind — handler fires.
+    btn.click();
+    expect(clickCount).toBe(1);
+
+    // 2) Unbind — container's click listener is removed.
+    toggle.set(false);
+    e.render();
+    btn.click();
+    expect(clickCount).toBe(1);
+
+    // 3) Re-bind — without the fix, evObj still exists on the element so
+    //    diffAttributes' `if (evObj)` branch overwrites evObj.click but
+    //    skips ensureDelegated, leaving the container with no click
+    //    listener. The new handler would silently never fire.
+    toggle.set(true);
+    e.render();
+    btn.click();
+    expect(clickCount).toBe(2);
+  });
 });
 
 // ---------------------------------------------------------------------------

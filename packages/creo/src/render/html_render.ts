@@ -1,9 +1,5 @@
 import type { ViewRecord } from "@/internal/internal_view";
-import {
-  F_PRIMITIVE,
-  F_MOVED,
-  F_TEXT_CONTENT,
-} from "@/internal/internal_view";
+import { F_PRIMITIVE, F_MOVED, F_TEXT_CONTENT } from "@/internal/internal_view";
 import type { IRender } from "./render_interface";
 import { $primitive } from "@/public/primitive";
 import type { Wildcard } from "@/internal/wildcard";
@@ -182,7 +178,11 @@ function ensureDelegated(container: HTMLElement, domEvent: string): void {
   const state = getState(container);
   const count = state.counts.get(domEvent) ?? 0;
   if (count === 0) {
-    container.addEventListener(domEvent, state.handler, listenerOptions(domEvent));
+    container.addEventListener(
+      domEvent,
+      state.handler,
+      listenerOptions(domEvent),
+    );
   }
   state.counts.set(domEvent, count + 1);
 }
@@ -192,7 +192,11 @@ function removeDelegated(container: HTMLElement, domEvent: string): void {
   const count = state.counts.get(domEvent) ?? 0;
   if (count <= 1) {
     state.counts.delete(domEvent);
-    container.removeEventListener(domEvent, state.handler, listenerOptions(domEvent));
+    container.removeEventListener(
+      domEvent,
+      state.handler,
+      listenerOptions(domEvent),
+    );
   } else {
     state.counts.set(domEvent, count - 1);
   }
@@ -302,8 +306,7 @@ export class HtmlRender implements IRender<HTMLElement | Text> {
           view.renderRef = { element: textNode, prevProps: null };
           parentNode.insertBefore(textNode, refNode);
         } else {
-          const parentIsSvg =
-            (parentNode as Element).namespaceURI === SVG_NS;
+          const parentIsSvg = (parentNode as Element).namespaceURI === SVG_NS;
           const useSvg = tag === "svg" || parentIsSvg;
           const element = useSvg
             ? document.createElementNS(SVG_NS, tag)
@@ -441,10 +444,7 @@ export class HtmlRender implements IRender<HTMLElement | Text> {
 
   // -- Internal: attributes + delegated events --------------------------------
 
-  private setAttributes(
-    element: Element,
-    props: Record<string, unknown>,
-  ) {
+  private setAttributes(element: Element, props: Record<string, unknown>) {
     for (const key in props) {
       const value = props[key];
       if (key === "key" || value == null) continue;
@@ -485,7 +485,7 @@ export class HtmlRender implements IRender<HTMLElement | Text> {
         const evObj = (element as any)[$EV] as
           | Record<string, Function>
           | undefined;
-        if (evObj) {
+        if (evObj && domEvent in evObj) {
           evObj[domEvent] = value as Function;
         } else {
           this.bindEvent(element, key, value as Function);
@@ -496,11 +496,7 @@ export class HtmlRender implements IRender<HTMLElement | Text> {
     }
   }
 
-  private bindEvent(
-    element: Element,
-    prop: string,
-    handler: Function,
-  ): void {
+  private bindEvent(element: Element, prop: string, handler: Function): void {
     const creoName = prop.slice(2);
     const domEvent = DOM_EVENT[creoName] ?? creoName.toLowerCase();
     const evObj: Record<string, Function> =
@@ -552,7 +548,8 @@ export class HtmlRender implements IRender<HTMLElement | Text> {
 
   private getFirstDomNode(view: ViewRecord): Node | null {
     if (!view.renderRef) return null;
-    if (view.flags & F_PRIMITIVE) return (view.renderRef as PrimitiveDomRef).element;
+    if (view.flags & F_PRIMITIVE)
+      return (view.renderRef as PrimitiveDomRef).element;
     if (view.children) {
       for (const child of view.children) {
         const dom = this.getFirstDomNode(child);
@@ -569,7 +566,10 @@ export class HtmlRender implements IRender<HTMLElement | Text> {
   ): void {
     if (!view.renderRef) return;
     if (view.flags & F_PRIMITIVE) {
-      parentNode.insertBefore((view.renderRef as PrimitiveDomRef).element, insertBefore);
+      parentNode.insertBefore(
+        (view.renderRef as PrimitiveDomRef).element,
+        insertBefore,
+      );
     } else if (view.children) {
       for (const child of view.children) {
         this.moveDomNodes(child, parentNode, insertBefore);
