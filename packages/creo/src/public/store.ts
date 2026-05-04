@@ -1,3 +1,4 @@
+import type { Maybe } from "@/functional/maybe";
 import type { MaybePromise } from "@/functional/maybe_promise";
 
 const $store = Symbol("store");
@@ -25,6 +26,9 @@ export class Store<T> {
   readonly [$store] = true;
   #current: T;
   #subscribers = new Set<() => void>();
+  // Tail of the pending async update chain. Subsequent updates queue onto
+  // it; `set` clears it to cancel any in-flight resolutions.
+  #pending: Maybe<Promise<T>>;
 
   constructor(initial: T) {
     this.#current = initial;
@@ -35,21 +39,39 @@ export class Store<T> {
   }
 
   set(value: T): void {
+    this.#pending = null;
     this.#current = value;
     this.#notify();
   }
 
   update(fn: (current: T) => MaybePromise<T>): void {
-    const result = fn(this.#current);
-    if (result instanceof Promise) {
-      result.then((value) => {
+    if (this.#pending) {
+      const next: Promise<T> = this.#pending.then((v) => fn(v));
+      this.#pending = next;
+      next.then((value) => {
+        if (this.#pending !== next) return;
+        this.#pending = null;
         this.#current = value;
         this.#notify();
       });
-    } else {
+      return;
+    }
+
+    const result = fn(this.#current);
+    if (!(result instanceof Promise)) {
       this.#current = result;
       this.#notify();
+      return;
     }
+
+    const captured = result;
+    this.#pending = captured;
+    captured.then((value) => {
+      if (this.#pending !== captured) return;
+      this.#pending = null;
+      this.#current = value;
+      this.#notify();
+    });
   }
 
   subscribe(cb: () => void): () => void {

@@ -1,3 +1,4 @@
+import type { Maybe } from "@/functional/maybe";
 import type { MaybePromise } from "@/functional/maybe_promise";
 
 /**
@@ -18,10 +19,19 @@ export interface Reactive<T> {
  *   count.get()              // read current value
  *   count.set(5)             // set immediately, schedule render
  *   count.update(n => n + 1) // update via fn, schedule render
+ *
+ * Async updates chain: a second `update` issued while a previous async
+ * update is still in flight runs against the previous update's result,
+ * not against the snapshot at issue time. `set` cancels any pending
+ * chain — its value becomes authoritative and in-flight links won't
+ * commit afterwards.
  */
 export class State<T> implements Reactive<T> {
   #current: T;
   #schedule: () => void;
+  // Tail of the pending async update chain. Subsequent updates queue onto
+  // it; `set` clears it to cancel any in-flight resolutions.
+  #pending: Maybe<Promise<T>>;
 
   constructor(initial: T, schedule: () => void) {
     this.#current = initial;
@@ -33,21 +43,42 @@ export class State<T> implements Reactive<T> {
   }
 
   set(value: T): void {
+    this.#pending = null;
     this.#current = value;
     this.#schedule();
   }
 
   update(fn: (current: T) => MaybePromise<T>): void {
-    const result = fn(this.#current);
-    if (result instanceof Promise) {
-      result.then((value) => {
+    if (this.#pending) {
+      // Queue onto the pending chain so this fn runs against the previous
+      // update's result, not against #current at call time.
+      const next: Promise<T> = this.#pending.then((v) => fn(v));
+      this.#pending = next;
+      next.then((value) => {
+        // Skip if a later update or `set` moved the tail past us.
+        if (this.#pending !== next) return;
+        this.#pending = null;
         this.#current = value;
         this.#schedule();
       });
-    } else {
+      return;
+    }
+
+    const result = fn(this.#current);
+    if (!(result instanceof Promise)) {
       this.#current = result;
       this.#schedule();
+      return;
     }
+
+    const captured = result;
+    this.#pending = captured;
+    captured.then((value) => {
+      if (this.#pending !== captured) return;
+      this.#pending = null;
+      this.#current = value;
+      this.#schedule();
+    });
   }
 }
 

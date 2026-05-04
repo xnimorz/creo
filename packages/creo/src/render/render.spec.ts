@@ -1203,6 +1203,90 @@ describe("State", () => {
     expect(container.textContent).toBe("3");
   });
 
+  it("should chain async updates so each runs against the previous result", async () => {
+    // Without chaining, every async update reads `#current` at call time
+    // and clobbers the others on resolution. With chaining, the second
+    // update runs against the first's resolved value.
+    let countState: Reactive<number>;
+
+    const Counter = view<void>(({ use }) => {
+      const count = use(0);
+      countState = count;
+      return {
+        render() {
+          text(count.get());
+        },
+      };
+    });
+
+    const { engine, container } = mountStateful(Counter);
+
+    // Faster-resolving update issued first; slower one second. If the
+    // implementation reads #current at issue time, both see 0 and both
+    // commit 1 — final value 1. With chaining, second sees the first's
+    // result (1) and increments to 2.
+    let resolveFirst!: () => void;
+    let resolveSecond!: () => void;
+    const firstGate = new Promise<void>((r) => { resolveFirst = r; });
+    const secondGate = new Promise<void>((r) => { resolveSecond = r; });
+
+    countState!.update(async (n) => {
+      await firstGate;
+      return n + 1;
+    });
+    countState!.update(async (n) => {
+      await secondGate;
+      return n + 1;
+    });
+
+    // Resolve the second gate first to prove chaining isn't relying on
+    // resolution order — the second fn must wait for the first regardless.
+    resolveSecond();
+    resolveFirst();
+
+    // Drain microtasks until the chain commits.
+    for (let i = 0; i < 16; i++) await Promise.resolve();
+
+    engine.render();
+    expect(countState!.get()).toBe(2);
+    expect(container.textContent).toBe("2");
+  });
+
+  it("set cancels in-flight async updates", async () => {
+    let countState: Reactive<number>;
+
+    const Counter = view<void>(({ use }) => {
+      const count = use(0);
+      countState = count;
+      return {
+        render() {
+          text(count.get());
+        },
+      };
+    });
+
+    const { engine, container } = mountStateful(Counter);
+
+    let resolve!: () => void;
+    const gate = new Promise<void>((r) => { resolve = r; });
+
+    countState!.update(async (n) => {
+      await gate;
+      return n + 100; // would commit 100 if not canceled
+    });
+
+    countState!.set(7);
+    expect(countState!.get()).toBe(7);
+
+    resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    engine.render();
+    expect(countState!.get()).toBe(7);
+    expect(container.textContent).toBe("7");
+  });
+
   it("should re-render a list managed by state", () => {
     let itemsState: Reactive<string[]>;
 
