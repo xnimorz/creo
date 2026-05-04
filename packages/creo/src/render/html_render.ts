@@ -312,6 +312,7 @@ export class HtmlRender implements IRender<HTMLElement | Text> {
           const domRef: PrimitiveDomRef = { element, prevProps: null };
           view.renderRef = domRef;
           this.setAttributes(element, props);
+          domRef.prevProps = props;
 
           // If single text child, use textContent directly
           if (view.children?.length === 1) {
