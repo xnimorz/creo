@@ -126,6 +126,3 @@ export class HtmlStringRender implements IRender<string> {
     return result;
   }
 }
-
-/** @deprecated Use HtmlStringRender instead */
-export const StringRender = HtmlStringRender;

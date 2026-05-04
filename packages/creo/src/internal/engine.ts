@@ -190,14 +190,6 @@ export class Engine {
     this.schedule();
   }
 
-  // #removeDirty<Props = Wildcard, Api = Wildcard, RenderRef = Wildcard>(
-  //   view: ViewRecord<Props, Api, RenderRef>,
-  // ): void {
-  // view.flags &= ~F_DIRTY;
-  // view.flags &= ~F_MOVED;
-  //   this.#dirtyQueue.delete(view);
-  // }
-
   schedule(): void {
     if (this.#renderScheduled) return;
     this.#renderScheduled = true;

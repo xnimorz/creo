@@ -23,7 +23,7 @@ export function createApp(
 ) {
   return {
     mount(props?: Wildcard): AppHandle {
-      const engine = new Engine(renderer, options?.scheduler);      
+      const engine = new Engine(renderer, options?.scheduler);
       engine.createRoot(slot, props ?? {});
       engine.render();
       return { engine };

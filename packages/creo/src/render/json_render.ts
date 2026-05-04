@@ -42,10 +42,8 @@ export class JsonRender implements IRender<JsonNode> {
       }
       const parentNode = view.parent.renderRef as Maybe<JsonNode>;
       if (parentNode) {
-        // Insert at correct position
-        const idx = view.parent.children
-          ? view.parent.children.indexOf(view)
-          : -1;
+        // view.pos is maintained by the reconciler — no indexOf scan.
+        const idx = view.pos;
         if (idx >= 0 && idx < parentNode.children.length) {
           parentNode.children.splice(idx, 0, node);
         } else {
@@ -59,17 +57,19 @@ export class JsonRender implements IRender<JsonNode> {
     if (view.parent) {
       const parentNode = view.parent.renderRef as Maybe<JsonNode>;
       if (parentNode) {
-        const oldIdx = parentNode.children.indexOf(existing);
-        const targetIdx = view.parent.children
-          ? view.parent.children.indexOf(view)
-          : -1;
-        if (oldIdx !== -1 && targetIdx !== -1 && oldIdx !== targetIdx) {
-          parentNode.children.splice(oldIdx, 1);
-          parentNode.children.splice(
-            Math.min(targetIdx, parentNode.children.length),
-            0,
-            existing,
-          );
+        const targetIdx = view.pos;
+        // Skip the indexOf scan entirely when the node is already in
+        // place (the steady-state for non-moved updates).
+        if (targetIdx >= 0 && parentNode.children[targetIdx] !== existing) {
+          const oldIdx = parentNode.children.indexOf(existing);
+          if (oldIdx !== -1) {
+            parentNode.children.splice(oldIdx, 1);
+            parentNode.children.splice(
+              Math.min(targetIdx, parentNode.children.length),
+              0,
+              existing,
+            );
+          }
         }
       }
     }

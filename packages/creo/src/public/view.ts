@@ -5,22 +5,17 @@ import type { Use } from "./state";
 import type { $primitive } from "./primitive";
 import type { Wildcard } from "@/internal/wildcard";
 
+type ViewBodyBase<Props> = {
+  render: () => void;
+  onMount?: () => void;
+  shouldUpdate?: (nextProps: Props) => boolean;
+  onUpdateBefore?: () => void;
+  onUpdateAfter?: () => void;
+};
+
 export type ViewBody<Props, Api> = Api extends void
-  ? {
-      render: () => void;
-      onMount?: () => void;
-      shouldUpdate?: (nextProps: Props) => boolean;
-      onUpdateBefore?: () => void;
-      onUpdateAfter?: () => void;
-    }
-  : {
-      render: () => void;
-      onMount?: () => void;
-      shouldUpdate?: (nextProps: Props) => boolean;
-      onUpdateBefore?: () => void;
-      onUpdateAfter?: () => void;
-      api: Api;
-    };
+  ? ViewBodyBase<Props>
+  : ViewBodyBase<Props> & { api: Api };
 
 /** Slot callback — passed by the caller at the call site. */
 export type Slot = () => void;
