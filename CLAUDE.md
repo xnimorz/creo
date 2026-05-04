@@ -23,7 +23,7 @@ bun run publish:all                                  # dry-run (pass --no-dry-ru
 # Run the docs site (with the live recipe playground — simple-todo, advanced-todo, table, chess, etc.):
 cd docs && bun install && bun run dev
 
-# Run a standalone example (router / canvas-demo / editor / perf_profiler / benchmark):
+# Run a standalone example
 cd examples/router && bun install && bun run dev
 ```
 
@@ -35,11 +35,10 @@ Monorepo with `packages/*` workspaces:
 
 - `packages/creo` — core framework (engine, renderers, primitives, view/state/store)
 - `packages/creo-router` — hash-based router (separate package)
-- `packages/creo-editor` — editor component
 - `packages/creo-create-app` — CLI scaffolder (Vite, optional Hono server)
 - `packages/creo-create-tauri-app` — CLI scaffolder (Tauri v2, desktop + mobile)
 - `packages/creo-create-electron-app` — CLI scaffolder (Electron)
-- `examples/` — router, editor, canvas-demo, benchmark, perf_profiler (todo / chess / editable table now live as recipes under `docs/recipes/`)
+- `examples/` — router, benchmark, perf_profiler (todo / chess / editable table now live as recipes under `docs/recipes/`)
 - `scripts/version.ts`, `scripts/publish.ts` — release orchestrators
 - `docs/` — user-facing docs (view, state, store, lifecycle, events, primitives, renderers)
 
@@ -64,18 +63,20 @@ Core source map (see AGENTS.md for details):
 ### Component Definition
 
 React:
+
 ```tsx
 function Counter({ initial }: { initial: number }) {
   const [count, setCount] = useState(initial);
-  return <button onClick={() => setCount(c => c + 1)}>{count}</button>;
+  return <button onClick={() => setCount((c) => c + 1)}>{count}</button>;
 }
 ```
 
 Creo:
+
 ```ts
 const Counter = view<{ initial: number }>(({ props, use }) => {
   const count = use(props().initial);
-  const handleClick = () => count.update(n => n + 1);
+  const handleClick = () => count.update((n) => n + 1);
 
   return {
     render() {
@@ -89,32 +90,36 @@ const Counter = view<{ initial: number }>(({ props, use }) => {
 
 ### Key Mappings
 
-| React | Creo |
-|-------|------|
-| `function Component(props)` | `view<Props>(({ props }) => ({ render() {} }))` — `props` is a function: call `props()` |
-| `useState(initial)` | `use(initial)` → `.get()` / `.set()` / `.update()` |
-| `props.children` | `slot` — called as `slot?.()` inside render; callers can pass a string or `() => void` |
-| `onClick={handler}` | `onClick: handler` in primitive props |
-| `useEffect(() => {}, [])` (mount) | `onMount()` on ViewBody |
-| `useEffect(() => {})` (update) | `onUpdateAfter()` on ViewBody |
-| `useLayoutEffect` (before paint) | `onUpdateBefore()` on ViewBody |
-| `React.memo(Component, areEqual)` | `shouldUpdate(nextProps)` on ViewBody |
-| `key={id}` | `{ key: id }` in props |
-| `useContext` | `store.new()` + `use(store)` (global shared state) |
-| `<div className="x">` | `div({ class: "x" }, () => { ... })` — use `_` instead of `{}` when no props |
-| `ReactDOM.createRoot(el).render(<App/>)` | `createApp(() => App(), new HtmlRender(el)).mount()` |
+| React                                    | Creo                                                                                    |
+| ---------------------------------------- | --------------------------------------------------------------------------------------- |
+| `function Component(props)`              | `view<Props>(({ props }) => ({ render() {} }))` — `props` is a function: call `props()` |
+| `useState(initial)`                      | `use(initial)` → `.get()` / `.set()` / `.update()`                                      |
+| `props.children`                         | `slot` — called as `slot?.()` inside render; callers can pass a string or `() => void`  |
+| `onClick={handler}`                      | `onClick: handler` in primitive props                                                   |
+| `useEffect(() => {}, [])` (mount)        | `onMount()` on ViewBody                                                                 |
+| `useEffect(() => {})` (update)           | `onUpdateAfter()` on ViewBody                                                           |
+| `useLayoutEffect` (before paint)         | `onUpdateBefore()` on ViewBody                                                          |
+| `React.memo(Component, areEqual)`        | `shouldUpdate(nextProps)` on ViewBody                                                   |
+| `key={id}`                               | `{ key: id }` in props                                                                  |
+| `useContext`                             | `store.new()` + `use(store)` (global shared state)                                      |
+| `<div className="x">`                    | `div({ class: "x" }, () => { ... })` — use `_` instead of `{}` when no props            |
+| `ReactDOM.createRoot(el).render(<App/>)` | `createApp(() => App(), new HtmlRender(el)).mount()`                                    |
 
 ### Children / Composition
 
 React:
+
 ```tsx
 function Card({ children }) {
   return <div className="card">{children}</div>;
 }
-<Card><p>hello</p></Card>
+<Card>
+  <p>hello</p>
+</Card>;
 ```
 
 Creo:
+
 ```ts
 const Card = view(({ slot }) => ({
   render() {
@@ -134,12 +139,14 @@ Card(_, "simple text content");
 ### Event Handling
 
 React:
+
 ```tsx
 <button onClick={(e) => handleClick(e)}>Click</button>
 <input onChange={(e) => setValue(e.target.value)} />
 ```
 
 Creo — declare handlers before ViewBody, pass as `on*` props:
+
 ```ts
 const MyView = view(({ use }) => {
   const value = use("");
@@ -155,30 +162,34 @@ const MyView = view(({ use }) => {
 });
 ```
 
-| Event prop | Event data type | Fields |
-|---|---|---|
-| `onClick` | `PointerEventData` | `x`, `y` |
-| `onDblclick` | `PointerEventData` | `x`, `y` |
-| `onPointerDown` | `PointerEventData` | `x`, `y` |
-| `onPointerUp` | `PointerEventData` | `x`, `y` |
-| `onPointerMove` | `PointerEventData` | `x`, `y` |
-| `onFocus` | `FocusEventData` | — |
-| `onBlur` | `FocusEventData` | — |
-| `onInput` | `InputEventData` | `value` |
-| `onChange` | `InputEventData` | `value` |
-| `onKeyDown` | `KeyEventData` | `key`, `code` |
-| `onKeyUp` | `KeyEventData` | `key`, `code` |
+| Event prop      | Event data type    | Fields        |
+| --------------- | ------------------ | ------------- |
+| `onClick`       | `PointerEventData` | `x`, `y`      |
+| `onDblclick`    | `PointerEventData` | `x`, `y`      |
+| `onPointerDown` | `PointerEventData` | `x`, `y`      |
+| `onPointerUp`   | `PointerEventData` | `x`, `y`      |
+| `onPointerMove` | `PointerEventData` | `x`, `y`      |
+| `onFocus`       | `FocusEventData`   | —             |
+| `onBlur`        | `FocusEventData`   | —             |
+| `onInput`       | `InputEventData`   | `value`       |
+| `onChange`      | `InputEventData`   | `value`       |
+| `onKeyDown`     | `KeyEventData`     | `key`, `code` |
+| `onKeyUp`       | `KeyEventData`     | `key`, `code` |
 
 All event data includes `stopPropagation()` and `preventDefault()` from `BaseEventData`.
 
 ### Conditional Rendering
 
 React:
+
 ```tsx
-{isEditing ? <Input /> : <Display />}
+{
+  isEditing ? <Input /> : <Display />;
+}
 ```
 
 Creo:
+
 ```ts
 if (isEditing.get()) {
   EditableCell({ key: id, value });
@@ -190,11 +201,15 @@ if (isEditing.get()) {
 ### Lists
 
 React:
+
 ```tsx
-{items.map(item => <Item key={item.id} data={item} />)}
+{
+  items.map((item) => <Item key={item.id} data={item} />);
+}
 ```
 
 Creo:
+
 ```ts
 for (const item of items.get()) {
   Item({ key: item.id, data: item });
@@ -204,6 +219,7 @@ for (const item of items.get()) {
 ### State & Store
 
 Local state (inside a view):
+
 ```ts
 const count = use(0);
 count.set(5);              // set immediately, schedule render
@@ -216,6 +232,7 @@ count.get();               // read committed value
 ```
 
 Global store (outside views):
+
 ```ts
 const ThemeStore = store.new("light");
 ThemeStore.set("dark"); // updates all subscribers
@@ -228,12 +245,12 @@ theme.set("light"); // updates the store, all subscribers re-render
 
 ### Lifecycle
 
-| Phase | React | Creo (ViewBody property) |
-|-------|-------|------|
-| After first mount | `useEffect(() => {}, [])` | `onMount()` |
-| Before re-render | — | `onUpdateBefore()` |
-| After re-render | `useEffect(() => {})` | `onUpdateAfter()` |
-| Skip render | `React.memo(cmp, fn)` | `shouldUpdate(nextProps)` |
+| Phase             | React                     | Creo (ViewBody property)  |
+| ----------------- | ------------------------- | ------------------------- |
+| After first mount | `useEffect(() => {}, [])` | `onMount()`               |
+| Before re-render  | —                         | `onUpdateBefore()`        |
+| After re-render   | `useEffect(() => {})`     | `onUpdateAfter()`         |
+| Skip render       | `React.memo(cmp, fn)`     | `shouldUpdate(nextProps)` |
 
 ```ts
 const MyView = view<{ value: number }>(({ props }) => ({
@@ -281,7 +298,7 @@ const MyView = view(({ use }) => {
   const count = use(0);
 
   // Declare handlers here — stable references, access state via .get()
-  const increment = () => count.update(n => n + 1);
+  const increment = () => count.update((n) => n + 1);
   const reset = () => count.set(0);
 
   return {
@@ -333,7 +350,7 @@ button({ onClick: handler }, "Click me");
 h1(_, "Page Title");
 li(_, "Item text");
 span({ class: "label" }, userName);
-div({ class: "greeting" }, `Hello, ${props().name}!`);  // template literals are strings
+div({ class: "greeting" }, `Hello, ${props().name}!`); // template literals are strings
 p(_, String(count.get()));
 
 // Avoid — unnecessary text() wrapper:
@@ -359,19 +376,19 @@ Use `text()` only when you need to mix text with other elements inside a functio
 ```ts
 div({ class: "wrapper" }, () => {
   span(_, "hello");
-  text(" world");  // text() needed here — mixed content in function slot
+  text(" world"); // text() needed here — mixed content in function slot
 });
 ```
 
 **When to use each slot form:**
 
-| Children | Use |
-|---|---|
-| None | omit second arg: `button({ onClick })` |
-| Single string (static or dynamic) | string slot: `h1(_, title)` |
-| Single child view | function slot: `section(_, () => UserCard({ id }))` |
-| Multiple children | function slot with primitives / views inside |
-| Mixed text + elements | function slot + explicit `text()` for the text parts |
+| Children                          | Use                                                  |
+| --------------------------------- | ---------------------------------------------------- |
+| None                              | omit second arg: `button({ onClick })`               |
+| Single string (static or dynamic) | string slot: `h1(_, title)`                          |
+| Single child view                 | function slot: `section(_, () => UserCard({ id }))`  |
+| Multiple children                 | function slot with primitives / views inside         |
+| Mixed text + elements             | function slot + explicit `text()` for the text parts |
 
 ### `_` for Empty Props
 
