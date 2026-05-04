@@ -12,16 +12,21 @@ export function shallowEqual(a: Wildcard, b: Wildcard): boolean {
     return false;
   }
 
-  // Avoid Object.keys() allocations — use for...in instead
+  // Single-walk-with-count: avoid Object.keys() allocations and the slower
+  // Object.is semantics (NaN/-0 distinctions don't matter for props).
   let countA = 0;
   for (const key in a) {
     countA++;
-    // @ts-ignore
-    if (!Object.is(a[key], b[key])) return false;
+    if (a[key] !== b[key]) return false;
   }
 
   let countB = 0;
-  for (const _ in b) countB++;
+  for (const _ in b) {
+    countB++;
+    // Early bail: b has at least one key not in a (since all a's keys
+    // matched, any extra in b means counts must diverge).
+    if (countB > countA) return false;
+  }
 
   return countA === countB;
 }
