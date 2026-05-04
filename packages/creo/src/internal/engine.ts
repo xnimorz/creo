@@ -11,7 +11,7 @@ import {
 import type { Wildcard } from "./wildcard";
 import { type Maybe } from "@/functional/maybe";
 import type { Key } from "@/functional/key";
-import type { Slot, SlotContent, ViewFn } from "@/public/view";
+import type { SlotContent, ViewFn } from "@/public/view";
 import { textViewFn } from "@/public/primitives/primitives";
 import { $primitive } from "@/public/primitive";
 import { State, type Reactive } from "@/public/state";
@@ -70,8 +70,21 @@ export class Engine {
       pos: -1,
     };
     if (slot) {
-      const slotFn = typeof slot === "string" ? this.#stringSlot(slot) : slot;
-      res.sc = this.#collect(slotFn, [], res);
+      if (typeof slot === "string") {
+        // String slot — inline a single text ViewRecord. Avoids both the
+        // throwaway closure and a collector trip per view.
+        res.sc = [
+          this.newView(
+            textViewFn as ViewFn<Wildcard, Wildcard>,
+            res,
+            slot,
+            null,
+            null,
+          ),
+        ];
+      } else {
+        res.sc = this.#collect(slot, [], res);
+      }
     }
     return res;
   }
@@ -211,13 +224,6 @@ export class Engine {
     return collector;
   }
 
-  /** Convert a string slot into a callback that emits a text ViewRecord. */
-  #stringSlot(content: string): Slot {
-    return () => {
-      this.view(textViewFn as ViewFn<Wildcard, Wildcard>, content, null, null);
-    };
-  }
-
   // -- Props update -----------------------------------------------------------
 
   nextProps<Props = Wildcard, Api = Wildcard, RenderRef = Wildcard>(
@@ -233,14 +239,22 @@ export class Engine {
       // Re-parent sc items to this view (they were parented to the pending view)
       for (const child of preCollectedSc) child.parent = view;
       view.sc = preCollectedSc;
-    } else {
-      if (nextSlot) {
-        const slotFn =
-          typeof nextSlot === "string" ? this.#stringSlot(nextSlot) : nextSlot;
-        view.sc = this.#collect(slotFn, [], view);
+    } else if (nextSlot) {
+      if (typeof nextSlot === "string") {
+        view.sc = [
+          this.newView(
+            textViewFn as ViewFn<Wildcard, Wildcard>,
+            view,
+            nextSlot,
+            null,
+            null,
+          ),
+        ];
       } else {
-        view.sc = null;
+        view.sc = this.#collect(nextSlot, [], view);
       }
+    } else {
+      view.sc = null;
     }
 
     const structChanged = hasScStructuralChange(prevSc, view.sc);
