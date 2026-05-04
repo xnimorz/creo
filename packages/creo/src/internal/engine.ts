@@ -418,14 +418,16 @@ export class Engine {
           view.keyToView.set(pending[j]!.userKey!, pending[j]!);
         }
       }
-      // Rebuild children: head (already patched) + new insertions + tail
-      // (already patched by Phase 2; lives in oldChildren at indices
-      // strictly greater than oldEnd).
-      view.children = [
-        ...oldChildren.slice(0, i),
-        ...pending.slice(i, newEnd + 1),
-        ...oldChildren.slice(oldEnd + 1),
-      ];
+      // Rebuild children: head (already patched) + insertions + tail.
+      // Pre-sized array, indexed write — no intermediate slices/spreads.
+      const tailStart = oldEnd + 1;
+      const tailLen = oldChildren.length - tailStart;
+      const insertCount = newEnd - i + 1;
+      const out = new Array<ViewRecord>(i + insertCount + tailLen);
+      for (let j = 0; j < i; j++) out[j] = oldChildren[j]!;
+      for (let j = 0; j < insertCount; j++) out[i + j] = pending[i + j]!;
+      for (let j = 0; j < tailLen; j++) out[i + insertCount + j] = oldChildren[tailStart + j]!;
+      view.children = out;
       return;
     }
 
@@ -434,11 +436,13 @@ export class Engine {
       for (let j = i; j <= oldEnd; j++) {
         this.dispose(oldChildren[j]!);
       }
-      // Rebuild children array: head + tail
-      view.children = [
-        ...oldChildren.slice(0, i),
-        ...oldChildren.slice(oldEnd + 1),
-      ];
+      // Rebuild children array: head + tail. Pre-sized indexed write.
+      const tailStart = oldEnd + 1;
+      const tailLen = oldChildren.length - tailStart;
+      const out = new Array<ViewRecord>(i + tailLen);
+      for (let j = 0; j < i; j++) out[j] = oldChildren[j]!;
+      for (let j = 0; j < tailLen; j++) out[i + j] = oldChildren[tailStart + j]!;
+      view.children = out;
       return;
     }
 
@@ -476,8 +480,12 @@ export class Engine {
     // Compute LIS on the old indices — these views stay in place
     const stable = lis(newIdxToOldIdx);
 
-    // Build new children array for the middle portion
-    const newChildren: ViewRecord[] = new Array(middleLen);
+    // Build view.children directly: head + middle + tail. Pre-sized,
+    // indexed write — no intermediate `newChildren` array, no slices.
+    const tailStart = oldEnd + 1;
+    const tailLen = oldChildren.length - tailStart;
+    const out = new Array<ViewRecord>(i + middleLen + tailLen);
+    for (let j = 0; j < i; j++) out[j] = oldChildren[j]!;
     for (let j = middleLen - 1; j >= 0; j--) {
       const newIdx = i + j;
       const pendView = pending[newIdx]!;
@@ -490,7 +498,7 @@ export class Engine {
           if (!view.keyToView) view.keyToView = new Map();
           view.keyToView.set(pendView.userKey, pendView);
         }
-        newChildren[j] = pendView;
+        out[i + j] = pendView;
       } else {
         // Matched child — reuse the old view
         const oldView = oldChildren[newIdxToOldIdx[j]!]!;
@@ -504,14 +512,11 @@ export class Engine {
         if (!stable.has(j)) {
           this.markMoved(oldView);
         }
-        newChildren[j] = oldView;
+        out[i + j] = oldView;
       }
     }
-
-    // Rebuild view.children: head + middle + tail
-    const head = oldChildren.slice(0, i);
-    const tail = oldChildren.slice(oldEnd + 1);
-    view.children = [...head, ...newChildren, ...tail];
+    for (let j = 0; j < tailLen; j++) out[i + middleLen + j] = oldChildren[tailStart + j]!;
+    view.children = out;
   }
 
   /** Patch an existing view with pending props, or replace if viewFn changed. */
