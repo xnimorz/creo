@@ -402,6 +402,32 @@ export class HtmlRender implements IRender<HTMLElement | Text> {
     view.renderRef = undefined;
   }
 
+  /**
+   * Re-render only when a stateful DOM property in `nextProps` actually
+   * differs from the live DOM. With this in place a 50-input form whose
+   * parent re-renders touches the DOM only for the input the user is
+   * actually editing.
+   */
+  shouldReassert(view: ViewRecord, nextProps: unknown): boolean {
+    if (nextProps == null || typeof nextProps !== "object") return false;
+    const ref = view.renderRef as Maybe<PrimitiveDomRef>;
+    if (!ref || ref.element instanceof Text) return false;
+    const el = ref.element as Wildcard;
+    const props = nextProps as Record<string, unknown>;
+    for (const key of DOM_PROPERTIES) {
+      if (!(key in props)) continue;
+      const live = el[key];
+      const next = props[key];
+      // Browser coerces these properties — compare under matching coercion.
+      if (typeof next === "boolean" || typeof live === "boolean") {
+        if (Boolean(live) !== Boolean(next)) return true;
+      } else if (String(live) !== String(next)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   // -- Internal: DOM tree navigation ------------------------------------------
 
   private findParentDom(view: ViewRecord): Node {

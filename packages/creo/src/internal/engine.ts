@@ -22,20 +22,6 @@ import { orchestrator } from "./orchestrator";
 
 export type Scheduler = (callback: () => void) => void;
 
-// Primitive props that map to live DOM properties whose value can drift away
-// from the rendered prop via user input (typing in an input, toggling a
-// checkbox, muting a video). For these keys we cannot trust shallowEqual to
-// mean "DOM is up to date" — re-render the primitive so the renderer can
-// re-assert the live property.
-const STATEFUL_DOM_KEYS = ["value", "checked", "selected", "indeterminate", "muted"] as const;
-function hasStatefulDomKey(props: unknown): boolean {
-  if (props == null || typeof props !== "object") return false;
-  for (const k of STATEFUL_DOM_KEYS) {
-    if (k in (props as object)) return true;
-  }
-  return false;
-}
-
 export class Engine {
   #dirtyQueue = new Set<ViewRecord>();
   #collector: Maybe<ViewRecord[]>;
@@ -261,9 +247,11 @@ export class Engine {
     const shouldUpdate = view.body?.shouldUpdate
       ? view.body.shouldUpdate(nextProps)
       : !shallowEqual(view.props, nextProps) ||
-        // Primitive holding a stateful DOM key — DOM may have drifted from
-        // the rendered prop; force a re-render so the renderer re-asserts.
-        ((view.flags & F_PRIMITIVE) !== 0 && hasStatefulDomKey(nextProps));
+        // Primitive whose live output may have drifted from props (e.g. user
+        // typed in <input value=…>) — let the renderer decide whether a
+        // re-assertion is actually needed.
+        ((view.flags & F_PRIMITIVE) !== 0 &&
+          this.renderer.shouldReassert?.(view, nextProps) === true);
 
     if (shouldUpdate || structChanged) {
       // Full re-render: own props or slot structure changed

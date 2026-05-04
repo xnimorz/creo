@@ -581,6 +581,122 @@ describe("HtmlRender", () => {
     expect(el.value).toBe("hello");
   });
 
+  it("undrifted inputs are not re-rendered when an unrelated parent state changes", () => {
+    // Spy on renderer.render to count post-mount renders per element.
+    let counterState!: Reactive<number>;
+
+    const Form = view<void>(({ use }) => {
+      const counter = use(0);
+      counterState = counter;
+      return {
+        render() {
+          div(_, () => {
+            input({ type: "text", value: "alpha", id: "a" });
+            input({ type: "text", value: "beta", id: "b" });
+            // Touch counter so the form re-renders when it changes.
+            span(_, String(counter.get()));
+          });
+        },
+      };
+    });
+
+    const c = document.createElement("div");
+    const renderer = new HtmlRender(c);
+
+    const renderCallsByEl = new Map<Element, number>();
+    const orig = renderer.render.bind(renderer);
+    renderer.render = (v: ViewRecord) => {
+      orig(v);
+      const ref = v.renderRef as { element?: Element } | null | undefined;
+      if (ref && ref.element instanceof HTMLElement) {
+        renderCallsByEl.set(
+          ref.element,
+          (renderCallsByEl.get(ref.element) ?? 0) + 1,
+        );
+      }
+    };
+
+    const e = new Engine(renderer);
+    orchestrator.setCurrentEngine(e);
+    e.createRoot(() => { Form(); }, {});
+    e.render();
+
+    const a = c.querySelector("#a") as HTMLInputElement;
+    const b = c.querySelector("#b") as HTMLInputElement;
+    expect(a.value).toBe("alpha");
+    expect(b.value).toBe("beta");
+
+    // Snapshot post-mount counts.
+    const aBefore = renderCallsByEl.get(a) ?? 0;
+    const bBefore = renderCallsByEl.get(b) ?? 0;
+
+    // Trigger an unrelated parent re-render. Neither input drifted, so the
+    // renderer should not be asked to render either of them.
+    counterState.update((n) => n + 1);
+    e.render();
+
+    expect(renderCallsByEl.get(a) ?? 0).toBe(aBefore);
+    expect(renderCallsByEl.get(b) ?? 0).toBe(bBefore);
+  });
+
+  it("only the drifted input is re-rendered, undrifted siblings are skipped", () => {
+    let counterState!: Reactive<number>;
+
+    const Form = view<void>(({ use }) => {
+      const counter = use(0);
+      counterState = counter;
+      return {
+        render() {
+          div(_, () => {
+            input({ type: "text", value: "alpha", id: "a" });
+            input({ type: "text", value: "beta", id: "b" });
+            span(_, String(counter.get()));
+          });
+        },
+      };
+    });
+
+    const c = document.createElement("div");
+    const renderer = new HtmlRender(c);
+
+    const renderCallsByEl = new Map<Element, number>();
+    const orig = renderer.render.bind(renderer);
+    renderer.render = (v: ViewRecord) => {
+      orig(v);
+      const ref = v.renderRef as { element?: Element } | null | undefined;
+      if (ref && ref.element instanceof HTMLElement) {
+        renderCallsByEl.set(
+          ref.element,
+          (renderCallsByEl.get(ref.element) ?? 0) + 1,
+        );
+      }
+    };
+
+    const e = new Engine(renderer);
+    orchestrator.setCurrentEngine(e);
+    e.createRoot(() => { Form(); }, {});
+    e.render();
+
+    const a = c.querySelector("#a") as HTMLInputElement;
+    const b = c.querySelector("#b") as HTMLInputElement;
+
+    // Drift only `a`'s DOM value. Prop says "alpha", DOM now says "ALPHA-typed".
+    a.value = "ALPHA-typed";
+
+    const aBefore = renderCallsByEl.get(a) ?? 0;
+    const bBefore = renderCallsByEl.get(b) ?? 0;
+
+    // Unrelated parent re-render. shouldReassert sees `a` drifted, `b`
+    // didn't. Only `a` should be re-rendered (and re-asserted to "alpha").
+    counterState.update((n) => n + 1);
+    e.render();
+
+    expect(a.value).toBe("alpha"); // drift corrected
+    expect(b.value).toBe("beta");
+    expect(renderCallsByEl.get(a) ?? 0).toBe(aBefore + 1);
+    expect(renderCallsByEl.get(b) ?? 0).toBe(bBefore);
+  });
+
   it("video `muted` prop writes the live property", () => {
     let mutedState: Reactive<boolean>;
 
