@@ -1,7 +1,10 @@
 import type { Maybe } from "@/functional/maybe";
 import type { MaybePromise } from "@/functional/maybe_promise";
 
-const $store = Symbol("store");
+// Symbol.for so isStore() works across multiple bundles of creo (e.g. when
+// a downstream library brings its own copy). A module-private Symbol() would
+// make `use(storeFromOtherBundle)` silently degrade to a fresh State.
+const $store = Symbol.for("creo.store");
 
 /**
  * Store — globally visible reactive data.
