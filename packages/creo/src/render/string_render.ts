@@ -14,16 +14,6 @@ const VOID_TAGS = new Set([
 // Attributes that are set as DOM properties, not HTML attributes
 const DOM_PROPERTIES = new Set(["value", "checked", "selected", "indeterminate", "muted"]);
 
-// Event handler prefix detection
-function isEventProp(key: string): boolean {
-  return (
-    key.charCodeAt(0) === 111 && // 'o'
-    key.charCodeAt(1) === 110 && // 'n'
-    key.charCodeAt(2) >= 65 &&   // 'A'
-    key.charCodeAt(2) <= 90      // 'Z'
-  );
-}
-
 function escapeHtml(str: string): string {
   return str
     .replace(/&/g, "&amp;")
@@ -89,12 +79,13 @@ export class HtmlStringRender implements IRender<string> {
   }
 
   private buildAttrs(props: Record<string, unknown>): string {
+    if (props == null) return "";
     let result = "";
     for (const key in props) {
       const value = props[key];
       if (key === "key" || value == null) continue;
-      // Skip event handlers — they don't appear in HTML
-      if (isEventProp(key)) continue;
+      // Skip the event-handler sub-object and refs — neither appears in HTML.
+      if (key === "on" || key === "ref") continue;
       // Skip DOM-only properties (value, checked, etc.)
       if (DOM_PROPERTIES.has(key)) continue;
 

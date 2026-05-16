@@ -11,7 +11,8 @@ import {
 import type { Wildcard } from "./wildcard";
 import { type Maybe } from "@/functional/maybe";
 import type { Key } from "@/functional/key";
-import type { SlotContent, ViewFn } from "@/public/view";
+import type { Ref, SlotContent, ViewFn } from "@/public/view";
+import { applyRef } from "@/public/view";
 import { textViewFn } from "@/public/primitives/primitives";
 import { $primitive } from "@/public/primitive";
 import { State, type Reactive } from "@/public/state";
@@ -21,6 +22,11 @@ import { lis } from "@/functional/lis";
 import { orchestrator } from "./orchestrator";
 
 export type Scheduler = (callback: () => void) => void;
+
+function getConsumerRef(view: ViewRecord): Maybe<Ref<unknown>> {
+  if (view.flags & F_PRIMITIVE) return undefined;
+  return view.props?.ref;
+}
 
 export class Engine {
   #dirtyQueue = new Set<ViewRecord>();
@@ -68,6 +74,7 @@ export class Engine {
       parent,
       scHost: null,
       pos: -1,
+      publicRef: null,
     };
     if (slot) {
       if (typeof slot === "string") {
@@ -143,6 +150,12 @@ export class Engine {
           child.parent = this.#collectFor ?? view;
           this.#collector?.push(child);
         }
+      },
+      // Stays valid past initial body construction — user can call from
+      // onMount or async work to swap the exposed value later.
+      ref: (value: unknown) => {
+        view.publicRef = value;
+        applyRef(getConsumerRef(view), value);
       },
     });
   }
@@ -224,6 +237,18 @@ export class Engine {
     nextSlot: Maybe<SlotContent>,
     preCollectedSc?: Maybe<ViewRecord[]>,
   ): void {
+    // Ref migration: if the consumer swapped `ref` between renders, detach
+    // the old (write null) and seed the new with whatever the view has
+    // already published via ctx.ref(). Do this before view.props is
+    // overwritten so getConsumerRef sees the *previous* ref.
+    const prevRef = getConsumerRef(view);
+    const nextRef = (nextProps as { ref?: Ref<unknown> } | null | undefined)
+      ?.ref;
+    if (prevRef !== nextRef) {
+      if (prevRef) applyRef(prevRef, null);
+      if (nextRef && view.publicRef != null) applyRef(nextRef, view.publicRef);
+    }
+
     const prevSc = view.sc;
     view.slot = nextSlot;
     // Use pre-collected sc if available (avoids re-running the slot function)
@@ -590,6 +615,8 @@ export class Engine {
         }
       }
     }
+    view.body?.dispose?.();
+    applyRef(getConsumerRef(view), null);
     if (view.unsubscribe) for (const unsub of view.unsubscribe) unsub();
     if (view.userKey != null) view.parent?.keyToView?.delete(view.userKey);
     this.renderer.unmount(view);
@@ -603,6 +630,8 @@ export class Engine {
     if (view.children) {
       for (const child of view.children) this.#disposeVirtual(child);
     }
+    view.body?.dispose?.();
+    applyRef(getConsumerRef(view), null);
     if (view.unsubscribe) for (const unsub of view.unsubscribe) unsub();
     if (view.userKey != null) view.parent?.keyToView?.delete(view.userKey);
     view.renderRef = undefined;

@@ -27,7 +27,7 @@ const Counter = view<{ initial: number }>(({ props, use }) => {
 
   return {
     render() {
-      button({ onClick: bump }, () => text(count.get()));
+      button({ on: { click: bump } }, () => text(count.get()));
     },
   };
 });

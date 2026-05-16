@@ -137,7 +137,7 @@ export function createRouter(config: RouterConfig) {
       render() {
         const p = props();
         a(
-          { href: "#" + p.href, class: p.class, onClick: handleClick },
+          { href: "#" + p.href, class: p.class, on: { click: handleClick } },
           slot,
         );
       },

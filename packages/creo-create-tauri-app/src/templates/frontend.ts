@@ -190,7 +190,7 @@ export const App = view(({ use }) => {
         p({}, () => {
           text("Cross-platform desktop & mobile app");
         });
-        button({ onClick: increment }, () => {
+        button({ on: { click: increment } }, () => {
           text(\`Count: \${count.get()}\`);
         });
       });

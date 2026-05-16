@@ -11,9 +11,9 @@ const Counter = view<{ initial: number }>(({ props, use }) => {
       div({ class: "counter" }, () => {
         div({ class: "count" }, String(count.get()));
         div({ class: "controls" }, () => {
-          button({ onClick: dec }, "−");
-          button({ onClick: reset }, "reset");
-          button({ onClick: inc }, "+");
+          button({ on: { click: dec } }, "−");
+          button({ on: { click: reset } }, "reset");
+          button({ on: { click: inc } }, "+");
         });
       });
     },

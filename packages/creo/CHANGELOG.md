@@ -3,7 +3,6 @@
 2. Add `ref` to primitives (DOM element) and composite views (exposed API)
 3. Provider-side rename: `ctx.expose(...)` is now `ctx.ref(...)`, matching the consumer-side `ref` prop. `Expose<Api>` is now `RefSetter<Api>`.
 4. Event handlers move from flat `on*` props to a nested `on: { ... }` object — e.g. `button({ on: { click: handler } })`. Removes the per-prop `isEventProp` charCode scan from the renderer's hot path; the `on` object's reference identity short-circuits the event diff. `EventHandlerProps<>` is removed.
-5. Drop `mouseEnter` / `mouseLeave` — use `pointerEnter` / `pointerLeave`. PointerEvents already cover mouse, touch, and pen via the `pointerType` field, so the duplicate mouse-only events were dead weight.
 
 ## Migration from 0.2.6
 
@@ -41,10 +40,10 @@ Mapping table for every prop the framework defines:
 | `onPointerUp`        | `pointerUp`        |
 | `onPointerMove`      | `pointerMove`      |
 | `onPointerCancel`    | `pointerCancel`    |
+| `onMouseEnter`       | `mouseEnter`       |
+| `onMouseLeave`       | `mouseLeave`       |
 | `onPointerEnter`     | `pointerEnter`     |
 | `onPointerLeave`     | `pointerLeave`     |
-| `onMouseEnter`       | use `pointerEnter` |
-| `onMouseLeave`       | use `pointerLeave` |
 | `onKeyDown`          | `keyDown`          |
 | `onKeyUp`            | `keyUp`            |
 | `onFocus`            | `focus`            |

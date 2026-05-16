@@ -60,9 +60,11 @@ const EditableCell = view<{
         class: "cell-input",
         value: ctx.props().value,
         autofocus: true,
-        onInput: handleInput,
-        onKeyDown: handleKeyDown,
-        onBlur: handleBlur,
+        on: {
+          input: handleInput,
+          keyDown: handleKeyDown,
+          blur: handleBlur,
+        },
       });
     },
   };
@@ -78,8 +80,10 @@ const DisplayCell = view<{
     div(
       {
         class: ctx.props().selected ? "cell selected" : "cell",
-        onClick: () => ctx.props().onEdit(),
-        onDblclick: () => ctx.props().onEdit(),
+        on: {
+          click: () => ctx.props().onEdit(),
+          dblclick: () => ctx.props().onEdit(),
+        },
       },
       ctx.props().value || " ",
     );
@@ -171,12 +175,12 @@ const App = view(({ use }) => {
   return {
     render() {
       div({ class: "toolbar" }, () => {
-        button({ class: "btn", onClick: addRow }, "Add Row");
-        button({ class: "btn", onClick: addCol }, "Add Column");
+        button({ class: "btn", on: { click: addRow } }, "Add Row");
+        button({ class: "btn", on: { click: addCol } }, "Add Column");
       });
 
       div(
-        { class: "table", tabindex: 0, onKeyDown: handleTableKeyDown },
+        { class: "table", tabindex: 0, on: { keyDown: handleTableKeyDown } },
         () => {
           HeaderRow({ columns: columns.get() });
 

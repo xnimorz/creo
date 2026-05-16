@@ -167,7 +167,7 @@ export const Playground = view(({ use }) => {
                 {
                   key: r.id,
                   class: "recipe" + (active ? " active" : ""),
-                  onClick: () => loadRecipe(r),
+                  on: { click: () => loadRecipe(r) },
                 },
                 () => {
                   div({ class: "recipe-title" }, r.title);
@@ -181,7 +181,7 @@ export const Playground = view(({ use }) => {
         div({ class: "pg-main" }, () => {
           div({ class: "pg-toolbar" }, () => {
             span({ class: "pg-filename" }, currentRecipe.title + ".ts");
-            button({ class: "pg-run", onClick: run }, "Run");
+            button({ class: "pg-run", on: { click: run } }, "Run");
           });
 
           div({ class: "pg-split" }, () => {

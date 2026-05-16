@@ -110,10 +110,10 @@ const Row = view<{
     tr({ class: props().selected ? "danger" : "" }, () => {
       td({ class: "col-md-1" }, String(props().item.id));
       td({ class: "col-md-4" }, () => {
-        a({ onClick: props().onSelect }, props().item.label);
+        a({ on: { click: props().onSelect } }, props().item.label);
       });
       td({ class: "col-md-1" }, () => {
-        a({ onClick: props().onRemove }, () =>
+        a({ on: { click: props().onRemove } }, () =>
           span({ class: "glyphicon glyphicon-remove", "aria-hidden": "true" }),
         );
       });
@@ -139,7 +139,7 @@ const ActionButton = view<{
           type: "button",
           class: "btn btn-primary btn-block",
           id: ctx.props().id,
-          onClick: ctx.props().onClick,
+          on: { click: ctx.props().onClick },
         },
         ctx.props().title,
       );

@@ -2,6 +2,7 @@ import type { ViewRecord } from "@/internal/internal_view";
 import { F_PRIMITIVE, F_MOVED, F_TEXT_CONTENT } from "@/internal/internal_view";
 import type { IRender } from "./render_interface";
 import { $primitive } from "@/public/primitive";
+import { applyRef, type Ref } from "@/public/view";
 import type { Wildcard } from "@/internal/wildcard";
 import type { Maybe } from "@/functional/maybe";
 import type { Engine } from "@/internal/engine";
@@ -24,60 +25,6 @@ type PrimitiveDomRef = {
 // ---------------------------------------------------------------------------
 // Event delegation — Inferno-style: one listener per event type on container
 // ---------------------------------------------------------------------------
-
-function isEventProp(key: string): boolean {
-  return (
-    key.charCodeAt(0) === 111 && // 'o'
-    key.charCodeAt(1) === 110 && // 'n'
-    key.charCodeAt(2) >= 65 && // 'A'
-    key.charCodeAt(2) <= 90 // 'Z'
-  );
-}
-
-const DOM_EVENT: Record<string, string> = {
-  // Pointer / mouse — bubble.
-  Click: "click",
-  Dblclick: "dblclick",
-  PointerDown: "pointerdown",
-  PointerUp: "pointerup",
-  PointerMove: "pointermove",
-  // Form — bubble.
-  Input: "input",
-  Change: "change",
-  // Keyboard — bubble.
-  KeyDown: "keydown",
-  KeyUp: "keyup",
-  // Focus / blur — don't bubble (capture-phase delegation).
-  Focus: "focus",
-  Blur: "blur",
-  // Hover — don't bubble; per-target only (no ancestor walk).
-  MouseEnter: "mouseenter",
-  MouseLeave: "mouseleave",
-  PointerEnter: "pointerenter",
-  PointerLeave: "pointerleave",
-  // Scroll / load / error — don't bubble.
-  Scroll: "scroll",
-  Load: "load",
-  Error: "error",
-  // Disclosure — don't bubble.
-  Toggle: "toggle",
-  // Media — don't bubble (capture-phase delegation).
-  VolumeChange: "volumechange",
-  Play: "play",
-  Pause: "pause",
-  Ended: "ended",
-  TimeUpdate: "timeupdate",
-  LoadedMetadata: "loadedmetadata",
-  LoadedData: "loadeddata",
-  CanPlay: "canplay",
-  CanPlayThrough: "canplaythrough",
-  DurationChange: "durationchange",
-  RateChange: "ratechange",
-  Seeking: "seeking",
-  Seeked: "seeked",
-  Stalled: "stalled",
-  Waiting: "waiting",
-};
 
 const $EV = Symbol.for("creo.ev");
 
@@ -105,11 +52,11 @@ function getState(container: HTMLElement) {
           if (evObj) {
             const handler = evObj[domEvent];
             if (handler) {
-              handler(mapEventData(domEvent, e));
+              handler(mapEventData(domEvent, e, dom));
               if (e.cancelBubble) return;
             }
           }
-          // For mouseenter/leave-style events the browser already dispatches
+          // For pointerenter/leave events the browser already dispatches
           // one event per ancestor newly entered — walking up here would
           // double-fire ancestor handlers.
           if (noWalk) return;
@@ -127,8 +74,6 @@ function getState(container: HTMLElement) {
 const CAPTURE_EVENTS = new Set([
   "focus",
   "blur",
-  "mouseenter",
-  "mouseleave",
   "pointerenter",
   "pointerleave",
   "scroll",
@@ -157,8 +102,6 @@ const CAPTURE_EVENTS = new Set([
 // from target to container would double-fire ancestor handlers. For these,
 // only consult the actual target element.
 const NO_WALK_EVENTS = new Set([
-  "mouseenter",
-  "mouseleave",
   "pointerenter",
   "pointerleave",
 ]);
@@ -208,8 +151,7 @@ const POINTER_EVENTS = new Set([
   "pointerdown",
   "pointerup",
   "pointermove",
-  "mouseenter",
-  "mouseleave",
+  "pointercancel",
   "pointerenter",
   "pointerleave",
 ]);
@@ -232,11 +174,38 @@ const MEDIA_EVENTS = new Set([
   "waiting",
 ]);
 
-function mapEventData(domEvent: string, e: Event): Record<string, unknown> {
+function mapEventData(
+  domEvent: string,
+  e: Event,
+  currentTarget: HTMLElement,
+): Record<string, unknown> {
   let data: Record<string, unknown>;
   if (POINTER_EVENTS.has(domEvent)) {
     const pe = e as PointerEvent;
-    data = { x: pe.clientX, y: pe.clientY };
+    // pointerId/pointerType can be missing on synthetic events; -1 / "" are
+    // sentinel values that won't collide with real pointer ids.
+    const pointerId = typeof pe.pointerId === "number" ? pe.pointerId : -1;
+    data = {
+      x: pe.clientX,
+      y: pe.clientY,
+      pointerId,
+      pointerType: typeof pe.pointerType === "string" ? pe.pointerType : "",
+      button: typeof pe.button === "number" ? pe.button : 0,
+      buttons: typeof pe.buttons === "number" ? pe.buttons : 0,
+      target: e.target as HTMLElement,
+      currentTarget,
+      capture: () => {
+        if (pointerId >= 0 && currentTarget.setPointerCapture) {
+          currentTarget.setPointerCapture(pointerId);
+        }
+      },
+      release: () => {
+        if (pointerId >= 0 && currentTarget.releasePointerCapture) {
+          currentTarget.releasePointerCapture(pointerId);
+        }
+      },
+      nativeEvent: e,
+    };
   } else if (domEvent === "input" || domEvent === "change") {
     const target = e.target as HTMLInputElement;
     data = { value: target.value, checked: !!target.checked };
@@ -341,6 +310,12 @@ export class HtmlRender implements IRender<HTMLElement | Text> {
             typeof (element as HTMLElement).focus === "function"
           ) {
             (element as HTMLElement).focus();
+          }
+
+          // Fire user ref after the element is in the DOM so ref(el) can
+          // call focus(), measure layout, attach observers, etc.
+          if (props != null) {
+            applyRef((props as { ref?: Ref<Element> }).ref, element);
           }
         }
       } else {
@@ -474,69 +449,113 @@ export class HtmlRender implements IRender<HTMLElement | Text> {
   // -- Internal: attributes + delegated events --------------------------------
 
   private setAttributes(element: Element, props: Record<string, unknown>) {
+    if (props == null) return;
     for (const key in props) {
       const value = props[key];
-      if (key === "key" || value == null) continue;
-      if (isEventProp(key)) {
-        this.bindEvent(element, key, value as Function);
+      // `ref` is fired after insertion in render(); never written to DOM.
+      // `on` is the event-handler sub-object, handled separately below.
+      if (key === "key" || key === "ref" || key === "on" || value == null)
         continue;
-      }
       this.setAttribute(element, key, value);
+    }
+    const on = props.on as Maybe<Record<string, Function>>;
+    if (on) {
+      for (const ev in on) {
+        const handler = on[ev];
+        if (handler) this.bindEvent(element, ev, handler);
+      }
     }
   }
 
   private diffAttributes(
     element: Element,
-    prev: Record<string, unknown>,
-    next: Record<string, unknown>,
+    prev: Maybe<Record<string, unknown>>,
+    next: Maybe<Record<string, unknown>>,
   ) {
-    for (const key in prev) {
-      if (key === "key") continue;
-      if (!(key in next) || next[key] == null) {
-        if (isEventProp(key)) {
-          this.unbindEvent(element, key);
-        } else {
+    if (prev) {
+      for (const key in prev) {
+        if (key === "key" || key === "ref" || key === "on") continue;
+        if (next == null || !(key in next) || next[key] == null) {
           this.removeAttribute(element, key);
         }
       }
     }
 
-    for (const key in next) {
-      const value = next[key];
-      if (key === "key" || value == null) continue;
-      // Re-assert DOM properties even if prevProps matches: the live DOM
-      // value can drift from prevProps via user input (typing in an input,
-      // toggling a checkbox) without our state ever changing.
-      if (prev[key] === value && !DOM_PROPERTIES.has(key)) continue;
-      if (isEventProp(key)) {
-        const creoName = key.slice(2);
-        const domEvent = DOM_EVENT[creoName] ?? creoName.toLowerCase();
+    if (next) {
+      for (const key in next) {
+        const value = next[key];
+        if (key === "key" || key === "ref" || key === "on" || value == null)
+          continue;
+        // Re-assert DOM properties even if prevProps matches: the live DOM
+        // value can drift from prevProps via user input (typing in an input,
+        // toggling a checkbox) without our state ever changing.
+        if (prev && prev[key] === value && !DOM_PROPERTIES.has(key)) continue;
+        this.setAttribute(element, key, value);
+      }
+    }
+
+    // Event handlers under `on`. Common case: the user keeps the `on` object
+    // referentially stable across renders — `prevOn === nextOn` short-circuits
+    // without touching individual handlers.
+    const prevOn = prev?.on as Maybe<Record<string, Function>>;
+    const nextOn = next?.on as Maybe<Record<string, Function>>;
+    if (prevOn !== nextOn) {
+      this.diffEvents(element, prevOn, nextOn);
+    }
+
+    // ref reassignment: detach the old, attach the new. Same pattern as React.
+    const prevRef = prev?.ref as Maybe<Ref<Element>>;
+    const nextRef = next?.ref as Maybe<Ref<Element>>;
+    if (prevRef !== nextRef) {
+      applyRef(prevRef, null);
+      applyRef(nextRef, element);
+    }
+  }
+
+  private diffEvents(
+    element: Element,
+    prev: Maybe<Record<string, Function>>,
+    next: Maybe<Record<string, Function>>,
+  ) {
+    if (prev) {
+      for (const ev in prev) {
+        if (!next || next[ev] == null) {
+          this.unbindEvent(element, ev);
+        }
+      }
+    }
+    if (next) {
+      for (const ev in next) {
+        const value = next[ev];
+        if (value == null) continue;
+        if (prev && prev[ev] === value) continue;
+        const domEvent = ev.toLowerCase();
         const evObj = (element as any)[$EV] as
           | Record<string, Function>
           | undefined;
         if (evObj && domEvent in evObj) {
-          evObj[domEvent] = value as Function;
+          evObj[domEvent] = value;
         } else {
-          this.bindEvent(element, key, value as Function);
+          this.bindEvent(element, ev, value);
         }
-      } else {
-        this.setAttribute(element, key, value);
       }
     }
   }
 
-  private bindEvent(element: Element, prop: string, handler: Function): void {
-    const creoName = prop.slice(2);
-    const domEvent = DOM_EVENT[creoName] ?? creoName.toLowerCase();
+  private bindEvent(
+    element: Element,
+    eventName: string,
+    handler: Function,
+  ): void {
+    const domEvent = eventName.toLowerCase();
     const evObj: Record<string, Function> =
       (element as any)[$EV] ?? ((element as any)[$EV] = {});
     evObj[domEvent] = handler;
     ensureDelegated(this.container, domEvent);
   }
 
-  private unbindEvent(element: Element, prop: string): void {
-    const creoName = prop.slice(2);
-    const domEvent = DOM_EVENT[creoName] ?? creoName.toLowerCase();
+  private unbindEvent(element: Element, eventName: string): void {
+    const domEvent = eventName.toLowerCase();
     const evObj = (element as any)[$EV] as Record<string, Function> | undefined;
     if (evObj) {
       delete evObj[domEvent];
@@ -626,6 +645,10 @@ export class HtmlRender implements IRender<HTMLElement | Text> {
       }
       delete (ref.element as any)[$EV];
     }
+    // Detach user ref before the element leaves the DOM so the callback
+    // still has a chance to read layout / disconnect observers if needed.
+    const prevProps = ref.prevProps as Maybe<{ ref?: Ref<Element> }>;
+    if (prevProps) applyRef(prevProps.ref, null);
     ref.element.parentNode?.removeChild(ref.element);
   }
 }

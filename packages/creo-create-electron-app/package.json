@@ -1,6 +1,6 @@
 {
   "name": "creo-create-electron-app",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "type": "module",
   "bin": {
     "creo-create-electron-app": "./dist/index.js"

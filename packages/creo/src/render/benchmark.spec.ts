@@ -86,12 +86,12 @@ const Row = view<{
         text(ctx.props().item.id);
       });
       td({ class: "col-md-4" }, () => {
-        a({ onClick: ctx.props().onSelect }, () => {
+        a({ on: { click: ctx.props().onSelect } }, () => {
           text(ctx.props().item.label);
         });
       });
       td({ class: "col-md-1" }, () => {
-        a({ onClick: ctx.props().onRemove }, () => {
+        a({ on: { click: ctx.props().onRemove } }, () => {
           span({
             class: "glyphicon glyphicon-remove",
             "aria-hidden": "true",

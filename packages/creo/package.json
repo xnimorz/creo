@@ -1,6 +1,6 @@
 {
   "name": "creo",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "type": "module",
   "main": "dist/index.js",
   "module": "dist/index.js",
@@ -12,7 +12,10 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "AGENTS.md",
+    "CHANGELOG.md",
+    "docs"
   ],
   "scripts": {
     "build": "bun run build.ts",

@@ -80,7 +80,7 @@ const Counter = view<{ initial: number }>(({ props, use }) => {
 
   return {
     render() {
-      button({ onClick: handleClick }, () => {
+      button({ on: { click: handleClick } }, () => {
         text(count.get());
       });
     },
@@ -95,7 +95,7 @@ const Counter = view<{ initial: number }>(({ props, use }) => {
 | `function Component(props)`              | `view<Props>(({ props }) => ({ render() {} }))` — `props` is a function: call `props()` |
 | `useState(initial)`                      | `use(initial)` → `.get()` / `.set()` / `.update()`                                      |
 | `props.children`                         | `slot` — called as `slot?.()` inside render; callers can pass a string or `() => void`  |
-| `onClick={handler}`                      | `onClick: handler` in primitive props                                                   |
+| `onClick={handler}`                      | `on: { click: handler }` in primitive props                                             |
 | `useEffect(() => {}, [])` (mount)        | `onMount()` on ViewBody                                                                 |
 | `useEffect(() => {})` (update)           | `onUpdateAfter()` on ViewBody                                                           |
 | `useLayoutEffect` (before paint)         | `onUpdateBefore()` on ViewBody                                                          |
@@ -145,7 +145,7 @@ React:
 <input onChange={(e) => setValue(e.target.value)} />
 ```
 
-Creo — declare handlers before ViewBody, pass as `on*` props:
+Creo — declare handlers before ViewBody, pass them under a single `on` prop on the primitive:
 
 ```ts
 const MyView = view(({ use }) => {
@@ -155,26 +155,26 @@ const MyView = view(({ use }) => {
 
   return {
     render() {
-      button({ onClick: handleClick }, "Click");
-      input({ value: value.get(), onInput: handleInput });
+      button({ on: { click: handleClick } }, "Click");
+      input({ value: value.get(), on: { input: handleInput } });
     },
   };
 });
 ```
 
-| Event prop      | Event data type    | Fields        |
-| --------------- | ------------------ | ------------- |
-| `onClick`       | `PointerEventData` | `x`, `y`      |
-| `onDblclick`    | `PointerEventData` | `x`, `y`      |
-| `onPointerDown` | `PointerEventData` | `x`, `y`      |
-| `onPointerUp`   | `PointerEventData` | `x`, `y`      |
-| `onPointerMove` | `PointerEventData` | `x`, `y`      |
-| `onFocus`       | `FocusEventData`   | —             |
-| `onBlur`        | `FocusEventData`   | —             |
-| `onInput`       | `InputEventData`   | `value`       |
-| `onChange`      | `InputEventData`   | `value`       |
-| `onKeyDown`     | `KeyEventData`     | `key`, `code` |
-| `onKeyUp`       | `KeyEventData`     | `key`, `code` |
+| Event key      | Event data type    | Fields        |
+| -------------- | ------------------ | ------------- |
+| `click`        | `PointerEventData` | `x`, `y`      |
+| `dblclick`     | `PointerEventData` | `x`, `y`      |
+| `pointerDown`  | `PointerEventData` | `x`, `y`      |
+| `pointerUp`    | `PointerEventData` | `x`, `y`      |
+| `pointerMove`  | `PointerEventData` | `x`, `y`      |
+| `focus`        | `FocusEventData`   | —             |
+| `blur`         | `FocusEventData`   | —             |
+| `input`        | `InputEventData`   | `value`       |
+| `change`       | `InputEventData`   | `value`       |
+| `keyDown`      | `KeyEventData`     | `key`, `code` |
+| `keyUp`        | `KeyEventData`     | `key`, `code` |
 
 All event data includes `stopPropagation()` and `preventDefault()` from `BaseEventData`.
 
@@ -291,7 +291,7 @@ const MyView = view<{ value: number }>(({ props }) => ({
 
 ### Event Handlers
 
-Declare handler functions before returning ViewBody. Pass them as `on*` props on primitives. This keeps handlers stable across re-renders and render functions clean:
+Declare handler functions before returning ViewBody. Group them under a single `on` prop on the primitive (event names lose the `on` prefix). This keeps handlers stable across re-renders and avoids the renderer scanning every prop key for an `on*` pattern:
 
 ```ts
 const MyView = view(({ use }) => {
@@ -303,14 +303,25 @@ const MyView = view(({ use }) => {
 
   return {
     render() {
-      button({ onClick: increment }, () => {
+      button({ on: { click: increment } }, () => {
         text(count.get());
       });
-      button({ onClick: reset }, "Reset");
+      button({ on: { click: reset } }, "Reset");
     },
   };
 });
 ```
+
+When you need a primitive to react to several events, list them in the same `on` object:
+
+```ts
+input({
+  value: query.get(),
+  on: { input: onInput, keyDown: onKey, blur: onBlur },
+});
+```
+
+For hot lists you can hoist the `on` object so the renderer skips the sub-diff entirely (`prev.on === next.on`).
 
 ### State
 
@@ -325,11 +336,11 @@ Slot accepts a function `() => void` or a `string`. A string slot is shorthand f
 
 ```ts
 // No children:
-button({ onClick: handler });
+button({ on: { click: handler } });
 HeaderRow({ columns });
 
 // String slot — renders as a text node:
-button({ onClick: handler }, "Click me");
+button({ on: { click: handler } }, "Click me");
 span({ class: "label" }, title);
 li(_, "Item text");
 
@@ -346,7 +357,7 @@ Prefer passing a string directly as a slot instead of wrapping in `() => text(".
 
 ```ts
 // Preferred — inline string (static or dynamic):
-button({ onClick: handler }, "Click me");
+button({ on: { click: handler } }, "Click me");
 h1(_, "Page Title");
 li(_, "Item text");
 span({ class: "label" }, userName);
@@ -354,7 +365,7 @@ div({ class: "greeting" }, `Hello, ${props().name}!`); // template literals are 
 p(_, String(count.get()));
 
 // Avoid — unnecessary text() wrapper:
-button({ onClick: handler }, () => text("Click me"));
+button({ on: { click: handler } }, () => text("Click me"));
 h1(_, () => text("Page Title"));
 ```
 
@@ -384,7 +395,7 @@ div({ class: "wrapper" }, () => {
 
 | Children                          | Use                                                  |
 | --------------------------------- | ---------------------------------------------------- |
-| None                              | omit second arg: `button({ onClick })`               |
+| None                              | omit second arg: `button({ on: { click } })`         |
 | Single string (static or dynamic) | string slot: `h1(_, title)`                          |
 | Single child view                 | function slot: `section(_, () => UserCard({ id }))`  |
 | Multiple children                 | function slot with primitives / views inside         |

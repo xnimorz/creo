@@ -251,7 +251,7 @@ describe("Renderer Parity — HtmlRender vs HtmlStringRender", () => {
     it("event handlers are omitted from HTML output", () => {
       const App = view(() => ({
         render() {
-          button({ class: "btn", onClick: () => {} }, "Click");
+          button({ class: "btn", on: { click: () => {} } }, "Click");
         },
       }));
       const html = assertParity(App);
@@ -265,10 +265,12 @@ describe("Renderer Parity — HtmlRender vs HtmlStringRender", () => {
         render() {
           input({
             type: "text",
-            onInput: () => {},
-            onKeyDown: () => {},
-            onFocus: () => {},
-            onBlur: () => {},
+            on: {
+              input: () => {},
+              keyDown: () => {},
+              focus: () => {},
+              blur: () => {},
+            },
           });
         },
       }));
@@ -543,11 +545,11 @@ describe("Renderer Parity — HtmlRender vs HtmlStringRender", () => {
       const TodoItem = view<{ text: string; done: boolean }>(({ props }) => ({
         render() {
           div({ class: props().done ? "todo done" : "todo" }, () => {
-            span({ class: "check", onClick: () => {} }, () => {
+            span({ class: "check", on: { click: () => {} } }, () => {
               text(props().done ? "[x]" : "[ ]");
             });
             span({ class: "label" }, () => text(props().text));
-            button({ class: "delete", onClick: () => {} }, "x");
+            button({ class: "delete", on: { click: () => {} } }, "x");
           });
         },
       }));

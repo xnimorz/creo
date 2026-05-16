@@ -143,7 +143,7 @@ h1(_, "Title");          // not h1({}, "Title")
 ### Inline Strings
 Prefer passing strings directly as slots instead of wrapping in `() => text(...)`. The engine auto-wraps strings into text nodes:
 ```ts
-button({ onClick: handler }, "Click me");   // not () => text("Click me")
+button({ on: { click: handler } }, "Click me");  // not () => text("Click me")
 li(_, "Item text");                         // not () => text("Item text")
 span({ class: "label" }, title);            // string variable works too
 ```

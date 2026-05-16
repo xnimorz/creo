@@ -8,8 +8,18 @@ export { createApp } from "@/public/app";
 // View & State
 // ---------------------------------------------------------------------------
 
-export { view } from "@/public/view";
-export type { ViewBody, ViewFn, Slot, SlotContent, PublicView } from "@/public/view";
+export { view, applyRef } from "@/public/view";
+export type {
+  ViewBody,
+  ViewFn,
+  Slot,
+  SlotContent,
+  PublicView,
+  Ref,
+  RefCallback,
+  RefObject,
+  RefSetter,
+} from "@/public/view";
 export type { Reactive, Use } from "@/public/state";
 export { State } from "@/public/state";
 export { Store, store, isStore } from "@/public/store";
@@ -19,7 +29,7 @@ export { Store, store, isStore } from "@/public/store";
 // ---------------------------------------------------------------------------
 
 export { $primitive } from "@/public/primitive";
-export type { PrimitiveProps, EventHandlerProps } from "@/public/primitive";
+export type { PrimitiveProps } from "@/public/primitive";
 
 export {
   // Factory
@@ -27,31 +37,124 @@ export {
   // Text
   text,
   // Layout / structural
-  div, span, section, article, aside, nav, header, footer, main,
+  div,
+  span,
+  section,
+  article,
+  aside,
+  nav,
+  header,
+  footer,
+  main,
   // Sectioning
-  address, hgroup, search,
+  address,
+  hgroup,
+  search,
   // Text / inline
-  p, h1, h2, h3, h4, h5, h6, pre, code, em, strong, small, br, hr, a, blockquote, label,
+  p,
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  pre,
+  code,
+  em,
+  strong,
+  small,
+  br,
+  hr,
+  a,
+  blockquote,
+  label,
   // Text semantics
-  abbr, b, bdi, bdo, cite, data, dfn, i, kbd, mark, q, rp, rt, ruby, s, samp, sub, sup, time, u, varEl, wbr,
+  abbr,
+  b,
+  bdi,
+  bdo,
+  cite,
+  data,
+  dfn,
+  i,
+  kbd,
+  mark,
+  q,
+  rp,
+  rt,
+  ruby,
+  s,
+  samp,
+  sub,
+  sup,
+  time,
+  u,
+  varEl,
+  wbr,
   // Demarcating edits
-  del, ins,
+  del,
+  ins,
   // Lists
-  ul, ol, li, dl, dt, dd,
+  ul,
+  ol,
+  li,
+  dl,
+  dt,
+  dd,
   // Table
-  table, thead, tbody, tfoot, tr, th, td, caption, colgroup, col,
+  table,
+  thead,
+  tbody,
+  tfoot,
+  tr,
+  th,
+  td,
+  caption,
+  colgroup,
+  col,
   // Form
-  form, button, input, textarea, select, option, fieldset, legend, datalist, optgroup, output, progress, meter,
+  form,
+  button,
+  input,
+  textarea,
+  select,
+  option,
+  fieldset,
+  legend,
+  datalist,
+  optgroup,
+  output,
+  progress,
+  meter,
   // Media
-  img, video, audio, canvas, source, track, map, area, picture,
+  img,
+  video,
+  audio,
+  canvas,
+  source,
+  track,
+  map,
+  area,
+  picture,
   // Embedded
-  iframe, embed, object, portal, svg,
+  iframe,
+  embed,
+  object,
+  portal,
+  svg,
   // Interactive
-  details, summary, dialog, menu,
+  details,
+  summary,
+  dialog,
+  menu,
   // Figure
-  figure, figcaption,
+  figure,
+  figcaption,
   // Scripting
-  script, noscript, template, slot,
+  script,
+  noscript,
+  template,
+  slot,
 } from "@/public/primitives/primitives";
 
 // ---------------------------------------------------------------------------
@@ -96,7 +199,14 @@ export { Engine, type Scheduler } from "@/internal/engine";
 // Utilities
 // ---------------------------------------------------------------------------
 
-export { type Maybe, type None, type Just, just, withDefault, _ } from "@/functional/maybe";
+export {
+  type Maybe,
+  type None,
+  type Just,
+  just,
+  withDefault,
+  _,
+} from "@/functional/maybe";
 export type { Key } from "@/functional/key";
 export { shallowEqual } from "@/functional/shallow_equal";
 export { assertNever } from "@/functional/assert";

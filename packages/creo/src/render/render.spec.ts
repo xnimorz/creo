@@ -385,8 +385,10 @@ describe("HtmlRender", () => {
       render() {
         button({
           class: "click-me",
-          onClick: () => {
-            clicked = true;
+          on: {
+            click: () => {
+              clicked = true;
+            },
           },
         });
       },
@@ -414,9 +416,11 @@ describe("HtmlRender", () => {
         input({
           type: "checkbox",
           value: "yes",
-          onChange: (e) => {
-            lastChecked = e.checked;
-            lastValue = e.value;
+          on: {
+            change: (e) => {
+              lastChecked = e.checked;
+              lastValue = e.value;
+            },
           },
         });
       },
@@ -526,7 +530,7 @@ describe("HtmlRender", () => {
             key: id,
             type: "radio",
             name: "plan2",
-            onChange: (ev) => events.push({ id, checked: ev.checked }),
+            on: { change: (ev) => events.push({ id, checked: ev.checked }) },
           });
         }
       },
@@ -761,8 +765,14 @@ describe("HtmlRender", () => {
         video({
           src: "x.mp4",
           muted: true,
-          onVolumeChange: (e) => {
-            events.push({ muted: e.muted, paused: e.paused, volume: e.volume });
+          on: {
+            volumeChange: (e) => {
+              events.push({
+                muted: e.muted,
+                paused: e.paused,
+                volume: e.volume,
+              });
+            },
           },
         });
       },
@@ -789,20 +799,29 @@ describe("HtmlRender", () => {
     }
   });
 
-  it("mouseEnter / mouseLeave fire only on the actual target (no ancestor double-fire)", () => {
+  it("pointerEnter / pointerLeave fire only on the actual target (no ancestor double-fire)", () => {
     const calls: string[] = [];
 
     const Inner = view<void>(() => ({
       render() {
-        div({ class: "inner", onMouseEnter: () => calls.push("inner-enter") });
+        div({
+          class: "inner",
+          on: { pointerEnter: () => calls.push("inner-enter") },
+        });
       },
     }));
 
     const Outer = view<void>(() => ({
       render() {
-        div({ class: "outer", onMouseEnter: () => calls.push("outer-enter") }, () => {
-          Inner();
-        });
+        div(
+          {
+            class: "outer",
+            on: { pointerEnter: () => calls.push("outer-enter") },
+          },
+          () => {
+            Inner();
+          },
+        );
       },
     }));
 
@@ -818,10 +837,10 @@ describe("HtmlRender", () => {
       const outer = c.querySelector(".outer") as HTMLElement;
       const inner = c.querySelector(".inner") as HTMLElement;
 
-      // The browser dispatches mouseenter once per element entered, each
+      // The browser dispatches pointerenter once per element entered, each
       // with its own target. dispatchEvent sets target = the dispatching el.
-      outer.dispatchEvent(new Event("mouseenter"));
-      inner.dispatchEvent(new Event("mouseenter"));
+      outer.dispatchEvent(new Event("pointerenter"));
+      inner.dispatchEvent(new Event("pointerenter"));
 
       // Outer should fire exactly once (from its own dispatch), not also from
       // the inner dispatch walking up.
@@ -839,7 +858,10 @@ describe("HtmlRender", () => {
         div({
           class: "scroller",
           style: "height:50px;overflow:auto;",
-          onScroll: (e) => events.push({ scrollTop: e.scrollTop, scrollLeft: e.scrollLeft }),
+          on: {
+            scroll: (e) =>
+              events.push({ scrollTop: e.scrollTop, scrollLeft: e.scrollLeft }),
+          },
         });
       },
     }));
@@ -873,8 +895,10 @@ describe("HtmlRender", () => {
       render() {
         html("img")({
           class: "pic",
-          onLoad: () => log.push("loaded"),
-          onError: (e) => log.push(`error:${e.message}`),
+          on: {
+            load: () => log.push("loaded"),
+            error: (e) => log.push(`error:${e.message}`),
+          },
         });
       },
     }));
@@ -908,7 +932,10 @@ describe("HtmlRender", () => {
       render() {
         video({
           src: "x.mp4",
-          onTimeUpdate: (e) => ticks.push({ currentTime: e.currentTime, duration: e.duration }),
+          on: {
+            timeUpdate: (e) =>
+              ticks.push({ currentTime: e.currentTime, duration: e.duration }),
+          },
         });
       },
     }));
@@ -938,12 +965,15 @@ describe("HtmlRender", () => {
 
     const Disclosure = view<void>(() => ({
       render() {
-        details({
-          class: "d",
-          onToggle: (e) => states.push(e.open),
-        }, () => {
-          summary(_, "more");
-        });
+        details(
+          {
+            class: "d",
+            on: { toggle: (e) => states.push(e.open) },
+          },
+          () => {
+            summary(_, "more");
+          },
+        );
       },
     }));
 
@@ -1017,8 +1047,10 @@ describe("HtmlRender", () => {
       render() {
         input({
           type: "text",
-          onFocus: () => { focused++; },
-          onBlur: () => { blurred++; },
+          on: {
+            focus: () => { focused++; },
+            blur: () => { blurred++; },
+          },
         });
       },
     }));
@@ -1059,7 +1091,7 @@ describe("HtmlRender", () => {
         render() {
           button(
             show.get()
-              ? { class: "btn", onClick: () => { clickCount++; } }
+              ? { class: "btn", on: { click: () => { clickCount++; } } }
               : { class: "btn" },
             "click me",
           );
@@ -1456,7 +1488,7 @@ describe("State", () => {
             input({ class: "editor", value: "hello" });
           } else {
             div(
-              { class: "display", onClick: () => editing.set(true) },
+              { class: "display", on: { click: () => editing.set(true) } },
               "click to edit",
             );
           }
@@ -2109,6 +2141,466 @@ describe("State", () => {
 
     expect(container.textContent).toBe("ADCBE");
   });
+});
+
+// ---------------------------------------------------------------------------
+// Drag/swipe API surface — pointer fields, ref, dispose, pointerCancel
+// ---------------------------------------------------------------------------
+
+describe("Drag/swipe API surface", () => {
+  it("exposes pointerId, pointerType, button, currentTarget on PointerEventData", () => {
+    let received: any = null;
+    const App = view<void>(() => ({
+      render() {
+        div({
+          class: "card",
+          on: {
+            pointerDown: (e) => {
+              received = e;
+            },
+          },
+        });
+      },
+    }));
+
+    const c = document.createElement("div");
+    const r = new HtmlRender(c);
+    const e = new Engine(r);
+    orchestrator.setCurrentEngine(e);
+    e.createRoot(() => { App(); }, {});
+    e.render();
+
+    const card = c.querySelector(".card")! as HTMLElement;
+    const evt = new (win as Wildcard).PointerEvent("pointerdown", {
+      bubbles: true,
+      pointerId: 7,
+      pointerType: "touch",
+      button: 0,
+      buttons: 1,
+      clientX: 100,
+      clientY: 200,
+    });
+    card.dispatchEvent(evt);
+
+    expect(received).not.toBeNull();
+    expect(received.x).toBe(100);
+    expect(received.y).toBe(200);
+    expect(received.pointerId).toBe(7);
+    expect(received.pointerType).toBe("touch");
+    expect(received.button).toBe(0);
+    expect(received.buttons).toBe(1);
+    expect(received.currentTarget).toBe(card);
+    expect(typeof received.capture).toBe("function");
+    expect(typeof received.release).toBe("function");
+    expect(received.nativeEvent).toBe(evt);
+  });
+
+  it("e.capture() calls setPointerCapture on currentTarget with the pointerId", () => {
+    const captured: number[] = [];
+    const App = view<void>(() => ({
+      render() {
+        div({
+          class: "card",
+          on: {
+            pointerDown: (e) => {
+              e.capture();
+            },
+          },
+        });
+      },
+    }));
+
+    const c = document.createElement("div");
+    const r = new HtmlRender(c);
+    const e = new Engine(r);
+    orchestrator.setCurrentEngine(e);
+    e.createRoot(() => { App(); }, {});
+    e.render();
+
+    const card = c.querySelector(".card")! as HTMLElement;
+    // happy-dom may or may not implement setPointerCapture; stub it to observe.
+    (card as Wildcard).setPointerCapture = (id: number) => {
+      captured.push(id);
+    };
+
+    const evt = new (win as Wildcard).PointerEvent("pointerdown", {
+      bubbles: true,
+      pointerId: 42,
+      pointerType: "touch",
+    });
+    card.dispatchEvent(evt);
+
+    expect(captured).toEqual([42]);
+  });
+
+  it("fires onPointerCancel handlers", () => {
+    let cancelled = false;
+    const App = view<void>(() => ({
+      render() {
+        div({
+          class: "card",
+          on: {
+            pointerCancel: () => {
+              cancelled = true;
+            },
+          },
+        });
+      },
+    }));
+
+    const c = document.createElement("div");
+    const r = new HtmlRender(c);
+    const eng = new Engine(r);
+    orchestrator.setCurrentEngine(eng);
+    eng.createRoot(() => { App(); }, {});
+    eng.render();
+
+    const card = c.querySelector(".card")! as HTMLElement;
+    const evt = new (win as Wildcard).PointerEvent("pointercancel", {
+      bubbles: true,
+      pointerId: 1,
+    });
+    card.dispatchEvent(evt);
+
+    expect(cancelled).toBe(true);
+  });
+
+  it("ref callback fires with element after mount and null on unmount", () => {
+    const calls: Array<Element | null> = [];
+    const refCb = (el: Element | null) => {
+      calls.push(el);
+    };
+
+    const show = store.new(true);
+    const App = view<void>(({ use }) => {
+      const visible = use(show);
+      return {
+        render() {
+          if (visible.get()) {
+            div({ class: "tracked", ref: refCb });
+          }
+        },
+      };
+    });
+
+    const c = document.createElement("div");
+    const r = new HtmlRender(c);
+    const eng = new Engine(r);
+    orchestrator.setCurrentEngine(eng);
+    eng.createRoot(() => { App(); }, {});
+    eng.render();
+
+    expect(calls.length).toBe(1);
+    expect(calls[0]).toBe(c.querySelector(".tracked"));
+
+    show.set(false);
+    eng.render();
+
+    expect(calls.length).toBe(2);
+    expect(calls[1]).toBeNull();
+  });
+
+  it("ref reassignment detaches old and attaches new", () => {
+    const oldCalls: Array<Element | null> = [];
+    const newCalls: Array<Element | null> = [];
+    const oldRef = (el: Element | null) => oldCalls.push(el);
+    const newRef = (el: Element | null) => newCalls.push(el);
+
+    const useNew = store.new(false);
+    const App = view<void>(({ use }) => {
+      const flip = use(useNew);
+      return {
+        render() {
+          div({ class: "tracked", ref: flip.get() ? newRef : oldRef });
+        },
+      };
+    });
+
+    const c = document.createElement("div");
+    const r = new HtmlRender(c);
+    const eng = new Engine(r);
+    orchestrator.setCurrentEngine(eng);
+    eng.createRoot(() => { App(); }, {});
+    eng.render();
+
+    expect(oldCalls.length).toBe(1);
+    expect(newCalls.length).toBe(0);
+
+    useNew.set(true);
+    eng.render();
+
+    expect(oldCalls.length).toBe(2);
+    expect(oldCalls[1]).toBeNull();
+    expect(newCalls.length).toBe(1);
+    expect(newCalls[0]).toBe(c.querySelector(".tracked"));
+  });
+
+  it("ref is not written to the DOM as an attribute", () => {
+    const App = view<void>(() => ({
+      render() {
+        div({ class: "tracked", ref: () => {} });
+      },
+    }));
+
+    const c = document.createElement("div");
+    const r = new HtmlRender(c);
+    const eng = new Engine(r);
+    orchestrator.setCurrentEngine(eng);
+    eng.createRoot(() => { App(); }, {});
+    eng.render();
+
+    const el = c.querySelector(".tracked")!;
+    expect(el.getAttribute("ref")).toBeNull();
+  });
+
+  it("dispose() runs once when a view leaves the tree", () => {
+    let disposed = 0;
+
+    const Inner = view<void>(() => ({
+      render() {
+        span(_, "inner");
+      },
+      dispose() {
+        disposed++;
+      },
+    }));
+
+    const visible = store.new(true);
+    const App = view<void>(({ use }) => {
+      const v = use(visible);
+      return {
+        render() {
+          if (v.get()) Inner();
+        },
+      };
+    });
+
+    const c = document.createElement("div");
+    const r = new HtmlRender(c);
+    const eng = new Engine(r);
+    orchestrator.setCurrentEngine(eng);
+    eng.createRoot(() => { App(); }, {});
+    eng.render();
+
+    expect(disposed).toBe(0);
+
+    visible.set(false);
+    eng.render();
+
+    expect(disposed).toBe(1);
+  });
+
+  it("primitive accepts a { current } ref object", () => {
+    const elRef: { current: Element | null } = { current: null };
+
+    const App = view<void>(() => ({
+      render() {
+        div({ class: "tracked", ref: elRef });
+      },
+    }));
+
+    const c = document.createElement("div");
+    const r = new HtmlRender(c);
+    const eng = new Engine(r);
+    orchestrator.setCurrentEngine(eng);
+    eng.createRoot(() => { App(); }, {});
+    eng.render();
+
+    expect(elRef.current).toBe(c.querySelector(".tracked"));
+  });
+
+  it("primitive ref object is nulled on unmount", () => {
+    const elRef: { current: Element | null } = { current: null };
+
+    const visible = store.new(true);
+    const App = view<void>(({ use }) => {
+      const v = use(visible);
+      return {
+        render() {
+          if (v.get()) div({ class: "tracked", ref: elRef });
+        },
+      };
+    });
+
+    const c = document.createElement("div");
+    const r = new HtmlRender(c);
+    const eng = new Engine(r);
+    orchestrator.setCurrentEngine(eng);
+    eng.createRoot(() => { App(); }, {});
+    eng.render();
+    expect(elRef.current).not.toBeNull();
+
+    visible.set(false);
+    eng.render();
+    expect(elRef.current).toBeNull();
+  });
+
+  it("composite view exposes api through a consumer-supplied ref object", () => {
+    type CounterApi = { increment: () => number; current: () => number };
+
+    const Counter = view<void, CounterApi>(({ use, ref }) => {
+      const count = use(0);
+      ref({
+        increment: () => {
+          count.update((n) => n + 1);
+          return count.get();
+        },
+        current: () => count.get(),
+      });
+      return {
+        render() {
+          span(_, String(count.get()));
+        },
+      };
+    });
+
+    const api: { current: CounterApi | null } = { current: null };
+    const App = view<void>(() => ({
+      render() {
+        Counter({ ref: api });
+      },
+    }));
+
+    const c = document.createElement("div");
+    const r = new HtmlRender(c);
+    const eng = new Engine(r);
+    orchestrator.setCurrentEngine(eng);
+    eng.createRoot(() => { App(); }, {});
+    eng.render();
+
+    expect(api.current).not.toBeNull();
+    expect(api.current!.current()).toBe(0);
+    expect(api.current!.increment()).toBe(1);
+    expect(api.current!.current()).toBe(1);
+  });
+
+  it("composite view exposes api through a callback ref", () => {
+    type Api = { ping: () => string };
+    const seen: Array<Api | null> = [];
+
+    const Pong = view<void, Api>(({ ref }) => {
+      ref({ ping: () => "pong" });
+      return {
+        render() { span(_, "p"); },
+      };
+    });
+
+    const App = view<void>(() => ({
+      render() {
+        Pong({ ref: (api) => { seen.push(api); } });
+      },
+    }));
+
+    const c = document.createElement("div");
+    const r = new HtmlRender(c);
+    const eng = new Engine(r);
+    orchestrator.setCurrentEngine(eng);
+    eng.createRoot(() => { App(); }, {});
+    eng.render();
+
+    expect(seen.length).toBe(1);
+    expect(seen[0]!.ping()).toBe("pong");
+  });
+
+  it("composite consumer-ref migrates when the parent swaps refs between renders", () => {
+    type Api = { hello: () => string };
+
+    const Greeter = view<void, Api>(({ ref }) => {
+      ref({ hello: () => "hi" });
+      return { render() { span(_, "g"); } };
+    });
+
+    const refA: { current: Api | null } = { current: null };
+    const refB: { current: Api | null } = { current: null };
+    const useB = store.new(false);
+
+    const App = view<void>(({ use }) => {
+      const flip = use(useB);
+      return {
+        render() {
+          Greeter({ ref: flip.get() ? refB : refA });
+        },
+      };
+    });
+
+    const c = document.createElement("div");
+    const r = new HtmlRender(c);
+    const eng = new Engine(r);
+    orchestrator.setCurrentEngine(eng);
+    eng.createRoot(() => { App(); }, {});
+    eng.render();
+
+    expect(refA.current?.hello()).toBe("hi");
+    expect(refB.current).toBeNull();
+
+    useB.set(true);
+    eng.render();
+
+    expect(refA.current).toBeNull();
+    expect(refB.current?.hello()).toBe("hi");
+  });
+
+  it("composite consumer-ref is nulled on unmount", () => {
+    type Api = { hi: () => string };
+    const ref: { current: Api | null } = { current: null };
+
+    const Inner = view<void, Api>(({ ref }) => {
+      ref({ hi: () => "ok" });
+      return { render() { span(_, "i"); } };
+    });
+
+    const visible = store.new(true);
+    const App = view<void>(({ use }) => {
+      const v = use(visible);
+      return {
+        render() {
+          if (v.get()) Inner({ ref });
+        },
+      };
+    });
+
+    const c = document.createElement("div");
+    const r = new HtmlRender(c);
+    const eng = new Engine(r);
+    orchestrator.setCurrentEngine(eng);
+    eng.createRoot(() => { App(); }, {});
+    eng.render();
+
+    expect(ref.current?.hi()).toBe("ok");
+
+    visible.set(false);
+    eng.render();
+
+    expect(ref.current).toBeNull();
+  });
+
+  it("ctx.ref() called from onMount is propagated to the consumer's ref", () => {
+    type Api = { ready: boolean };
+    const ref: { current: Api | null } = { current: null };
+
+    const Late = view<void, Api>(({ ref: setRef }) => ({
+      onMount() {
+        setRef({ ready: true });
+      },
+      render() {
+        span(_, "late");
+      },
+    }));
+
+    const App = view<void>(() => ({
+      render() { Late({ ref }); },
+    }));
+
+    const c = document.createElement("div");
+    const r = new HtmlRender(c);
+    const eng = new Engine(r);
+    orchestrator.setCurrentEngine(eng);
+    eng.createRoot(() => { App(); }, {});
+    eng.render();
+
+    expect(ref.current?.ready).toBe(true);
+  });
+
 });
 
 // ---------------------------------------------------------------------------

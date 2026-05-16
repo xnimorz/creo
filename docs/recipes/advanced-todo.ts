@@ -112,12 +112,18 @@ const TodoDisplay = view<{
       ].filter(Boolean).join(" ");
 
       div(
-        { class: cls, onPointerUp: handlePointerUp },
+        { class: cls, on: { pointerUp: handlePointerUp } },
         () => {
-          span({ class: "drag-handle", onPointerDown: handleDragStart }, "⠿");
-          span({ class: "todo-check", onClick: handleToggle }, todo.done ? "☑" : "☐");
-          span({ class: "todo-text", onClick: handleEdit }, todo.text);
-          span({ class: "todo-delete", onClick: handleDelete }, "×");
+          span(
+            { class: "drag-handle", on: { pointerDown: handleDragStart } },
+            "⠿",
+          );
+          span(
+            { class: "todo-check", on: { click: handleToggle } },
+            todo.done ? "☑" : "☐",
+          );
+          span({ class: "todo-text", on: { click: handleEdit } }, todo.text);
+          span({ class: "todo-delete", on: { click: handleDelete } }, "×");
         },
       );
     },
@@ -159,9 +165,11 @@ const TodoEditor = view<{
           class: "edit-input",
           value: draft,
           autofocus: true,
-          onInput: handleInput,
-          onKeyDown: handleKeyDown,
-          onBlur: handleBlur,
+          on: {
+            input: handleInput,
+            keyDown: handleKeyDown,
+            blur: handleBlur,
+          },
         });
       });
     },
@@ -283,8 +291,10 @@ const App = view(({ use }) => {
       div(
         {
           class: d ? "app dragging-active" : "app",
-          onPointerMove: handlePointerMove,
-          onPointerUp: cancelDrag,
+          on: {
+            pointerMove: handlePointerMove,
+            pointerUp: cancelDrag,
+          },
         },
         () => {
           h1(_, "Todo App");
@@ -294,10 +304,12 @@ const App = view(({ use }) => {
               class: "add-input",
               value: draft,
               placeholder: "What needs to be done?",
-              onInput: handleInput,
-              onKeyDown: handleAddKeyDown,
+              on: { input: handleInput, keyDown: handleAddKeyDown },
             });
-            button({ class: "btn btn-primary", onClick: addTodo }, "Add");
+            button(
+              { class: "btn btn-primary", on: { click: addTodo } },
+              "Add",
+            );
           });
 
           const list = todos.get();
@@ -307,7 +319,10 @@ const App = view(({ use }) => {
 
           div({ class: "filter-bar" }, () => {
             button(
-              { class: "btn btn-filter", onClick: toggleHideCompleted },
+              {
+                class: "btn btn-filter",
+                on: { click: toggleHideCompleted },
+              },
               hiding ? "Show completed" : "Hide completed",
             );
           });

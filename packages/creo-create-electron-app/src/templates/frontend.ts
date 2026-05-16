@@ -165,7 +165,7 @@ export const App = view(({ use }) => {
       div(_, () => {
         h1(_, "Creo + Electron");
         p(_, "Cross-platform desktop app");
-        button({ onClick: increment }, \`Count: \${count.get()}\`);
+        button({ on: { click: increment } }, \`Count: \${count.get()}\`);
       });
     },
   };

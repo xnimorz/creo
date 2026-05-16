@@ -38,45 +38,53 @@ const Toolbar = view(() => {
   return {
     render() {
       div({ class: "toolbar" }, () => {
-        button({ onClick: mark("b") }, "B");
-        button({ onClick: mark("i") }, "I");
-        button({ onClick: mark("u") }, "U");
+        button({ on: { click: mark("b") } }, "B");
+        button({ on: { click: mark("i") } }, "I");
+        button({ on: { click: mark("u") } }, "U");
         button(
           {
-            onClick: (e) => {
-              e.preventDefault();
-              editor.dispatch({ t: "toggleList", ordered: false });
-              editor.focus();
+            on: {
+              click: (e) => {
+                e.preventDefault();
+                editor.dispatch({ t: "toggleList", ordered: false });
+                editor.focus();
+              },
             },
           },
           "• List",
         );
         button(
           {
-            onClick: (e) => {
-              e.preventDefault();
-              editor.dispatch({ t: "toggleList", ordered: true });
-              editor.focus();
+            on: {
+              click: (e) => {
+                e.preventDefault();
+                editor.dispatch({ t: "toggleList", ordered: true });
+                editor.focus();
+              },
             },
           },
           "1. List",
         );
         button(
           {
-            onClick: (e) => {
-              e.preventDefault();
-              editor.undo();
-              editor.focus();
+            on: {
+              click: (e) => {
+                e.preventDefault();
+                editor.undo();
+                editor.focus();
+              },
             },
           },
           "Undo",
         );
         button(
           {
-            onClick: (e) => {
-              e.preventDefault();
-              editor.redo();
-              editor.focus();
+            on: {
+              click: (e) => {
+                e.preventDefault();
+                editor.redo();
+                editor.focus();
+              },
             },
           },
           "Redo",

@@ -30,7 +30,7 @@ export type ViewRecord<
   slot: Maybe<SlotContent>;
   // Once ViewRecord moves from Pending to Real state,
   // it will cache the body of the view, so that ViewFn is called once per View Lifecycle
-  body: Maybe<ViewBody<Props, Api>>;
+  body: Maybe<ViewBody<Props>>;
   // Provided by higher component slot — we calculate children and keep their refs here
   sc: Maybe<ViewRecord[]>;
   // Each renderer provides its own RenderRef type, associated with how the renderer works
@@ -52,6 +52,12 @@ export type ViewRecord<
 
   /** The primitive whose .children contains the live sc items after reconcile. */
   scHost: Maybe<ViewRecord>;
+
+  /**
+   * Last value the viewFn passed to `ctx.ref(...)`. Stored so the engine
+   * can re-apply it when the consumer's `ref` prop changes between renders.
+   */
+  publicRef: Maybe<unknown>;
 };
 
 // ---------------------------------------------------------------------------

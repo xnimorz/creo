@@ -1,8 +1,9 @@
 import type { Wildcard } from "@/internal/wildcard";
-import { $primitive, type EventHandlerProps } from "../primitive";
+import { $primitive } from "../primitive";
 import {
   view,
   type PublicView,
+  type Ref,
   type Slot,
   type ViewBody,
   type ViewFn,
@@ -21,6 +22,19 @@ export type BaseEventData = {
 export type PointerEventData = BaseEventData & {
   x: number;
   y: number;
+  /** Pointer ID — pass to setPointerCapture. */
+  pointerId: number;
+  pointerType: "mouse" | "touch" | "pen" | "";
+  button: number;
+  buttons: number;
+  target: HTMLElement;
+  /** The element the handler is bound to (handles event delegation correctly). */
+  currentTarget: HTMLElement;
+  /** Capture the pointer to currentTarget — keeps move/up firing when the pointer leaves bounds. */
+  capture: () => void;
+  release: () => void;
+  /** Escape hatch — the underlying DOM event. Avoid where the typed fields cover the use case. */
+  nativeEvent: Event;
 };
 
 export type KeyEventData = BaseEventData & {
@@ -68,9 +82,8 @@ export type ContainerEvents = {
   pointerDown: (e: PointerEventData) => void;
   pointerUp: (e: PointerEventData) => void;
   pointerMove: (e: PointerEventData) => void;
+  pointerCancel: (e: PointerEventData) => void;
   // Hover (capture-phase, per-target, not double-fired up the tree).
-  mouseEnter: (e: PointerEventData) => void;
-  mouseLeave: (e: PointerEventData) => void;
   pointerEnter: (e: PointerEventData) => void;
   pointerLeave: (e: PointerEventData) => void;
   keyDown: (e: KeyEventData) => void;
@@ -125,18 +138,23 @@ export type HtmlAttrs = {
   hidden?: boolean;
   role?: string;
   draggable?: boolean;
+  /**
+   * Set with the underlying DOM element after mount, and with `null` after
+   * unmount. Accepts either a callback or a `{ current }` ref object   
+   */
+  ref?: Ref<Element>;
   [attr: string]: unknown;
 };
 
 export function html<
   Attrs extends HtmlAttrs = HtmlAttrs,
   Events = ContainerEvents,
->(tag: string): PublicView<Attrs & EventHandlerProps<Events>, void> {
-  const fn: ViewFn<Attrs & EventHandlerProps<Events>, void> = <Props>({
+>(tag: string): PublicView<Attrs & { on?: Partial<Events> }, Element> {
+  const fn: ViewFn<Attrs & { on?: Partial<Events> }, Element> = <Props>({
     slot,
   }: {
     slot: Slot;
-  }): ViewBody<Props, void> => ({
+  }): ViewBody<Props> => ({
     render() {
       slot();
     },

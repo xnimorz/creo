@@ -42,10 +42,9 @@ const TodoApp = view(({ use }) => {
           input({
             class: "new-todo",
             placeholder: "What needs doing?",
-            onInput: onDraft,
-            onKeyDown: onKey,
+            on: { input: onDraft, keyDown: onKey },
           });
-          button({ onClick: add }, "Add");
+          button({ on: { click: add } }, "Add");
         });
 
         ul({ class: "list" }, () => {
@@ -54,10 +53,13 @@ const TodoApp = view(({ use }) => {
               input({
                 type: "checkbox",
                 checked: t.done,
-                onChange: () => toggle(t.id),
+                on: { change: () => toggle(t.id) },
               });
               span({ class: "title" }, t.title);
-              button({ class: "remove", onClick: () => remove(t.id) }, "×");
+              button(
+                { class: "remove", on: { click: () => remove(t.id) } },
+                "×",
+              );
             });
           }
         });

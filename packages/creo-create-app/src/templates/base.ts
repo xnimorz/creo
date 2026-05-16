@@ -139,7 +139,7 @@ export const App = view(({ use }) => {
         h1({}, () => {
           text("Creo App");
         });
-        button({ onClick: increment }, () => {
+        button({ on: { click: increment } }, () => {
           text(\`Count: \${count.get()}\`);
         });
       });

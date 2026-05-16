@@ -37,7 +37,10 @@ const RandomQuote = view(({ use }) => {
           p({ class: "author" }, `— ${q.author}`);
         }
 
-        button({ onClick: load, disabled: loading.get() }, "Get another");
+        button(
+          { on: { click: load }, disabled: loading.get() },
+          "Get another",
+        );
       });
     },
   };
