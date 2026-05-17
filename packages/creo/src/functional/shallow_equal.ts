@@ -17,7 +17,10 @@ export function shallowEqual(a: Wildcard, b: Wildcard): boolean {
   let countA = 0;
   for (const key in a) {
     countA++;
-    if (a[key] !== b[key]) return false;
+    if (a[key] === b[key]) continue;
+    // One-level deeper for the conventional event-handler object.
+    if (key === "on" && shallowEqual(a[key], b[key])) continue;
+    return false;
   }
 
   let countB = 0;

@@ -643,6 +643,65 @@ describe("HtmlRender", () => {
     expect(renderCallsByEl.get(b) ?? 0).toBe(bBefore);
   });
 
+  it("inline `on: { ... }` with stable handler refs does not re-render the primitive", () => {
+    // Regression: a fresh `on` literal on every render must not cause the
+    // primitive to be marked dirty when the handler references are stable.
+    // The carve-out in shallowEqual handles this.
+    let counterState!: Reactive<number>;
+    let clicks = 0;
+    const handler = () => { clicks++; };
+
+    const Form = view<void>(({ use }) => {
+      const counter = use(0);
+      counterState = counter;
+      return {
+        render() {
+          div(_, () => {
+            // Inline `on` literal — fresh object every render.
+            button({ class: "btn", on: { click: handler } }, "Click");
+            // Touch counter so the parent re-renders.
+            span(_, String(counter.get()));
+          });
+        },
+      };
+    });
+
+    const c = document.createElement("div");
+    const renderer = new HtmlRender(c);
+
+    const renderCallsByEl = new Map<Element, number>();
+    const orig = renderer.render.bind(renderer);
+    renderer.render = (v: ViewRecord) => {
+      orig(v);
+      const ref = v.renderRef as { element?: Element } | null | undefined;
+      if (ref && ref.element instanceof HTMLElement) {
+        renderCallsByEl.set(
+          ref.element,
+          (renderCallsByEl.get(ref.element) ?? 0) + 1,
+        );
+      }
+    };
+
+    const e = new Engine(renderer);
+    orchestrator.setCurrentEngine(e);
+    e.createRoot(() => { Form(); }, {});
+    e.render();
+
+    const btn = c.querySelector(".btn") as HTMLButtonElement;
+    const btnBefore = renderCallsByEl.get(btn) ?? 0;
+
+    // Trigger a parent re-render. The button's only "change" is a fresh
+    // `on` literal pointing at the same handler — must not re-render.
+    counterState.update((n) => n + 1);
+    e.render();
+
+    expect(renderCallsByEl.get(btn) ?? 0).toBe(btnBefore);
+
+    // Handler still fires after the parent re-renders.
+    btn.click();
+    expect(clicks).toBe(1);
+  });
+
   it("only the drifted input is re-rendered, undrifted siblings are skipped", () => {
     let counterState!: Reactive<number>;
 
