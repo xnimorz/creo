@@ -47,12 +47,26 @@ Event handlers live under a single `on` key. Event names are the camelCase form 
 | `pointerDown` | Pointer button pressed | `PointerEventData` |
 | `pointerUp` | Pointer button released | `PointerEventData` |
 | `pointerMove` | Pointer moved | `PointerEventData` |
+| `pointerEnter` / `pointerLeave` | Hover boundary (per-target, no walk) | `PointerEventData` |
+| `pointerOver` / `pointerOut` | Hover boundary (bubbling) | `PointerEventData` |
+| `contextmenu` | Right-click / context menu | `PointerEventData` |
+| `wheel` | Mouse wheel / trackpad | `WheelEventData` |
 | `keyDown` | Key pressed | `KeyEventData` |
 | `keyUp` | Key released | `KeyEventData` |
 | `focus` | Element focused | `FocusEventData` |
 | `blur` | Element blurred | `FocusEventData` |
 | `input` | Input value changed | `InputEventData` |
 | `change` | Input value committed | `InputEventData` |
+| `invalid` | Form control validation failed | `BaseEventData` |
+| `submit` | Form submitted (on `<form>`) | `SubmitEventData` |
+| `reset` | Form reset (on `<form>`) | `BaseEventData` |
+| `dragStart` / `dragEnd` / `dragOver` / `dragEnter` / `dragLeave` / `drop` | Drag and drop | `DragEventData` |
+| `copy` / `cut` / `paste` | Clipboard actions | `ClipboardEventData` |
+| `toggle` | `<details>` / `<dialog>` / popover state changed | `ToggleEventData` |
+| `beforeToggle` | About to change `<details>` / `<dialog>` / popover state | `BeforeToggleEventData` |
+| `command` | Invoker Commands API receiver | `CommandEventData` |
+| `scroll` | Scrolled (passive) | `ScrollEventData` |
+| `load` / `error` | Resource loaded or failed | `LoadEventData` / `ErrorEventData` |
 
 ## Event data types
 
@@ -181,6 +195,62 @@ const SearchBox = view((ctx) => {
         placeholder: "Search...",
         on: { input: handleInput },
       });
+    },
+  };
+});
+```
+
+### Invoker Commands (`command` / `commandfor`)
+
+Modern browsers let a `<button>` declaratively invoke another element via `commandfor="targetId"` and `command="..."`. The receiver fires a `command` event. Creo wires this through the standard `on:` system.
+
+```ts
+import { view, button, dialog, text } from "creo";
+import type { CommandEventData } from "creo";
+
+const InvokerExample = view(() => {
+  const onCommand = (e: CommandEventData) => {
+    console.log(`Invoked: ${e.command} by`, e.source);
+  };
+
+  return {
+    render() {
+      button(
+        { commandfor: "dlg", command: "show-modal" },
+        "Open dialog",
+      );
+      dialog({ id: "dlg", on: { command: onCommand } }, () => {
+        text("Hello from a dialog");
+        button({ commandfor: "dlg", command: "close" }, "Close");
+      });
+    },
+  };
+});
+```
+
+Built-in commands include `show-modal`, `close`, `request-close`, `show-popover`, `hide-popover`, `toggle-popover`. Custom commands start with `--` (e.g. `command="--my-action"`).
+
+### Drag and drop
+
+```ts
+import type { DragEventData } from "creo";
+
+const Draggable = view(() => {
+  const onDragStart = (e: DragEventData) => {
+    e.dataTransfer?.setData("text/plain", "hello");
+  };
+  const onDrop = (e: DragEventData) => {
+    e.preventDefault();
+    console.log("dropped:", e.dataTransfer?.getData("text/plain"));
+  };
+  const onDragOver = (e: DragEventData) => {
+    e.preventDefault(); // required to allow drop
+  };
+
+  return {
+    render() {
+      div({ draggable: true, on: { dragStart: onDragStart } }, "drag me");
+      div({ on: { dragOver: onDragOver, drop: onDrop } }, "drop here");
     },
   };
 });

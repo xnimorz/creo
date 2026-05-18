@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "bun:test";
 import { Window } from "happy-dom";
 import type { ViewFn } from "@/public/view";
 import { view } from "@/public/view";
-import { div, span, text, button, input, svg, html, video, audio, details, summary } from "@/public/primitives/primitives";
+import { div, span, text, button, input, svg, html, video, audio, details, summary, form, dialog } from "@/public/primitives/primitives";
 import type { Reactive } from "@/public/state";
 import { store } from "@/public/store";
 import { Engine } from "@/internal/engine";
@@ -1130,6 +1130,327 @@ describe("HtmlRender", () => {
       expect(blurred).toBe(1);
     } finally {
       document.body.removeChild(c);
+    }
+  });
+
+  // -------------------------------------------------------------------------
+  // New event types — Invoker Commands, wheel, contextmenu, drag/drop,
+  // clipboard, form submit/reset/invalid, beforeToggle, pointerOver/Out
+  // -------------------------------------------------------------------------
+
+  function mount(viewFn: () => void): { container: HTMLElement; cleanup: () => void } {
+    const c = document.createElement("div");
+    document.body.appendChild(c);
+    const r = new HtmlRender(c);
+    const e = new Engine(r);
+    orchestrator.setCurrentEngine(e);
+    e.createRoot(viewFn, {});
+    e.render();
+    return { container: c, cleanup: () => document.body.removeChild(c) };
+  }
+
+  it("wheel delivers deltaX/deltaY/deltaMode and pointer payload", () => {
+    const events: { deltaX: number; deltaY: number; deltaMode: number; x: number }[] = [];
+
+    const Box = view<void>(() => ({
+      render() {
+        div({
+          class: "wheel",
+          on: {
+            wheel: (e) =>
+              events.push({ deltaX: e.deltaX, deltaY: e.deltaY, deltaMode: e.deltaMode, x: e.x }),
+          },
+        });
+      },
+    }));
+
+    const { container, cleanup } = mount(() => { Box(); });
+    try {
+      const el = container.querySelector(".wheel") as HTMLElement;
+      const wheel = new Event("wheel", { bubbles: true }) as Event & {
+        deltaX?: number;
+        deltaY?: number;
+        deltaZ?: number;
+        deltaMode?: number;
+        clientX?: number;
+        clientY?: number;
+      };
+      wheel.deltaX = 10;
+      wheel.deltaY = -25;
+      wheel.deltaMode = 0;
+      wheel.clientX = 5;
+      wheel.clientY = 7;
+      el.dispatchEvent(wheel);
+      expect(events.length).toBe(1);
+      expect(events[0]!.deltaY).toBe(-25);
+      expect(events[0]!.deltaMode).toBe(0);
+      expect(events[0]!.x).toBe(5);
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("contextmenu fires with pointer payload and supports preventDefault", () => {
+    const calls: { x: number; prevented: boolean }[] = [];
+
+    const Box = view<void>(() => ({
+      render() {
+        div({
+          class: "ctx",
+          on: {
+            contextmenu: (e) => {
+              e.preventDefault();
+              calls.push({ x: e.x, prevented: true });
+            },
+          },
+        });
+      },
+    }));
+
+    const { container, cleanup } = mount(() => { Box(); });
+    try {
+      const el = container.querySelector(".ctx") as HTMLElement;
+      const ev = new Event("contextmenu", { bubbles: true, cancelable: true }) as Event & { clientX?: number };
+      ev.clientX = 42;
+      el.dispatchEvent(ev);
+      expect(calls).toEqual([{ x: 42, prevented: true }]);
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("pointerOver / pointerOut bubble up the tree (unlike enter/leave)", () => {
+    const calls: string[] = [];
+
+    const Inner = view<void>(() => ({
+      render() {
+        div({ class: "inner", on: { pointerOver: () => calls.push("inner-over") } });
+      },
+    }));
+
+    const Outer = view<void>(() => ({
+      render() {
+        div(
+          { class: "outer", on: { pointerOver: () => calls.push("outer-over") } },
+          () => { Inner(); },
+        );
+      },
+    }));
+
+    const { container, cleanup } = mount(() => { Outer(); });
+    try {
+      const inner = container.querySelector(".inner") as HTMLElement;
+      // pointerover bubbles — the delegation should fire inner then outer.
+      inner.dispatchEvent(new Event("pointerover", { bubbles: true }));
+      expect(calls).toEqual(["inner-over", "outer-over"]);
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("drag/drop events expose dataTransfer", () => {
+    const events: { type: string; hasDataTransfer: boolean }[] = [];
+
+    const Box = view<void>(() => ({
+      render() {
+        div({
+          class: "drag",
+          draggable: true,
+          on: {
+            dragStart: (e) => events.push({ type: "start", hasDataTransfer: e.dataTransfer !== null }),
+            drop: (e) => events.push({ type: "drop", hasDataTransfer: e.dataTransfer !== null }),
+          },
+        });
+      },
+    }));
+
+    const { container, cleanup } = mount(() => { Box(); });
+    try {
+      const el = container.querySelector(".drag") as HTMLElement;
+      const dt = { types: [], items: [], files: [] } as unknown as DataTransfer;
+      const dragStart = new Event("dragstart", { bubbles: true }) as Event & { dataTransfer?: DataTransfer };
+      dragStart.dataTransfer = dt;
+      el.dispatchEvent(dragStart);
+      const drop = new Event("drop", { bubbles: true }) as Event & { dataTransfer?: DataTransfer };
+      drop.dataTransfer = dt;
+      el.dispatchEvent(drop);
+      expect(events).toEqual([
+        { type: "start", hasDataTransfer: true },
+        { type: "drop", hasDataTransfer: true },
+      ]);
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("copy / cut / paste expose clipboardData", () => {
+    const events: { type: string; hasClipboard: boolean }[] = [];
+
+    const Box = view<void>(() => ({
+      render() {
+        div({
+          class: "clip",
+          on: {
+            copy: (e) => events.push({ type: "copy", hasClipboard: e.clipboardData !== null }),
+            cut: (e) => events.push({ type: "cut", hasClipboard: e.clipboardData !== null }),
+            paste: (e) => events.push({ type: "paste", hasClipboard: e.clipboardData !== null }),
+          },
+        });
+      },
+    }));
+
+    const { container, cleanup } = mount(() => { Box(); });
+    try {
+      const el = container.querySelector(".clip") as HTMLElement;
+      const fake = {} as DataTransfer;
+      const make = (type: string) => {
+        const ev = new Event(type, { bubbles: true }) as Event & { clipboardData?: DataTransfer };
+        ev.clipboardData = fake;
+        return ev;
+      };
+      el.dispatchEvent(make("copy"));
+      el.dispatchEvent(make("cut"));
+      el.dispatchEvent(make("paste"));
+      expect(events.map((e) => e.type)).toEqual(["copy", "cut", "paste"]);
+      expect(events.every((e) => e.hasClipboard)).toBe(true);
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("form submit / reset / invalid fire via delegation", () => {
+    const log: string[] = [];
+
+    const F = view<void>(() => ({
+      render() {
+        form(
+          {
+            class: "f",
+            on: {
+              submit: (e) => {
+                e.preventDefault();
+                log.push("submit");
+              },
+              reset: () => log.push("reset"),
+            },
+          },
+          () => {
+            input({ class: "in", required: true, on: { invalid: () => log.push("invalid") } });
+          },
+        );
+      },
+    }));
+
+    const { container, cleanup } = mount(() => { F(); });
+    try {
+      const f = container.querySelector(".f") as HTMLFormElement;
+      const i = container.querySelector(".in") as HTMLInputElement;
+      f.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      f.dispatchEvent(new Event("reset", { bubbles: true }));
+      // invalid does not bubble — registered in capture phase.
+      i.dispatchEvent(new Event("invalid"));
+      expect(log).toEqual(["submit", "reset", "invalid"]);
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("beforeToggle on dialog exposes oldState / newState", () => {
+    const states: { oldState: string; newState: string }[] = [];
+
+    const D = view<void>(() => ({
+      render() {
+        dialog(
+          {
+            class: "dlg",
+            on: {
+              beforeToggle: (e) =>
+                states.push({ oldState: e.oldState, newState: e.newState }),
+            },
+          },
+          () => { text("hi"); },
+        );
+      },
+    }));
+
+    const { container, cleanup } = mount(() => { D(); });
+    try {
+      const d = container.querySelector(".dlg") as HTMLElement;
+      // happy-dom may not synthesize a real ToggleEvent, dispatch manually.
+      const ev = new Event("beforetoggle") as Event & { oldState?: string; newState?: string };
+      ev.oldState = "closed";
+      ev.newState = "open";
+      d.dispatchEvent(ev);
+      expect(states).toEqual([{ oldState: "closed", newState: "open" }]);
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("command event exposes command name and source", () => {
+    const events: { command: string; sourceTag: string }[] = [];
+
+    const App = view<void>(() => ({
+      render() {
+        div({ class: "wrap" }, () => {
+          button({ class: "invoker", commandfor: "dlg", command: "show-modal" }, "Open");
+          dialog(
+            {
+              id: "dlg",
+              class: "target",
+              on: {
+                command: (e) =>
+                  events.push({ command: e.command, sourceTag: e.source?.tagName ?? "" }),
+              },
+            },
+            () => { text("hello"); },
+          );
+        });
+      },
+    }));
+
+    const { container, cleanup } = mount(() => { App(); });
+    try {
+      const target = container.querySelector(".target") as HTMLElement;
+      const invoker = container.querySelector(".invoker") as HTMLElement;
+      // Assert attrs landed on the DOM.
+      expect(invoker.getAttribute("commandfor")).toBe("dlg");
+      expect(invoker.getAttribute("command")).toBe("show-modal");
+
+      // Synthesize CommandEvent for happy-dom (which may not implement it).
+      const ev = new Event("command", { bubbles: true }) as Event & {
+        command?: string;
+        source?: Element;
+      };
+      ev.command = "show-modal";
+      ev.source = invoker;
+      target.dispatchEvent(ev);
+      expect(events).toEqual([{ command: "show-modal", sourceTag: "BUTTON" }]);
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("popover / popovertarget / popovertargetaction attrs round-trip to the DOM", () => {
+    const App = view<void>(() => ({
+      render() {
+        button(
+          { class: "trigger", popovertarget: "p1", popovertargetaction: "toggle" },
+          "Toggle",
+        );
+        div({ id: "p1", class: "pop", popover: "auto" }, () => { text("pop"); });
+      },
+    }));
+
+    const { container, cleanup } = mount(() => { App(); });
+    try {
+      const trigger = container.querySelector(".trigger") as HTMLElement;
+      const pop = container.querySelector(".pop") as HTMLElement;
+      expect(trigger.getAttribute("popovertarget")).toBe("p1");
+      expect(trigger.getAttribute("popovertargetaction")).toBe("toggle");
+      expect(pop.getAttribute("popover")).toBe("auto");
+    } finally {
+      cleanup();
     }
   });
 

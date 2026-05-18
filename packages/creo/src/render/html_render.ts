@@ -80,6 +80,8 @@ const CAPTURE_EVENTS = new Set([
   "load",
   "error",
   "toggle",
+  "beforetoggle",
+  "invalid",
   "volumechange",
   "play",
   "pause",
@@ -101,10 +103,7 @@ const CAPTURE_EVENTS = new Set([
 // dispatches one event per ancestor newly entered, so walking up the tree
 // from target to container would double-fire ancestor handlers. For these,
 // only consult the actual target element.
-const NO_WALK_EVENTS = new Set([
-  "pointerenter",
-  "pointerleave",
-]);
+const NO_WALK_EVENTS = new Set(["pointerenter", "pointerleave"]);
 
 // Events fired at high frequency where we want passive listeners by default.
 const PASSIVE_EVENTS = new Set(["scroll"]);
@@ -154,7 +153,21 @@ const POINTER_EVENTS = new Set([
   "pointercancel",
   "pointerenter",
   "pointerleave",
+  "pointerover",
+  "pointerout",
+  "contextmenu",
 ]);
+
+const DRAG_EVENTS = new Set([
+  "dragstart",
+  "dragend",
+  "dragover",
+  "dragenter",
+  "dragleave",
+  "drop",
+]);
+
+const CLIPBOARD_EVENTS = new Set(["copy", "cut", "paste"]);
 
 const MEDIA_EVENTS = new Set([
   "volumechange",
@@ -174,6 +187,41 @@ const MEDIA_EVENTS = new Set([
   "waiting",
 ]);
 
+function pointerPayload(
+  pe: PointerEvent | MouseEvent | DragEvent | WheelEvent,
+  e: Event,
+  currentTarget: HTMLElement,
+): Record<string, unknown> {
+  const pointerId =
+    typeof (pe as PointerEvent).pointerId === "number"
+      ? (pe as PointerEvent).pointerId
+      : -1;
+  return {
+    x: pe.clientX,
+    y: pe.clientY,
+    pointerId,
+    pointerType:
+      typeof (pe as PointerEvent).pointerType === "string"
+        ? (pe as PointerEvent).pointerType
+        : "",
+    button: typeof pe.button === "number" ? pe.button : 0,
+    buttons: typeof pe.buttons === "number" ? pe.buttons : 0,
+    target: e.target as HTMLElement,
+    currentTarget,
+    capture: () => {
+      if (pointerId >= 0 && currentTarget.setPointerCapture) {
+        currentTarget.setPointerCapture(pointerId);
+      }
+    },
+    release: () => {
+      if (pointerId >= 0 && currentTarget.releasePointerCapture) {
+        currentTarget.releasePointerCapture(pointerId);
+      }
+    },
+    nativeEvent: e,
+  };
+}
+
 function mapEventData(
   domEvent: string,
   e: Event,
@@ -181,31 +229,21 @@ function mapEventData(
 ): Record<string, unknown> {
   let data: Record<string, unknown>;
   if (POINTER_EVENTS.has(domEvent)) {
-    const pe = e as PointerEvent;
-    // pointerId/pointerType can be missing on synthetic events; -1 / "" are
-    // sentinel values that won't collide with real pointer ids.
-    const pointerId = typeof pe.pointerId === "number" ? pe.pointerId : -1;
-    data = {
-      x: pe.clientX,
-      y: pe.clientY,
-      pointerId,
-      pointerType: typeof pe.pointerType === "string" ? pe.pointerType : "",
-      button: typeof pe.button === "number" ? pe.button : 0,
-      buttons: typeof pe.buttons === "number" ? pe.buttons : 0,
-      target: e.target as HTMLElement,
-      currentTarget,
-      capture: () => {
-        if (pointerId >= 0 && currentTarget.setPointerCapture) {
-          currentTarget.setPointerCapture(pointerId);
-        }
-      },
-      release: () => {
-        if (pointerId >= 0 && currentTarget.releasePointerCapture) {
-          currentTarget.releasePointerCapture(pointerId);
-        }
-      },
-      nativeEvent: e,
-    };
+    data = pointerPayload(e as PointerEvent, e, currentTarget);
+  } else if (domEvent === "wheel") {
+    const we = e as WheelEvent;
+    data = pointerPayload(we, e, currentTarget);
+    data.deltaX = we.deltaX;
+    data.deltaY = we.deltaY;
+    data.deltaZ = we.deltaZ;
+    data.deltaMode = we.deltaMode;
+  } else if (DRAG_EVENTS.has(domEvent)) {
+    const de = e as DragEvent;
+    data = pointerPayload(de, e, currentTarget);
+    data.dataTransfer = de.dataTransfer ?? null;
+  } else if (CLIPBOARD_EVENTS.has(domEvent)) {
+    const ce = e as ClipboardEvent;
+    data = { clipboardData: ce.clipboardData ?? null };
   } else if (domEvent === "input" || domEvent === "change") {
     const target = e.target as HTMLInputElement;
     data = { value: target.value, checked: !!target.checked };
@@ -227,9 +265,24 @@ function mapEventData(
   } else if (domEvent === "error") {
     const ev = e as ErrorEvent;
     data = { message: ev.message ?? "" };
-  } else if (domEvent === "toggle") {
+  } else if (domEvent === "toggle" || domEvent === "beforetoggle") {
+    const te = e as Event & { oldState?: string; newState?: string };
     const target = e.target as HTMLDetailsElement;
-    data = { open: !!target.open };
+    data = {
+      open: !!target.open,
+      oldState: te.oldState ?? "",
+      newState: te.newState ?? "",
+    };
+  } else if (domEvent === "submit") {
+    const se = e as Event & { submitter?: Element | null };
+    data = { submitter: (se.submitter as HTMLElement) ?? null };
+  } else if (domEvent === "command") {
+    // CommandEvent is not in every TS lib version yet.
+    const ce = e as Event & { command?: string; source?: Element | null };
+    data = {
+      command: ce.command ?? "",
+      source: (ce.source as HTMLElement) ?? (e.target as HTMLElement),
+    };
   } else if (domEvent === "keydown" || domEvent === "keyup") {
     const ke = e as KeyboardEvent;
     data = { key: ke.key, code: ke.code };

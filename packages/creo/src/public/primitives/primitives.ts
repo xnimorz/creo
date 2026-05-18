@@ -72,6 +72,41 @@ export type MediaEventData = BaseEventData & {
   duration: number;
 };
 
+export type WheelEventData = PointerEventData & {
+  deltaX: number;
+  deltaY: number;
+  deltaZ: number;
+  /** 0 = pixel, 1 = line, 2 = page */
+  deltaMode: number;
+};
+
+export type DragEventData = PointerEventData & {
+  dataTransfer: DataTransfer | null;
+};
+
+export type ClipboardEventData = BaseEventData & {
+  clipboardData: DataTransfer | null;
+};
+
+export type SubmitEventData = BaseEventData & {
+  submitter: HTMLElement | null;
+};
+
+export type BeforeToggleEventData = BaseEventData & {
+  oldState: string;
+  newState: string;
+};
+
+/**
+ * Fired on the receiver of a `<button commandfor="id" command="...">` invocation.
+ * Built-in commands include `show-modal`, `close`, `request-close`,
+ * `show-popover`, `hide-popover`, `toggle-popover`; custom commands start with `--`.
+ */
+export type CommandEventData = BaseEventData & {
+  command: string;
+  source: HTMLElement;
+};
+
 // ---------------------------------------------------------------------------
 // Event maps
 // ---------------------------------------------------------------------------
@@ -86,6 +121,11 @@ export type ContainerEvents = {
   // Hover (capture-phase, per-target, not double-fired up the tree).
   pointerEnter: (e: PointerEventData) => void;
   pointerLeave: (e: PointerEventData) => void;
+  // Bubbling siblings of enter/leave — walk up the tree like other pointer events.
+  pointerOver: (e: PointerEventData) => void;
+  pointerOut: (e: PointerEventData) => void;
+  wheel: (e: WheelEventData) => void;
+  contextmenu: (e: PointerEventData) => void;
   keyDown: (e: KeyEventData) => void;
   keyUp: (e: KeyEventData) => void;
   focus: (e: FocusEventData) => void;
@@ -94,6 +134,19 @@ export type ContainerEvents = {
   scroll: (e: ScrollEventData) => void;
   load: (e: LoadEventData) => void;
   error: (e: ErrorEventData) => void;
+  // Drag-and-drop. dataTransfer access on dragOver/dragEnter is restricted by
+  // the browser to metadata only — the drop handler is the one that can read data.
+  dragStart: (e: DragEventData) => void;
+  dragEnd: (e: DragEventData) => void;
+  dragOver: (e: DragEventData) => void;
+  dragEnter: (e: DragEventData) => void;
+  dragLeave: (e: DragEventData) => void;
+  drop: (e: DragEventData) => void;
+  copy: (e: ClipboardEventData) => void;
+  cut: (e: ClipboardEventData) => void;
+  paste: (e: ClipboardEventData) => void;
+  // Invoker Commands API — any element may be a command receiver.
+  command: (e: CommandEventData) => void;
 };
 
 export type FormEvents = ContainerEvents & {
@@ -101,6 +154,12 @@ export type FormEvents = ContainerEvents & {
   change: (e: InputEventData) => void;
   keyDown: (e: KeyEventData) => void;
   keyUp: (e: KeyEventData) => void;
+  invalid: (e: BaseEventData) => void;
+};
+
+export type FormSubmitEvents = ContainerEvents & {
+  submit: (e: SubmitEventData) => void;
+  reset: (e: BaseEventData) => void;
 };
 
 export type MediaEvents = ContainerEvents & {
@@ -123,6 +182,7 @@ export type MediaEvents = ContainerEvents & {
 
 export type DisclosureEvents = ContainerEvents & {
   toggle: (e: ToggleEventData) => void;
+  beforeToggle: (e: BeforeToggleEventData) => void;
 };
 
 // ---------------------------------------------------------------------------
@@ -138,9 +198,11 @@ export type HtmlAttrs = {
   hidden?: boolean;
   role?: string;
   draggable?: boolean;
+  /** Popover API — typically "auto", "manual", or "hint". */
+  popover?: string;
   /**
    * Set with the underlying DOM element after mount, and with `null` after
-   * unmount. Accepts either a callback or a `{ current }` ref object   
+   * unmount. Accepts either a callback or a `{ current }` ref object
    */
   ref?: Ref<Element>;
   [attr: string]: unknown;
@@ -249,11 +311,22 @@ export const td = html<
 
 export const form = html<
   HtmlAttrs & { action?: string; method?: string },
-  ContainerEvents
+  FormSubmitEvents
 >("form");
 
 export const button = html<
-  HtmlAttrs & { disabled?: boolean; type?: string },
+  HtmlAttrs & {
+    disabled?: boolean;
+    type?: string;
+    /** Invoker Commands — id of the element to invoke. */
+    commandfor?: string;
+    /** Invoker Commands — built-in (e.g. "show-modal", "close") or custom ("--foo"). */
+    command?: string;
+    /** Popover API — id of the popover element to invoke. */
+    popovertarget?: string;
+    /** Popover API — "show", "hide", or "toggle". */
+    popovertargetaction?: string;
+  },
   ContainerEvents
 >("button");
 
