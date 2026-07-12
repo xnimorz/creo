@@ -12,7 +12,8 @@
   ],
   "scripts": {
     "build": "bun run build.ts",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "prepack": "bun run build"
   },
   "devDependencies": {
     "typescript": "^5",

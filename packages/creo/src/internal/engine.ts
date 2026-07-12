@@ -37,6 +37,9 @@ export class Engine {
   #renderScheduled = false;
   #rendering = false;
 
+  // Re-use idx buffer to reduce GC impact
+  #idxScratch: number[] = [];
+
   constructor(
     public renderer: IRender<Wildcard>,
     scheduler?: Scheduler,
@@ -350,16 +353,19 @@ export class Engine {
         child.pos = i;
         this.initViewBody(child);
         this.markDirty(child);
-        if (child.userKey != null) {
-          if (!view.keyToView) view.keyToView = new Map();
-          view.keyToView.set(child.userKey, child);
-        }
+        this.#registerKey(view, child);
       }
       return;
     }
     // Now, we have both view.children & pendingChildren
     // Check if any child is keyed — if so, use keyed algorithm
-    const hasKeys = pendingChildren.some((c) => c.userKey != null);
+    let hasKeys = false;
+    for (let k = 0; k < pendingChildren.length; k++) {
+      if (pendingChildren[k]!.userKey != null) {
+        hasKeys = true;
+        break;
+      }
+    }
     if (hasKeys) {
       this.#reconcileKeyed(view, view.children, pendingChildren);
     } else {
@@ -437,10 +443,7 @@ export class Engine {
       for (let j = i; j <= newEnd; j++) {
         this.initViewBody(pending[j]!);
         this.markDirty(pending[j]!);
-        if (pending[j]!.userKey != null) {
-          if (!view.keyToView) view.keyToView = new Map();
-          view.keyToView.set(pending[j]!.userKey!, pending[j]!);
-        }
+        this.#registerKey(view, pending[j]!);
       }
       // Rebuild children: head (already patched) + insertions + tail.
       // Pre-sized array, indexed write — no intermediate slices/spreads.
@@ -491,7 +494,7 @@ export class Engine {
     }
 
     // Phase 4: Middle diff
-    // Build map: pending key → index in pending
+    // Build map: pending key → index in pending.
     const newKeyToIndex = new Map<Key, number>();
     for (let j = i; j <= newEnd; j++) {
       const key = pending[j]!.userKey;
@@ -499,25 +502,24 @@ export class Engine {
     }
 
     const middleLen = newEnd - i + 1;
-    // newIdxToOldIdx[j] = old index of the view now at pending[i+j], or -1 if new
-    const newIdxToOldIdx = new Array<number>(middleLen).fill(-1);
-    // Track which old children were matched
-    const matched = new Set<number>();
+    // newIdxToOldIdx[j] = old index of the view now at pending[i+j], or -1 if
+    // new. Reused scratch array, sized to middleLen so lis() sees only the
+    // relevant range.
+    const newIdxToOldIdx = this.#idxScratch;
+    newIdxToOldIdx.length = middleLen;
+    for (let k = 0; k < middleLen; k++) newIdxToOldIdx[k] = -1;
 
+    // Match old children to new positions and dispose unmatched ones in a
+    // single pass — an old child is matched iff its key is in newKeyToIndex,
+    // so no separate `matched` Set is needed.
     for (let j = i; j <= oldEnd; j++) {
       const oldView = oldChildren[j]!;
       const key = oldView.userKey;
-      if (key != null && newKeyToIndex.has(key)) {
-        const newIdx = newKeyToIndex.get(key)!;
+      const newIdx = key != null ? newKeyToIndex.get(key) : undefined;
+      if (newIdx !== undefined) {
         newIdxToOldIdx[newIdx - i] = j;
-        matched.add(j);
-      }
-    }
-
-    // Dispose unmatched old children
-    for (let j = i; j <= oldEnd; j++) {
-      if (!matched.has(j)) {
-        this.dispose(oldChildren[j]!);
+      } else {
+        this.dispose(oldView);
       }
     }
 
@@ -542,10 +544,7 @@ export class Engine {
         // New child — init and mount
         this.initViewBody(pendView);
         this.markDirty(pendView);
-        if (pendView.userKey != null) {
-          if (!view.keyToView) view.keyToView = new Map();
-          view.keyToView.set(pendView.userKey, pendView);
-        }
+        this.#registerKey(view, pendView);
         pendView.pos = i + j;
         out[i + j] = pendView;
       } else {
@@ -591,53 +590,65 @@ export class Engine {
       oldChildren[idx] = pendView;
       this.initViewBody(pendView);
       this.markDirty(pendView);
-      if (pendView.userKey != null) {
-        if (!parent.keyToView) parent.keyToView = new Map();
-        parent.keyToView.set(pendView.userKey, pendView);
-      }
+      this.#registerKey(parent, pendView);
     }
   }
 
   // -- Disposal ---------------------------------------------------------------
 
   dispose(view: ViewRecord): void {
-    // If this is a primitive with a DOM element, removing it from DOM
-    // automatically removes all descendant DOM nodes. Only do virtual
-    // cleanup (unsubscribe, key removal, dirty queue) for children.
-    const isPrimitiveWithDom = view.flags & F_PRIMITIVE && view.renderRef;
-
-    if (view.children) {
-      for (const child of view.children) {
-        if (isPrimitiveWithDom) {
-          this.#disposeVirtual(child);
-        } else {
-          this.dispose(child);
+    // Collect the subtree in pre-order (carrying a per-node "virtual" flag),
+    // then clean up back-to-front so children are disposed before parents.
+    // Iterative rather than recursive so a pathologically deep tree can't
+    // overflow the stack on teardown.
+    const nodes: ViewRecord[] = [view];
+    const virtuals: boolean[] = [false];
+    for (let read = 0; read < nodes.length; read++) {
+      const node = nodes[read]!;
+      const virtual = virtuals[read]!;
+      if (node.children) {
+        // A node is virtual (no per-node DOM removal) if an ancestor is a
+        // primitive whose own DOM removal already takes its descendants with
+        // it. Recompute here so nested primitives flip their children virtual.
+        const childVirtual =
+          virtual ||
+          ((node.flags & F_PRIMITIVE) !== 0 && node.renderRef != null);
+        for (const child of node.children) {
+          nodes.push(child);
+          virtuals.push(childVirtual);
         }
       }
     }
+    for (let k = nodes.length - 1; k >= 0; k--) {
+      this.#disposeNode(nodes[k]!, virtuals[k]!);
+    }
+  }
+
+  /**
+   * Cleanup for a single view. When `virtual` the parent primitive's DOM
+   * removal already covers this node, so we skip renderer.unmount and just
+   * drop the renderRef.
+   */
+  #disposeNode(view: ViewRecord, virtual: boolean): void {
     view.body?.dispose?.();
     applyRef(getConsumerRef(view), null);
     if (view.unsubscribe) for (const unsub of view.unsubscribe) unsub();
     if (view.userKey != null) view.parent?.keyToView?.delete(view.userKey);
-    this.renderer.unmount(view);
+    if (virtual) {
+      view.renderRef = undefined;
+    } else {
+      this.renderer.unmount(view);
+    }
     this.#dirtyQueue.delete(view);
     view.flags |= F_DISPOSED;
     view.flags &= ~(F_DIRTY | F_MOVED);
   }
 
-  /** Dispose without DOM removal — parent primitive handles DOM cleanup. */
-  #disposeVirtual(view: ViewRecord): void {
-    if (view.children) {
-      for (const child of view.children) this.#disposeVirtual(child);
-    }
-    view.body?.dispose?.();
-    applyRef(getConsumerRef(view), null);
-    if (view.unsubscribe) for (const unsub of view.unsubscribe) unsub();
-    if (view.userKey != null) view.parent?.keyToView?.delete(view.userKey);
-    view.renderRef = undefined;
-    this.#dirtyQueue.delete(view);
-    view.flags |= F_DISPOSED;
-    view.flags &= ~(F_DIRTY | F_MOVED);
+  /** Register a keyed child in its parent's key→view map, lazily creating it. */
+  #registerKey(parent: ViewRecord, child: ViewRecord): void {
+    if (child.userKey == null) return;
+    if (!parent.keyToView) parent.keyToView = new Map();
+    parent.keyToView.set(child.userKey, child);
   }
 
   // -- Render loop ------------------------------------------------------------

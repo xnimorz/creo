@@ -1,7 +1,16 @@
+# 0.2.9
+
+1. Reconciler teardown is now iterative instead of recursive — disposing a view subtree can no longer overflow the call stack on pathologically deep trees. The two near-duplicate cleanup paths (full dispose / virtual dispose) are unified into a single per-node routine that carries a "virtual" flag, so descendants of a removed DOM primitive skip redundant `unmount` calls (the browser already removes them in one cascade).
+2. Text-node updates short-circuit on referential prop equality — an unchanged `text()` skips the `String()` conversion and `textContent` read entirely.
+3. Stateful-DOM re-assertion now runs only for tags whose live value can drift from props (`input`, `select`, `textarea`, `option`, `audio`, `video`); a plain `div` / `span` no longer re-checks DOM properties on every parent re-render.
+4. `stopPropagation()` no longer relies on the deprecated `Event.cancelBubble` to halt the event-delegation walk — it flags the dispatched payload directly instead.
+5. `State.update()` and `Store.update()` share a single async-chaining implementation (`chainUpdate`) rather than duplicating the pending-promise queue logic; behaviour is unchanged.
+6. `JsonRender.unmount` locates the child via the reconciler-maintained `view.pos` (O(1)), falling back to `indexOf` only when that position is stale.
+
 # 0.2.8
 
 1. `shallowEqual` now does a one-level-deeper compare when it encounters the `on` key, so callers writing `button({ on: { click: handler } })` inline don't pay for redundant primitive re-renders when handler references are stable.
-2. Distribute guidance docs in the npm tarball — `CHANGELOG.md`, `AGENTS.md`, and the `docs/` folder are now copied into the `creo` package on build and shipped with publish.
+7. Distribute guidance docs in the npm tarball — `CHANGELOG.md`, `AGENTS.md`, and the `docs/` folder are now copied into the `creo` package on build and shipped with publish.
 
 # 0.2.7
 

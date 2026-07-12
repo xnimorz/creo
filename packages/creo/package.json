@@ -1,6 +1,7 @@
 {
   "name": "creo",
   "version": "0.2.8",
+  
   "type": "module",
   "main": "dist/index.js",
   "module": "dist/index.js",
@@ -22,7 +23,7 @@
     "build-only": "rm -rf ./dist/*; bun run build.ts",
     "test": "bun test src/",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "prepublishOnly": "bun run build"
+    "prepack": "bun run build"
   },
   "devDependencies": {
     "@types/bun": "latest",

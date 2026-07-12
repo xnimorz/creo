@@ -1248,6 +1248,43 @@ describe("HtmlRender", () => {
     }
   });
 
+  it("stopPropagation() halts the delegation walk up the tree", () => {
+    const calls: string[] = [];
+
+    const Inner = view<void>(() => ({
+      render() {
+        div({
+          class: "inner",
+          on: {
+            pointerOver: (e) => {
+              calls.push("inner-over");
+              e.stopPropagation();
+            },
+          },
+        });
+      },
+    }));
+
+    const Outer = view<void>(() => ({
+      render() {
+        div(
+          { class: "outer", on: { pointerOver: () => calls.push("outer-over") } },
+          () => { Inner(); },
+        );
+      },
+    }));
+
+    const { container, cleanup } = mount(() => { Outer(); });
+    try {
+      const inner = container.querySelector(".inner") as HTMLElement;
+      inner.dispatchEvent(new Event("pointerover", { bubbles: true }));
+      // inner called stopPropagation — outer's handler must not fire.
+      expect(calls).toEqual(["inner-over"]);
+    } finally {
+      cleanup();
+    }
+  });
+
   it("drag/drop events expose dataTransfer", () => {
     const events: { type: string; hasDataTransfer: boolean }[] = [];
 

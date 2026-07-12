@@ -9,7 +9,6 @@ interface PackageInfo {
   name: string;
   dir: string;
   version: string;
-  hasBuild: boolean;
   deps: string[];
 }
 
@@ -53,7 +52,6 @@ async function main() {
       name: pkg.name,
       dir,
       version: pkg.version,
-      hasBuild: !!(pkg.scripts as Record<string, string>)?.build,
       deps: [
         ...Object.keys((pkg.peerDependencies as Record<string, string>) ?? {}),
         ...Object.keys((pkg.dependencies as Record<string, string>) ?? {}),
@@ -93,28 +91,17 @@ async function main() {
   if (!dryRun && !otp) {
     otp = promptOtp();
     if (!otp) {
-      console.error("No OTP provided. Pass --otp=<code>, set NPM_OTP, or enter when prompted.");
+      console.error(
+        "No OTP provided. Pass --otp=<code>, set NPM_OTP, or enter when prompted.",
+      );
       process.exit(1);
     }
   }
 
-  // Build and publish in order
   for (const pkg of sorted) {
     const pkgDir = resolve(packagesDir, pkg.dir);
 
-    // Build
-    if (pkg.hasBuild) {
-      console.log(`Building ${pkg.name}...`);
-      try {
-        await $`cd ${pkgDir} && bun run build`.quiet();
-      } catch (e) {
-        console.error(`  ✗ Build failed for ${pkg.name}`);
-        process.exit(1);
-      }
-      console.log(`  ✓ Built ${pkg.name}`);
-    }
-
-    // Publish
+    // Publish (prepack builds a fresh dist as part of this)
     console.log(`Publishing ${pkg.name}@${pkg.version}...`);
     try {
       if (dryRun) {

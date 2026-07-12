@@ -74,9 +74,8 @@ export class JsonRender implements IRender<JsonNode> {
       }
     }
     const tag = view.viewFn[$primitive];
-    existing.props = tag === "text"
-      ? { content: view.props }
-      : { ...view.props };
+    existing.props =
+      tag === "text" ? { content: view.props } : { ...view.props };
   }
 
   unmount(view: ViewRecord): void {
@@ -84,8 +83,14 @@ export class JsonRender implements IRender<JsonNode> {
     if (!childNode || !view.parent) return;
     const parentNode = view.parent.renderRef as Maybe<JsonNode>;
     if (parentNode) {
-      const idx = parentNode.children.indexOf(childNode);
-      if (idx !== -1) parentNode.children.splice(idx, 1);
+      const children = parentNode.children;
+      // view.pos is maintained by the reconciler
+      // We perform it first and then fallback for indexOf
+      let idx = view.pos;
+      if (idx < 0 || idx >= children.length || children[idx] !== childNode) {
+        idx = children.indexOf(childNode);
+      }
+      if (idx !== -1) children.splice(idx, 1);
     }
   }
 
@@ -94,9 +99,7 @@ export class JsonRender implements IRender<JsonNode> {
   private buildNode(view: ViewRecord): JsonNode {
     const tag = view.viewFn[$primitive];
 
-    const props = tag === "text"
-      ? { content: view.props }
-      : { ...view.props };
+    const props = tag === "text" ? { content: view.props } : { ...view.props };
 
     const node: JsonNode = {
       type: tag ?? "composite",

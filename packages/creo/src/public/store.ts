@@ -1,9 +1,9 @@
 import type { Maybe } from "@/functional/maybe";
 import type { MaybePromise } from "@/functional/maybe_promise";
+import { chainUpdate, type UpdateChain } from "@/functional/chain_update";
 
 // Symbol.for so isStore() works across multiple bundles of creo (e.g. when
-// a downstream library brings its own copy). A module-private Symbol() would
-// make `use(storeFromOtherBundle)` silently degrade to a fresh State.
+// a downstream library brings its own copy)
 const $store = Symbol.for("creo.store");
 
 /**
@@ -32,6 +32,8 @@ export class Store<T> {
   // Tail of the pending async update chain. Subsequent updates queue onto
   // it; `set` clears it to cancel any in-flight resolutions.
   #pending: Maybe<Promise<T>>;
+  // Lazily-built adapter for the shared chainUpdate algorithm.
+  #chain: Maybe<UpdateChain<T>>;
 
   constructor(initial: T) {
     this.#current = initial;
@@ -48,33 +50,21 @@ export class Store<T> {
   }
 
   update(fn: (current: T) => MaybePromise<T>): void {
-    if (this.#pending) {
-      const next: Promise<T> = this.#pending.then((v) => fn(v));
-      this.#pending = next;
-      next.then((value) => {
-        if (this.#pending !== next) return;
-        this.#pending = null;
-        this.#current = value;
-        this.#notify();
-      });
-      return;
+    let chain = this.#chain;
+    if (!chain) {
+      chain = this.#chain = {
+        getCurrent: () => this.#current,
+        setCurrent: (v) => {
+          this.#current = v;
+        },
+        getPending: () => this.#pending,
+        setPending: (p) => {
+          this.#pending = p;
+        },
+        notify: () => this.#notify(),
+      };
     }
-
-    const result = fn(this.#current);
-    if (!(result instanceof Promise)) {
-      this.#current = result;
-      this.#notify();
-      return;
-    }
-
-    const captured = result;
-    this.#pending = captured;
-    captured.then((value) => {
-      if (this.#pending !== captured) return;
-      this.#pending = null;
-      this.#current = value;
-      this.#notify();
-    });
+    chainUpdate(chain, fn);
   }
 
   subscribe(cb: () => void): () => void {

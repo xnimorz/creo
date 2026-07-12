@@ -1,5 +1,6 @@
 import type { Maybe } from "@/functional/maybe";
 import type { MaybePromise } from "@/functional/maybe_promise";
+import { chainUpdate, type UpdateChain } from "@/functional/chain_update";
 
 /**
  * Reactive value — the shared interface returned by `use()`.
@@ -32,6 +33,8 @@ export class State<T> implements Reactive<T> {
   // Tail of the pending async update chain. Subsequent updates queue onto
   // it; `set` clears it to cancel any in-flight resolutions.
   #pending: Maybe<Promise<T>>;
+  // Lazily-built adapter for the shared chainUpdate algorithm.
+  #chain: Maybe<UpdateChain<T>>;
 
   constructor(initial: T, schedule: () => void) {
     this.#current = initial;
@@ -49,36 +52,21 @@ export class State<T> implements Reactive<T> {
   }
 
   update(fn: (current: T) => MaybePromise<T>): void {
-    if (this.#pending) {
-      // Queue onto the pending chain so this fn runs against the previous
-      // update's result, not against #current at call time.
-      const next: Promise<T> = this.#pending.then((v) => fn(v));
-      this.#pending = next;
-      next.then((value) => {
-        // Skip if a later update or `set` moved the tail past us.
-        if (this.#pending !== next) return;
-        this.#pending = null;
-        this.#current = value;
-        this.#schedule();
-      });
-      return;
+    let chain = this.#chain;
+    if (!chain) {
+      chain = this.#chain = {
+        getCurrent: () => this.#current,
+        setCurrent: (v) => {
+          this.#current = v;
+        },
+        getPending: () => this.#pending,
+        setPending: (p) => {
+          this.#pending = p;
+        },
+        notify: () => this.#schedule(),
+      };
     }
-
-    const result = fn(this.#current);
-    if (!(result instanceof Promise)) {
-      this.#current = result;
-      this.#schedule();
-      return;
-    }
-
-    const captured = result;
-    this.#pending = captured;
-    captured.then((value) => {
-      if (this.#pending !== captured) return;
-      this.#pending = null;
-      this.#current = value;
-      this.#schedule();
-    });
+    chainUpdate(chain, fn);
   }
 }
 

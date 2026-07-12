@@ -84,7 +84,16 @@ text(count.get());
 
 `form`, `button`, `input`, `textarea`, `select`, `option`, `fieldset`, `legend`, `datalist`, `optgroup`, `output`, `progress`, `meter`
 
-Form elements like `input`, `textarea`, and `select` support `FormEvents` (includes `onInput`, `onChange`). Other elements use `ContainerEvents`.
+Form elements like `input`, `textarea`, and `select` support `FormEvents` (includes `input`, `change`, `invalid`). `<form>` supports `FormSubmitEvents` (adds `submit`, `reset`). Other elements use `ContainerEvents`.
+
+`<button>` also accepts the Invoker Commands and Popover API attributes:
+
+- `commandfor` — id of the element to invoke
+- `command` — the command to dispatch (built-in: `show-modal`, `close`, `request-close`, `show-popover`, `hide-popover`, `toggle-popover`; custom commands start with `--`)
+- `popovertarget` — id of a popover element
+- `popovertargetaction` — `"show"`, `"hide"`, or `"toggle"`
+
+The receiving element handles a `command` event (`CommandEventData`) via the standard `on:` system. See [Events](./events.md#invoker-commands-command--commandfor) for an example.
 
 ### Media
 
@@ -116,6 +125,7 @@ type HtmlAttrs = {
   hidden?: boolean;
   role?: string;
   draggable?: boolean;
+  popover?: string;  // Popover API: "auto" | "manual" | "hint"
   [attr: string]: unknown;  // open index signature for any HTML attribute
 };
 ```

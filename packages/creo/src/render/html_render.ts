@@ -15,7 +15,7 @@ import type { Engine } from "@/internal/engine";
  * For primitives: { element, prevProps }
  * For composites: renderRef is set to `true` (just a non-null marker)
  *
- * Discriminated via view.flags & F_PRIMITIVE — no `kind` field needed.
+ * Discriminated via view.flags & F_PRIMITIVE
  */
 type PrimitiveDomRef = {
   element: Element | Text;
@@ -23,10 +23,15 @@ type PrimitiveDomRef = {
 };
 
 // ---------------------------------------------------------------------------
-// Event delegation — Inferno-style: one listener per event type on container
+// Event delegation
 // ---------------------------------------------------------------------------
 
 const $EV = Symbol.for("creo.ev");
+// Marks a payload whose handler called stopPropagation(), so the delegation
+// walk knows to stop climbing without reading the deprecated `cancelBubble`.
+const $STOPPED = Symbol("creo.stopped");
+
+type EventPayload = Record<string, unknown> & { [$STOPPED]?: boolean };
 
 const containerState = new WeakMap<
   HTMLElement,
@@ -52,8 +57,9 @@ function getState(container: HTMLElement) {
           if (evObj) {
             const handler = evObj[domEvent];
             if (handler) {
-              handler(mapEventData(domEvent, e, dom));
-              if (e.cancelBubble) return;
+              const data = mapEventData(domEvent, e, dom);
+              handler(data);
+              if (data[$STOPPED]) return;
             }
           }
           // For pointerenter/leave events the browser already dispatches
@@ -226,8 +232,8 @@ function mapEventData(
   domEvent: string,
   e: Event,
   currentTarget: HTMLElement,
-): Record<string, unknown> {
-  let data: Record<string, unknown>;
+): EventPayload {
+  let data: EventPayload;
   if (POINTER_EVENTS.has(domEvent)) {
     data = pointerPayload(e as PointerEvent, e, currentTarget);
   } else if (domEvent === "wheel") {
@@ -289,7 +295,10 @@ function mapEventData(
   } else {
     data = {};
   }
-  data.stopPropagation = () => e.stopPropagation();
+  data.stopPropagation = () => {
+    e.stopPropagation();
+    data[$STOPPED] = true;
+  };
   data.preventDefault = () => e.preventDefault();
   return data;
 }
@@ -302,6 +311,18 @@ const DOM_PROPERTIES = new Set([
   "selected",
   "indeterminate",
   "muted",
+]);
+
+// Only these elements expose the stateful DOM_PROPERTIES whose live value can
+// drift from props via user interaction. A plain div/span never does, so the
+// re-assert walk can be skipped for them.
+const STATEFUL_TAGS = new Set([
+  "INPUT",
+  "SELECT",
+  "TEXTAREA",
+  "OPTION",
+  "AUDIO",
+  "VIDEO",
 ]);
 
 // ---------------------------------------------------------------------------
@@ -397,6 +418,10 @@ export class HtmlRender implements IRender<HTMLElement | Text> {
 
     // Text node in textContent mode — update parent's textContent
     if (view.flags & F_TEXT_CONTENT) {
+      // props is the text content (string | number) — referential equality
+      // means unchanged, so skip the String() + textContent read.
+      if (ref.prevProps === (view.props as never)) return;
+      ref.prevProps = view.props as never;
       const parentEl = ref.element as Element;
       const nextText = String(view.props);
       if (parentEl.textContent !== nextText) {
@@ -406,6 +431,8 @@ export class HtmlRender implements IRender<HTMLElement | Text> {
     }
 
     if (ref.element instanceof Text) {
+      if (ref.prevProps === (view.props as never)) return;
+      ref.prevProps = view.props as never;
       const nextText = String(view.props);
       if (ref.element.textContent !== nextText) {
         ref.element.textContent = nextText;
@@ -441,6 +468,7 @@ export class HtmlRender implements IRender<HTMLElement | Text> {
     const ref = view.renderRef as Maybe<PrimitiveDomRef>;
     if (!ref || ref.element instanceof Text) return false;
     const el = ref.element as Wildcard;
+    if (!STATEFUL_TAGS.has((el as Element).tagName)) return false;
     const props = nextProps as Record<string, unknown>;
     for (const key of DOM_PROPERTIES) {
       if (!(key in props)) continue;
