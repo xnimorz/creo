@@ -1,6 +1,6 @@
 {
   "name": "creo-router",
-  "version": "0.2.8",
+  "version": "0.2.9",
   "type": "module",
   "main": "dist/index.js",
   "module": "dist/index.js",
@@ -20,7 +20,7 @@
     "prepack": "bun run build"
   },
   "peerDependencies": {
-    "creo": ">=0.2.8"
+    "creo": ">=0.2.9"
   },
   "devDependencies": {
     "creo": "workspace:*",

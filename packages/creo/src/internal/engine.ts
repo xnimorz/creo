@@ -665,6 +665,11 @@ export class Engine {
     try {
       const cbs: (() => void)[] = [];
       for (const view of this.#dirtyQueue) {
+        // Drop the entry before processing: if this pass re-marks the view
+        // (e.g. a parent's reconcile pushes fresh props to an already-rendered
+        // child), the Set re-add lands past the live iterator and gets picked
+        // up in this same pass instead of being lost.
+        this.#dirtyQueue.delete(view);
         if (view.flags & F_DISPOSED) continue;
         this.initViewBody(view);
         const isNew = !view.renderRef;
@@ -691,7 +696,6 @@ export class Engine {
         }
       }
 
-      this.#dirtyQueue.clear();
       orchestrator.setCurrentEngine(null);
       this.#rendering = false;
       for (const cb of cbs) cb();

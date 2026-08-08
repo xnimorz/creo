@@ -1,3 +1,7 @@
+# 0.2.9
+
+1. Fix a view freezing forever when it was re-marked dirty mid-pass — the render loop's trailing `clear()` dropped the re-queued entry while `F_DIRTY` stayed set, so every later `markDirty` early-returned and only a remount revived the view. Views are now removed from the queue as they're processed, so a re-add lands where the live iterator still reaches it.
+
 # 0.2.8
 
 1. Reconciler teardown is now iterative instead of recursive — disposing a view subtree can no longer overflow the call stack on pathologically deep trees. The two near-duplicate cleanup paths (full dispose / virtual dispose) are unified into a single per-node routine that carries a "virtual" flag, so descendants of a removed DOM primitive skip redundant `unmount` calls (the browser already removes them in one cascade).

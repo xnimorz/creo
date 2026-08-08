@@ -1,7 +1,6 @@
 {
   "name": "creo",
-  "version": "0.2.8",
-  
+  "version": "0.2.9",
   "type": "module",
   "main": "dist/index.js",
   "module": "dist/index.js",

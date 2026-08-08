@@ -3,7 +3,7 @@
   "configurations": [
     {
       "name": "router",
-      "runtimeExecutable": "npx",
+      "runtimeExecutable": "bun",
       "runtimeArgs": ["vite", "--port", "5200"],
       "port": 5200,
       "cwd": "examples/router"
