@@ -1,6 +1,5 @@
 import { createApp, HtmlRender, _ } from "creo";
-// Must come before ./router so the secondary `#anchor` is stripped from
-// the URL before createRouter reads location.hash.
+// Must precede ./router: strips the secondary `#anchor` first
 import "./anchor";
 import { Layout } from "./views/Layout";
 import { RouterView } from "./router";

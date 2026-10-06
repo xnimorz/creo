@@ -36,7 +36,6 @@ Object.assign(globalThis, {
 // ---------------------------------------------------------------------------
 
 function assertParity(appView: (props?: any, slot?: any) => void) {
-  // HtmlStringRender
   const sr = new HtmlStringRender();
   const se = new Engine(sr);
   orchestrator.setCurrentEngine(se);
@@ -44,7 +43,6 @@ function assertParity(appView: (props?: any, slot?: any) => void) {
   se.render();
   const stringOutput = sr.renderToString();
 
-  // HtmlRender
   const container = win.document.createElement("div") as unknown as HTMLElement;
   const hr = new HtmlRender(container);
   const he = new Engine(hr);

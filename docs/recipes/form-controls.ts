@@ -46,9 +46,7 @@ const CheckboxDemo = view(({ use }) => {
   };
 });
 
-// 2. Radio group — `e.checked` is true on the newly selected option;
-// state.set drives the `checked` property on every radio so the unselected
-// ones get their live state cleared on the next render.
+// 2. Radio group — state drives `checked` on every radio, clearing the unselected ones.
 type Plan = "free" | "pro" | "team";
 const PLANS: { id: Plan; label: string }[] = [
   { id: "free", label: "Free" },
@@ -87,8 +85,7 @@ const RadioDemo = view(({ use }) => {
   };
 });
 
-// 3. Video / audio muted — prop hits el.muted, not the inert defaultMuted
-// attribute. onVolumeChange syncs back when the user uses the native controls.
+// 3. Video / audio muted — sets el.muted; volumechange syncs native-control changes back.
 const MediaDemo = view(({ use }) => {
   const videoMuted = use(true);
   const audioMuted = use(true);

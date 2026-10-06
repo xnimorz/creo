@@ -1,7 +1,6 @@
 export type Target = "ios" | "android" | "macos" | "windows" | "linux" | "web";
 
 export function cargoToml(name: string): string {
-  // Sanitize name for Rust crate (lowercase, hyphens to underscores)
   const crateName = name.replace(/[^a-zA-Z0-9_-]/g, "-").toLowerCase();
 
   return `[package]
@@ -44,7 +43,7 @@ fn main() {
 `;
 }
 
-// Helper - this is a placeholder; the actual scaffold will inject the correct name
+// Replaced by scaffold
 function crateFnName(): string {
   return "{crate_name}";
 }
@@ -107,7 +106,6 @@ export function tauriConf(name: string, targets: Target[]): string {
   };
 
   if (hasMobile) {
-    // Mobile needs a broader CSP and possibly different window config
     (conf.app as Record<string, unknown>).withGlobalTauri = true;
   }
 

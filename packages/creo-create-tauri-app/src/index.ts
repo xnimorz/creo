@@ -7,7 +7,6 @@ import type { Target } from "./templates/tauri";
 async function main(): Promise<void> {
   console.log("\ncreo-create-tauri-app\n");
 
-  // Project name from CLI arg or prompt
   let name = process.argv[2] || "";
   if (!name) {
     name = await askText("Project name", "my-creo-tauri-app");
@@ -23,7 +22,6 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  // Target selection
   const targets = (await askMultiSelect("Select target platforms:", [
     { label: "macOS", value: "macos", default: true },
     { label: "Windows", value: "windows", default: true },
@@ -40,7 +38,6 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  // Scaffold
   console.log("");
   scaffold({ name, dir, targets });
 
@@ -50,7 +47,6 @@ async function main(): Promise<void> {
     targets.includes("windows") ||
     targets.includes("linux");
 
-  // Summary
   console.log(`\u2713 Created "${name}" in ${dir}\n`);
   console.log(`  Targets: ${targets.join(", ")}\n`);
 

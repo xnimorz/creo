@@ -10,12 +10,7 @@ type AppHandle = {
   engine: Engine;
 };
 
-/**
- * Create a Creo application.
- *
- *   createApp(() => App(), new HtmlRender(el)).mount();
- *   createApp(() => App(), new HtmlRender(el), { scheduler: requestAnimationFrame }).mount();
- */
+/** createApp(() => App(), new HtmlRender(el), { scheduler? }).mount() */
 export function createApp(
   slot: () => void,
   renderer: IRender<Wildcard>,

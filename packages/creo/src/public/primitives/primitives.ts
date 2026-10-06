@@ -28,12 +28,12 @@ export type PointerEventData = BaseEventData & {
   button: number;
   buttons: number;
   target: HTMLElement;
-  /** The element the handler is bound to (handles event delegation correctly). */
+  /** Element the handler is bound to. */
   currentTarget: HTMLElement;
-  /** Capture the pointer to currentTarget — keeps move/up firing when the pointer leaves bounds. */
+  /** setPointerCapture on currentTarget. */
   capture: () => void;
   release: () => void;
-  /** Escape hatch — the underlying DOM event. Avoid where the typed fields cover the use case. */
+  /** Underlying DOM event (escape hatch). */
   nativeEvent: Event;
 };
 
@@ -97,11 +97,7 @@ export type BeforeToggleEventData = BaseEventData & {
   newState: string;
 };
 
-/**
- * Fired on the receiver of a `<button commandfor="id" command="...">` invocation.
- * Built-in commands include `show-modal`, `close`, `request-close`,
- * `show-popover`, `hide-popover`, `toggle-popover`; custom commands start with `--`.
- */
+/** Receiver of `<button commandfor command>`; custom commands start with `--`. */
 export type CommandEventData = BaseEventData & {
   command: string;
   source: HTMLElement;
@@ -118,10 +114,10 @@ export type ContainerEvents = {
   pointerUp: (e: PointerEventData) => void;
   pointerMove: (e: PointerEventData) => void;
   pointerCancel: (e: PointerEventData) => void;
-  // Hover (capture-phase, per-target, not double-fired up the tree).
+  // Per-target, not walked up the tree
   pointerEnter: (e: PointerEventData) => void;
   pointerLeave: (e: PointerEventData) => void;
-  // Bubbling siblings of enter/leave — walk up the tree like other pointer events.
+  // Bubbling enter/leave
   pointerOver: (e: PointerEventData) => void;
   pointerOut: (e: PointerEventData) => void;
   wheel: (e: WheelEventData) => void;
@@ -130,12 +126,11 @@ export type ContainerEvents = {
   keyUp: (e: KeyEventData) => void;
   focus: (e: FocusEventData) => void;
   blur: (e: FocusEventData) => void;
-  // Scroll fires passively at high frequency; preventDefault is a no-op.
+  // Passive: preventDefault is a no-op
   scroll: (e: ScrollEventData) => void;
   load: (e: LoadEventData) => void;
   error: (e: ErrorEventData) => void;
-  // Drag-and-drop. dataTransfer access on dragOver/dragEnter is restricted by
-  // the browser to metadata only — the drop handler is the one that can read data.
+  // Only drop can read dataTransfer data
   dragStart: (e: DragEventData) => void;
   dragEnd: (e: DragEventData) => void;
   dragOver: (e: DragEventData) => void;
@@ -145,7 +140,7 @@ export type ContainerEvents = {
   copy: (e: ClipboardEventData) => void;
   cut: (e: ClipboardEventData) => void;
   paste: (e: ClipboardEventData) => void;
-  // Invoker Commands API — any element may be a command receiver.
+  // Invoker Commands API
   command: (e: CommandEventData) => void;
 };
 
@@ -200,10 +195,7 @@ export type HtmlAttrs = {
   draggable?: boolean;
   /** Popover API — typically "auto", "manual", or "hint". */
   popover?: string;
-  /**
-   * Set with the underlying DOM element after mount, and with `null` after
-   * unmount. Accepts either a callback or a `{ current }` ref object
-   */
+  /** DOM element after mount, `null` after unmount. */
   ref?: Ref<Element>;
   [attr: string]: unknown;
 };
@@ -492,7 +484,7 @@ export const svg = html<
 >("svg");
 
 // ---------------------------------------------------------------------------
-// Scripting / metadata (rarely used in render, but complete for parity)
+// Scripting / metadata
 // ---------------------------------------------------------------------------
 
 export const script = html<

@@ -19,7 +19,7 @@ const DocRoute = view<{ slug: string }>(({ props }) => ({
   },
 }));
 
-// Collect every routable slug: everything in the nav plus whatever raw md exists
+// Routable slugs: nav entries plus any raw md
 const slugs = new Set<string>();
 for (const s of navSections) for (const i of s.items) slugs.add(i.slug);
 for (const k of Object.keys(docs)) slugs.add(k);

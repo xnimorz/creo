@@ -56,7 +56,6 @@ export function scaffold(options: ScaffoldOptions): void {
     capabilities(),
   );
 
-  // Rust sources — inject the correct crate name into main.rs
   const crateName = name.replace(/[^a-zA-Z0-9_-]/g, "-").toLowerCase();
   const libName = crateName.replace(/-/g, "_") + "_lib";
   writeFile(path.join(tauriDir, "src", "lib.rs"), libRs());
@@ -65,7 +64,6 @@ export function scaffold(options: ScaffoldOptions): void {
     mainRs().replace("{crate_name}", libName),
   );
 
-  // Placeholder icons directory
   writeFile(
     path.join(tauriDir, "icons", ".gitkeep"),
     "# Run `tauri icon` to generate icons from a source image\n",

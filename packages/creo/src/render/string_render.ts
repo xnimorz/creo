@@ -5,13 +5,12 @@ import { $primitive } from "@/public/primitive";
 import type { Maybe } from "@/functional/maybe";
 import type { Engine } from "@/internal/engine";
 
-// Self-closing HTML tags (no closing tag)
 const VOID_TAGS = new Set([
   "br", "hr", "img", "input", "source", "track", "embed",
   "area", "col", "wbr",
 ]);
 
-// Attributes that are set as DOM properties, not HTML attributes
+// Set as DOM properties, never serialized
 const DOM_PROPERTIES = new Set(["value", "checked", "selected", "indeterminate", "muted"]);
 
 function escapeHtml(str: string): string {
@@ -29,13 +28,7 @@ function escapeAttr(str: string): string {
     .replace(/>/g, "&gt;");
 }
 
-/**
- * HtmlStringRender — pull-based string renderer.
- * render/unmount are no-ops. Call renderToString() to
- * get the current HTML string from the VDOM.
- *
- * Output matches HtmlRender's DOM serialization (innerHTML).
- */
+/** Pull-based: render/unmount are no-ops; renderToString() matches HtmlRender's innerHTML. */
 export class HtmlStringRender implements IRender<string> {
   private root: Maybe<ViewRecord> = null;
 
@@ -74,7 +67,6 @@ export class HtmlStringRender implements IRender<string> {
       return `<${tag}${attrs}>${this.buildChildren(rec)}</${tag}>`;
     }
 
-    // Composite — transparent, just render children
     return this.buildChildren(rec);
   }
 
@@ -84,13 +76,11 @@ export class HtmlStringRender implements IRender<string> {
     for (const key in props) {
       const value = props[key];
       if (key === "key" || value == null) continue;
-      // Skip the event-handler sub-object and refs — neither appears in HTML.
       if (key === "on" || key === "ref") continue;
-      // Skip DOM-only properties (value, checked, etc.)
       if (DOM_PROPERTIES.has(key)) continue;
 
       if (key === "style") {
-        // Normalize style to match DOM's cssText (trailing semicolon)
+        // Match DOM cssText's trailing semicolon
         let css = String(value);
         css = css.trim();
         if (css && !css.endsWith(";")) css += ";";
@@ -99,7 +89,6 @@ export class HtmlStringRender implements IRender<string> {
       }
       if (typeof value === "boolean") {
         if (value) result += ` ${key}=""`;
-        // false booleans are omitted
       } else {
         const attrName = key === "class" ? "class" : key;
         result += ` ${attrName}="${escapeAttr(String(value))}"`;

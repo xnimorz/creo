@@ -208,10 +208,8 @@ console.log(
   `After clear:     views=${countViews(rootView!)} TRs=${container.getElementsByTagName("tr").length}`,
 );
 
-// _prevDom removed — no longer applicable
 console.log(`\n_prevDom: removed ✓`);
 
-// _vdomNode removed — no longer applicable
 console.log(`Stale _vdomNode: removed ✓`);
 
 // ========== Performance ==========

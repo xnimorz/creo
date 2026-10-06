@@ -9,7 +9,7 @@ import type { IRender } from "@/render/render_interface";
 import { orchestrator } from "./orchestrator";
 import type { Maybe } from "@/functional/maybe";
 
-// Mock renderer — sets renderRef so engine can distinguish new vs existing
+// Sets renderRef so engine can tell new from existing
 const createMockRenderer = (): IRender<Wildcard> => ({
   engine: null as any,
   render: mock((v: ViewRecord) => {
@@ -20,7 +20,6 @@ const createMockRenderer = (): IRender<Wildcard> => ({
   }),
 });
 
-// Mock view function that returns a simple view body
 const createMockViewFn = (onRender?: () => void): ViewFn<any, any> => {
   return ({ props, use }) => ({
     render: onRender || (() => {}),
@@ -49,7 +48,6 @@ function createParentView(
   });
 }
 
-/** Mount a root view and return the root ViewRecord. */
 function mountRoot(
   engine: Engine,
   viewFn: ViewFn<any, any>,
@@ -62,11 +60,9 @@ function mountRoot(
     {},
   );
   engine.render();
-  // The root's first child is our actual viewFn
   return root;
 }
 
-/** Get the "app" view — the first child of the root wrapper. */
 function appView(root: ViewRecord): ViewRecord {
   return root.children![0]!;
 }

@@ -21,9 +21,7 @@ import type { Wildcard } from "@/internal/wildcard";
 // ---------------------------------------------------------------------------
 
 const win = new Window({ url: "http://localhost" });
-// happy-dom 20.x leaves window.SyntaxError undefined, which makes its
-// querySelectorAll path throw on EVERY call (including internal calls like
-// the radio-group uncheck logic). Stub it so the error pipeline works.
+// happy-dom 20.x leaves window.SyntaxError undefined, breaking querySelectorAll
 (win as Wildcard).SyntaxError = SyntaxError;
 Object.assign(globalThis, {
   document: win.document,
@@ -213,14 +211,12 @@ describe("JsonRender", () => {
   it("should have correct tree structure", () => {
     const json = renderer.root!;
 
-    // Root is composite, find the app div inside
     const appDivs = findNodes(json, "div").filter(
       (d) => d.props.class === "app",
     );
     expect(appDivs.length).toBe(1);
     const appDiv = appDivs[0]!;
 
-    // App div has 2 composite children (TodoItems)
     const composites = appDiv.children.filter((c) => c.type === "composite");
     expect(composites.length).toBe(2);
 
@@ -467,7 +463,6 @@ describe("HtmlRender", () => {
     const box = c.getElementsByTagName("input")[0]! as HTMLInputElement;
     expect(box.checked).toBe(true);
 
-    // Simulate user un-checking, then state forcing it back on.
     box.checked = false;
     expect(box.checked).toBe(false);
 
@@ -546,7 +541,6 @@ describe("HtmlRender", () => {
       e.render();
 
       const [a, b] = Array.from(c.getElementsByTagName("input")) as HTMLInputElement[];
-      // Real radios fire a real change event when the user picks one.
       b!.checked = true;
       b!.dispatchEvent(new Event("change", { bubbles: true }));
       expect(events).toEqual([{ id: "b", checked: true }]);
@@ -578,7 +572,6 @@ describe("HtmlRender", () => {
     const el = c.getElementsByTagName("input")[0]! as HTMLInputElement;
     expect(el.value).toBe("hello");
 
-    // User typed extra text; handler decided not to change state.
     el.value = "helloworld";
     valueState!.set("hello"); // same value — must still re-assert DOM
     e.render();
@@ -586,7 +579,6 @@ describe("HtmlRender", () => {
   });
 
   it("undrifted inputs are not re-rendered when an unrelated parent state changes", () => {
-    // Spy on renderer.render to count post-mount renders per element.
     let counterState!: Reactive<number>;
 
     const Form = view<void>(({ use }) => {
@@ -597,7 +589,6 @@ describe("HtmlRender", () => {
           div(_, () => {
             input({ type: "text", value: "alpha", id: "a" });
             input({ type: "text", value: "beta", id: "b" });
-            // Touch counter so the form re-renders when it changes.
             span(_, String(counter.get()));
           });
         },
@@ -630,12 +621,10 @@ describe("HtmlRender", () => {
     expect(a.value).toBe("alpha");
     expect(b.value).toBe("beta");
 
-    // Snapshot post-mount counts.
     const aBefore = renderCallsByEl.get(a) ?? 0;
     const bBefore = renderCallsByEl.get(b) ?? 0;
 
-    // Trigger an unrelated parent re-render. Neither input drifted, so the
-    // renderer should not be asked to render either of them.
+    // Unrelated re-render, no drift → no input renders
     counterState.update((n) => n + 1);
     e.render();
 
@@ -644,9 +633,7 @@ describe("HtmlRender", () => {
   });
 
   it("inline `on: { ... }` with stable handler refs does not re-render the primitive", () => {
-    // Regression: a fresh `on` literal on every render must not cause the
-    // primitive to be marked dirty when the handler references are stable.
-    // The carve-out in shallowEqual handles this.
+    // Regression: fresh `on` literal with stable handlers must not mark dirty
     let counterState!: Reactive<number>;
     let clicks = 0;
     const handler = () => { clicks++; };
@@ -657,9 +644,7 @@ describe("HtmlRender", () => {
       return {
         render() {
           div(_, () => {
-            // Inline `on` literal — fresh object every render.
             button({ class: "btn", on: { click: handler } }, "Click");
-            // Touch counter so the parent re-renders.
             span(_, String(counter.get()));
           });
         },
@@ -690,14 +675,11 @@ describe("HtmlRender", () => {
     const btn = c.querySelector(".btn") as HTMLButtonElement;
     const btnBefore = renderCallsByEl.get(btn) ?? 0;
 
-    // Trigger a parent re-render. The button's only "change" is a fresh
-    // `on` literal pointing at the same handler — must not re-render.
     counterState.update((n) => n + 1);
     e.render();
 
     expect(renderCallsByEl.get(btn) ?? 0).toBe(btnBefore);
 
-    // Handler still fires after the parent re-renders.
     btn.click();
     expect(clicks).toBe(1);
   });
@@ -743,14 +725,12 @@ describe("HtmlRender", () => {
     const a = c.querySelector("#a") as HTMLInputElement;
     const b = c.querySelector("#b") as HTMLInputElement;
 
-    // Drift only `a`'s DOM value. Prop says "alpha", DOM now says "ALPHA-typed".
     a.value = "ALPHA-typed";
 
     const aBefore = renderCallsByEl.get(a) ?? 0;
     const bBefore = renderCallsByEl.get(b) ?? 0;
 
-    // Unrelated parent re-render. shouldReassert sees `a` drifted, `b`
-    // didn't. Only `a` should be re-rendered (and re-asserted to "alpha").
+    // Only the drifted input re-renders
     counterState.update((n) => n + 1);
     e.render();
 
@@ -896,13 +876,11 @@ describe("HtmlRender", () => {
       const outer = c.querySelector(".outer") as HTMLElement;
       const inner = c.querySelector(".inner") as HTMLElement;
 
-      // The browser dispatches pointerenter once per element entered, each
-      // with its own target. dispatchEvent sets target = the dispatching el.
+      // Browsers dispatch pointerenter per entered element
       outer.dispatchEvent(new Event("pointerenter"));
       inner.dispatchEvent(new Event("pointerenter"));
 
-      // Outer should fire exactly once (from its own dispatch), not also from
-      // the inner dispatch walking up.
+      // Outer fires once, not again via inner's walk-up
       expect(calls).toEqual(["outer-enter", "inner-enter"]);
     } finally {
       document.body.removeChild(c);
@@ -935,8 +913,7 @@ describe("HtmlRender", () => {
       e.render();
 
       const box = c.querySelector(".scroller") as HTMLElement;
-      // happy-dom doesn't simulate scroll geometry, but dispatching the event
-      // exercises the delegation path and payload mapping.
+      // happy-dom has no scroll geometry; this covers delegation only
       Object.defineProperty(box, "scrollTop", { value: 42, configurable: true });
       Object.defineProperty(box, "scrollLeft", { value: 7, configurable: true });
       box.dispatchEvent(new Event("scroll"));
@@ -1046,8 +1023,7 @@ describe("HtmlRender", () => {
       e.render();
 
       const d = c.querySelector(".d") as HTMLDetailsElement;
-      // Setting the `open` property in happy-dom already fires a toggle
-      // event — that exercises the delegation path on its own.
+      // happy-dom fires toggle when `open` is set
       d.open = true;
       d.open = false;
 
@@ -1083,7 +1059,6 @@ describe("HtmlRender", () => {
       e.createRoot(() => { Form(); }, {});
       e.render();
 
-      // Initially the input does not exist.
       expect(c.querySelector(".edit")).toBeNull();
 
       toggle!.set(true);
@@ -1091,7 +1066,6 @@ describe("HtmlRender", () => {
 
       const inputEl = c.querySelector(".edit") as HTMLInputElement;
       expect(inputEl).not.toBeNull();
-      // Renderer should have called .focus() — same shape React uses.
       expect(document.activeElement).toBe(inputEl);
     } finally {
       document.body.removeChild(c);
@@ -1134,8 +1108,6 @@ describe("HtmlRender", () => {
   });
 
   // -------------------------------------------------------------------------
-  // New event types — Invoker Commands, wheel, contextmenu, drag/drop,
-  // clipboard, form submit/reset/invalid, beforeToggle, pointerOver/Out
   // -------------------------------------------------------------------------
 
   function mount(viewFn: () => void): { container: HTMLElement; cleanup: () => void } {
@@ -1240,7 +1212,6 @@ describe("HtmlRender", () => {
     const { container, cleanup } = mount(() => { Outer(); });
     try {
       const inner = container.querySelector(".inner") as HTMLElement;
-      // pointerover bubbles — the delegation should fire inner then outer.
       inner.dispatchEvent(new Event("pointerover", { bubbles: true }));
       expect(calls).toEqual(["inner-over", "outer-over"]);
     } finally {
@@ -1278,7 +1249,6 @@ describe("HtmlRender", () => {
     try {
       const inner = container.querySelector(".inner") as HTMLElement;
       inner.dispatchEvent(new Event("pointerover", { bubbles: true }));
-      // inner called stopPropagation — outer's handler must not fire.
       expect(calls).toEqual(["inner-over"]);
     } finally {
       cleanup();
@@ -1384,7 +1354,7 @@ describe("HtmlRender", () => {
       const i = container.querySelector(".in") as HTMLInputElement;
       f.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
       f.dispatchEvent(new Event("reset", { bubbles: true }));
-      // invalid does not bubble — registered in capture phase.
+      // invalid doesn't bubble — capture phase
       i.dispatchEvent(new Event("invalid"));
       expect(log).toEqual(["submit", "reset", "invalid"]);
     } finally {
@@ -1413,7 +1383,7 @@ describe("HtmlRender", () => {
     const { container, cleanup } = mount(() => { D(); });
     try {
       const d = container.querySelector(".dlg") as HTMLElement;
-      // happy-dom may not synthesize a real ToggleEvent, dispatch manually.
+      // happy-dom may lack ToggleEvent
       const ev = new Event("beforetoggle") as Event & { oldState?: string; newState?: string };
       ev.oldState = "closed";
       ev.newState = "open";
@@ -1450,11 +1420,10 @@ describe("HtmlRender", () => {
     try {
       const target = container.querySelector(".target") as HTMLElement;
       const invoker = container.querySelector(".invoker") as HTMLElement;
-      // Assert attrs landed on the DOM.
       expect(invoker.getAttribute("commandfor")).toBe("dlg");
       expect(invoker.getAttribute("command")).toBe("show-modal");
 
-      // Synthesize CommandEvent for happy-dom (which may not implement it).
+      // happy-dom may lack CommandEvent
       const ev = new Event("command", { bubbles: true }) as Event & {
         command?: string;
         source?: Element;
@@ -1492,12 +1461,7 @@ describe("HtmlRender", () => {
   });
 
   it("re-bound event handler still fires after being temporarily removed", () => {
-    // When an event handler is bound, then unbound (which removes the
-    // container's delegated listener once its refcount hits zero), then
-    // re-bound, the renderer must re-register the container listener.
-    // Otherwise the handler is written into the element's evObj but the
-    // container has no listener for that event type, so dispatch never
-    // reaches it.
+    // Bind → unbind (refcount 0 removes container listener) → rebind must re-register it
     let clickCount = 0;
     let toggle!: Reactive<boolean>;
 
@@ -1525,20 +1489,14 @@ describe("HtmlRender", () => {
 
     const btn = c.getElementsByTagName("button")[0]!;
 
-    // 1) Initial bind — handler fires.
     btn.click();
     expect(clickCount).toBe(1);
 
-    // 2) Unbind — container's click listener is removed.
     toggle.set(false);
     e.render();
     btn.click();
     expect(clickCount).toBe(1);
 
-    // 3) Re-bind — without the fix, evObj still exists on the element so
-    //    diffAttributes' `if (evObj)` branch overwrites evObj.click but
-    //    skips ensureDelegated, leaving the container with no click
-    //    listener. The new handler would silently never fire.
     toggle.set(true);
     e.render();
     btn.click();
@@ -1769,9 +1727,6 @@ describe("State", () => {
   });
 
   it("should chain async updates so each runs against the previous result", async () => {
-    // Without chaining, every async update reads `#current` at call time
-    // and clobbers the others on resolution. With chaining, the second
-    // update runs against the first's resolved value.
     let countState: Reactive<number>;
 
     const Counter = view<void>(({ use }) => {
@@ -1786,10 +1741,7 @@ describe("State", () => {
 
     const { engine, container } = mountStateful(Counter);
 
-    // Faster-resolving update issued first; slower one second. If the
-    // implementation reads #current at issue time, both see 0 and both
-    // commit 1 — final value 1. With chaining, second sees the first's
-    // result (1) and increments to 2.
+    // Without chaining both would read 0 and commit 1
     let resolveFirst!: () => void;
     let resolveSecond!: () => void;
     const firstGate = new Promise<void>((r) => { resolveFirst = r; });
@@ -1804,12 +1756,10 @@ describe("State", () => {
       return n + 1;
     });
 
-    // Resolve the second gate first to prove chaining isn't relying on
-    // resolution order — the second fn must wait for the first regardless.
+    // Out-of-order resolution: second must still wait for first
     resolveSecond();
     resolveFirst();
 
-    // Drain microtasks until the chain commits.
     for (let i = 0; i < 16; i++) await Promise.resolve();
 
     engine.render();
@@ -1962,7 +1912,7 @@ describe("State", () => {
     const { engine, container } = mountStateful(App);
     expect(findByClass(container, "login").length).toBe(1);
 
-    // Simulate submit: mark submitting, switch auth, clear submitting — all in one batch.
+    // Submit flow in one batch
     submitting.set(true);
     auth.set({ user: 1 });
     submitting.set(false);
@@ -2019,11 +1969,7 @@ describe("State", () => {
       const p = use(phase);
       return {
         render() {
-          // Same-viewFn at pos 0 both phases: div({class:"slot"}, ...).
-          // Phase A: single text child -> F_TEXT_CONTENT optimization engages.
-          // Phase B: replaces text child with a nested div -> dispose(text)
-          // would remove the parent <div class="slot"> via ref.element without
-          // the F_TEXT_CONTENT guard in removeDomNodes.
+          // A: text child (F_TEXT_CONTENT). B: nested div — disposing the text must not remove .slot
           div({ class: "page" }, () => {
             if (p.get() === "loading") {
               div({ class: "slot" }, () => { text("Loading"); });
@@ -2052,7 +1998,6 @@ describe("State", () => {
     const after = page.children[1] as HTMLElement;
     expect(slot.className).toBe("slot");
     expect(after.className).toBe("after");
-    // The new inner div must land inside .slot, not into a detached node.
     expect(slot.children.length).toBe(1);
     expect((slot.children[0] as HTMLElement).className).toBe("inner");
     expect((slot.children[0] as HTMLElement).textContent).toBe("HERO");
