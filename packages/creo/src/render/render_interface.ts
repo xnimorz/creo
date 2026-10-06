@@ -10,6 +10,14 @@ export interface IRender<Output> {
   unmount(view: ViewRecord): void;
 
   /**
+   * Optional: beginMount(root) → render() pre-order, attach() post-order → endMount(root).
+   * `anchor` undefined = compute; the returned anchor is reused for following siblings.
+   */
+  beginMount?(root: ViewRecord, anchor?: unknown): unknown;
+  attach?(view: ViewRecord): void;
+  endMount?(root: ViewRecord): void;
+
+  /**
    * Optional: returns true if this primitive's live output may have
    * drifted from `nextProps` and needs re-rendering even though
    * `shallowEqual(prev, next)` reports props as unchanged.

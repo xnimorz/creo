@@ -39,10 +39,8 @@ const buildData = (count: number): RowData[] => {
 const Row = view<{
   item: RowData; selected: boolean; onSelect: () => void; onRemove: () => void;
 }>((ctx) => ({
-  update: {
-    should(next: any) {
-      return next.item.label !== ctx.props().item.label || next.selected !== ctx.props().selected;
-    },
+  shouldUpdate(next: any) {
+    return next.item.label !== ctx.props().item.label || next.selected !== ctx.props().selected;
   },
   render() {
     tr({ class: ctx.props().selected ? "danger" : "" }, () => {

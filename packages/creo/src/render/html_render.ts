@@ -332,25 +332,80 @@ const STATEFUL_TAGS = new Set([
 export class HtmlRender implements IRender<HTMLElement | Text> {
   engine!: Engine;
 
+  #mountRoot: Maybe<ViewRecord> = null;
+  #mountParent: Node | null = null;
+  #mountAnchor: Node | null = null;
+  // ref / autofocus deferred until endMount
+  #mountPending: PrimitiveDomRef[] = [];
+
   constructor(private container: HTMLElement) {}
 
   // -- IRender ----------------------------------------------------------------
 
+  beginMount(root: ViewRecord, anchor?: unknown): unknown {
+    this.#mountRoot = root;
+    this.#mountParent = this.findParentDom(root);
+    this.#mountAnchor =
+      anchor !== undefined
+        ? (anchor as Node | null)
+        : this.findInsertionPoint(root);
+    return this.#mountAnchor;
+  }
+
+  /** Post-order: append into the detached parent, or insert top-level nodes before the anchor. */
+  attach(view: ViewRecord): void {
+    if (!(view.flags & F_PRIMITIVE) || view.flags & F_TEXT_CONTENT) return;
+    const el = (view.renderRef as PrimitiveDomRef).element;
+    const root = this.#mountRoot;
+    let p = view;
+    while (p !== root) {
+      p = p.parent!;
+      if (p.flags & F_PRIMITIVE) {
+        (p.renderRef as PrimitiveDomRef).element.appendChild(el);
+        return;
+      }
+    }
+    this.#mountParent!.insertBefore(el, this.#mountAnchor);
+  }
+
+  endMount(_root: ViewRecord): void {
+    this.#mountRoot = null;
+    this.#mountParent = null;
+    this.#mountAnchor = null;
+    const pending = this.#mountPending;
+    if (pending.length === 0) return;
+    this.#mountPending = [];
+    for (const ref of pending) {
+      const element = ref.element as Element;
+      const props = ref.prevProps!;
+      // The HTML `autofocus` attribute only fires during initial document
+      // parse — for dynamically inserted elements browsers ignore it.
+      // Match React's behaviour by calling .focus() once after mount.
+      if (
+        props.autofocus === true &&
+        typeof (element as HTMLElement).focus === "function"
+      ) {
+        (element as HTMLElement).focus();
+      }
+      // Fire user ref after the element is in the DOM so ref(el) can
+      // call focus(), measure layout, attach observers, etc.
+      applyRef((props as { ref?: Ref<Element> }).ref, element);
+    }
+  }
+
   render(view: ViewRecord): void {
     if (!view.renderRef) {
-      // --- Mount ---
+      // --- Mount (create only, attach() inserts) ---
       if (view.flags & F_PRIMITIVE) {
-        const parentNode = this.findParentDom(view);
-        const refNode = this.findInsertionPoint(view);
         const tag = view.viewFn[$primitive]!;
 
         if (tag === "text") {
           const textNode = document.createTextNode(String(view.props));
           view.renderRef = { element: textNode, prevProps: null };
-          parentNode.insertBefore(textNode, refNode);
         } else {
-          const parentIsSvg = (parentNode as Element).namespaceURI === SVG_NS;
-          const useSvg = tag === "svg" || parentIsSvg;
+          const useSvg =
+            tag === "svg" ||
+            (this.findParentDom(view) as Element).namespaceURI === SVG_NS;
           const element = useSvg
             ? document.createElementNS(SVG_NS, tag)
             : document.createElement(tag);
@@ -368,28 +423,13 @@ export class HtmlRender implements IRender<HTMLElement | Text> {
               child.viewFn[$primitive] === "text"
             ) {
               element.textContent = String(child.props);
-              child.renderRef = { element, prevProps: null };
+              child.renderRef = { element, prevProps: child.props };
               child.flags |= F_TEXT_CONTENT;
             }
           }
 
-          parentNode.insertBefore(element, refNode);
-
-          // The HTML `autofocus` attribute only fires during initial document
-          // parse — for dynamically inserted elements browsers ignore it.
-          // Match React's behaviour by calling .focus() once after mount.
-          if (
-            props != null &&
-            (props as Record<string, unknown>).autofocus === true &&
-            typeof (element as HTMLElement).focus === "function"
-          ) {
-            (element as HTMLElement).focus();
-          }
-
-          // Fire user ref after the element is in the DOM so ref(el) can
-          // call focus(), measure layout, attach observers, etc.
-          if (props != null) {
-            applyRef((props as { ref?: Ref<Element> }).ref, element);
+          if (props != null && (props.ref != null || props.autofocus === true)) {
+            this.#mountPending.push(domRef);
           }
         }
       } else {

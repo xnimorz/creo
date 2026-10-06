@@ -76,18 +76,32 @@ markDirty(view) → add to #dirtyQueue Set → schedule()
                                               ↓
 render() processes #dirtyQueue:
   for each view in Set (visits items added during iteration):
-    1. initViewBody(view) — if F_PENDING, call viewFn once
-    2. isNew = !view.renderRef
-    3. if F_DIRTY:
-       a. reconcile(view) — collect pending children, diff with old
-       b. renderer.render(view) — mount or update DOM
+    1. if !view.renderRef (new): beginMount → #mountTree(view) → endMount
+    2. else if F_DIRTY:
+       a. reconcile(view) — collect pending children, diff with old;
+          records a contiguous run of brand-new children (#runFrom/#runTo)
+       b. renderer.render(view) — update DOM
        c. clear F_DIRTY, F_MOVED
-    4. else (F_MOVED only):
+       d. #mountRun — mount the run, all before one shared anchor
+    3. else (F_MOVED only):
        a. renderer.render(view) — reposition DOM
        b. clear F_MOVED
-  #dirtyQueue.clear()
   fire deferred callbacks (onMount, onUpdateAfter)
+
+#mountTree(view) — synchronous, depth-first:
+  initViewBody → reconcile → renderer.render (create, pre-order)
+  → onMount queued → children mounted recursively → renderer.attach (post-order)
 ```
+
+### Fresh-subtree mounting
+New subtrees never go through the dirty queue node-by-node. `HtmlRender`
+creates elements in `render()` but inserts them in `attach()`: inside the
+subtree they `appendChild` into a still-detached parent, and only the
+top-level nodes are inserted into the live DOM before the anchor computed
+in `beginMount`. Element refs and `autofocus` are deferred to `endMount`,
+when the subtree is in the document. Only new views from the middle diff and
+viewFn replacements are still queued individually, since they must wait for
+sibling moves. onMount order is depth-first, parent before children.
 
 ## Reconciliation Algorithm
 

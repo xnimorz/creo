@@ -99,12 +99,10 @@ const Row = view<{
   onSelect: () => void;
   onRemove: () => void;
 }>(({ props }) => ({
-  update: {
-    should(next: { item: RowData; selected: boolean; onSelect: () => void; onRemove: () => void }) {
-      return (
-        next.item.label !== props().item.label || next.selected !== props().selected
-      );
-    },
+  shouldUpdate(next) {
+    return (
+      next.item.label !== props().item.label || next.selected !== props().selected
+    );
   },
   render() {
     tr({ class: props().selected ? "danger" : "" }, () => {
@@ -131,7 +129,7 @@ const ActionButton = view<{
   id: string;
   onClick: () => void;
 }>((ctx) => ({
-  update: { should: () => false },
+  shouldUpdate: () => false,
   render() {
     div({ class: "col-sm-6 smallpad" }, () => {
       button(

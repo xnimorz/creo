@@ -3021,6 +3021,163 @@ describe("Drag/swipe API surface", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Fresh subtree mounting
+// ---------------------------------------------------------------------------
+
+describe("Fresh subtree mounting", () => {
+  function mount(app: () => void, c = document.createElement("div")) {
+    const eng = new Engine(new HtmlRender(c), () => {});
+    orchestrator.setCurrentEngine(eng);
+    eng.createRoot(app, {});
+    eng.render();
+    return { c, eng };
+  }
+
+  // Two top-level primitives per composite
+  const Pair = view<{ id: string }>(({ props }) => ({
+    render() {
+      span(_, `${props().id}1`);
+      span(_, `${props().id}2`);
+    },
+  }));
+
+  it("inserts a keyed run in the middle before the tail", () => {
+    let ids: Reactive<string[]>;
+    const App = view(({ use }) => {
+      ids = use(["a", "b", "e"]);
+      return {
+        render() {
+          div(_, () => {
+            for (const id of ids.get()) Pair({ key: id, id });
+          });
+        },
+      };
+    });
+    const { c, eng } = mount(() => App());
+    ids!.set(["a", "b", "c", "d", "e"]);
+    eng.render();
+    expect(c.textContent).toBe("a1a2b1b2c1c2d1d2e1e2");
+  });
+
+  it("appends a non-keyed run before a following sibling element", () => {
+    let n: Reactive<number>;
+    const List = view<{ n: number }>(({ props }) => ({
+      render() {
+        for (let i = 0; i < props().n; i++) Pair({ id: String(i) });
+      },
+    }));
+    const App = view(({ use }) => {
+      n = use(1);
+      return {
+        render() {
+          div(_, () => {
+            List({ n: n.get() });
+            span(_, "end");
+          });
+        },
+      };
+    });
+    const { c, eng } = mount(() => App());
+    n!.set(3);
+    eng.render();
+    expect(c.textContent).toBe("010211122122end");
+  });
+
+  it("builds each new subtree detached and inserts it into the live parent once", () => {
+    let rows: Reactive<number[]>;
+    const App = view(({ use }) => {
+      rows = use<number[]>([]);
+      return {
+        render() {
+          div({ class: "list" }, () => {
+            for (const r of rows.get()) {
+              div({ key: r, class: "row" }, () => {
+                span(_, String(r));
+                span(_, "x");
+              });
+            }
+          });
+        },
+      };
+    });
+    const { c, eng } = mount(() => App());
+    const list = findByClass(c, "list")[0]!;
+    const inserted: number[] = [];
+    const origInsert = list.insertBefore.bind(list);
+    const origAppend = list.appendChild.bind(list);
+    list.insertBefore = ((node: Node, ref: Node | null) => {
+      inserted.push(node.childNodes.length);
+      return origInsert(node, ref);
+    }) as typeof list.insertBefore;
+    list.appendChild = ((node: Node) => {
+      inserted.push(node.childNodes.length);
+      return origAppend(node);
+    }) as typeof list.appendChild;
+
+    rows!.set([1, 2, 3]);
+    eng.render();
+    expect(inserted).toEqual([2, 2, 2]);
+    expect(list.textContent).toBe("1x2x3x");
+  });
+
+  it("fires element refs only after the whole subtree is attached", () => {
+    const seen: boolean[] = [];
+    const c = document.createElement("div");
+    const App = view(() => ({
+      render() {
+        div(_, () => {
+          div(_, () => {
+            span({ ref: (el: Element | null) => { if (el) seen.push(c.contains(el)); } }, "deep");
+          });
+        });
+      },
+    }));
+    mount(() => App(), c);
+    expect(seen).toEqual([true]);
+  });
+
+  it("re-renders an ancestor whose store a descendant sets during init", () => {
+    const s = store.new("initial");
+    const Child = view(() => {
+      s.set("from-child");
+      return { render() {} };
+    });
+    const Parent = view(({ use }) => {
+      const v = use(s);
+      return {
+        render() {
+          div({ class: "p" }, v.get());
+          Child();
+        },
+      };
+    });
+    const { c, eng } = mount(() => Parent());
+    eng.render();
+    expect(findByClass(c, "p")[0]!.textContent).toBe("from-child");
+  });
+
+  it("fires onMount parent-first, children in document order", () => {
+    const order: string[] = [];
+    const Leaf = view<{ id: string }>(({ props }) => ({
+      onMount() { order.push(props().id); },
+      render() { span(_, props().id); },
+    }));
+    const Branch = view<{ id: string }>(({ props }) => ({
+      onMount() { order.push(props().id); },
+      render() {
+        Leaf({ id: `${props().id}.1` });
+        Leaf({ id: `${props().id}.2` });
+      },
+    }));
+    mount(() => {
+      Branch({ id: "a" });
+      Branch({ id: "b" });
+    });
+    expect(order).toEqual(["a", "a.1", "a.2", "b", "b.1", "b.2"]);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Helper for JSON tests
 // ---------------------------------------------------------------------------
 

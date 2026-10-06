@@ -40,6 +40,10 @@ export class Engine {
   // Re-use idx buffer to reduce GC impact
   #idxScratch: number[] = [];
 
+  // New children [from, to) left by the last reconcile(), mounted by the caller.
+  #runFrom = 0;
+  #runTo = 0;
+
   constructor(
     public renderer: IRender<Wildcard>,
     scheduler?: Scheduler,
@@ -334,6 +338,7 @@ export class Engine {
   // -- Reconciliation ---------------------------------------------------------
 
   reconcile(view: ViewRecord): void {
+    this.#runFrom = this.#runTo = 0;
     let pendingChildren: Maybe<ViewRecord[]> = null;
     if (view.body?.render) {
       pendingChildren = this.#collect(view.body.render, [], view);
@@ -351,10 +356,9 @@ export class Engine {
       for (let i = 0; i < pendingChildren.length; i++) {
         const child = pendingChildren[i]!;
         child.pos = i;
-        this.initViewBody(child);
-        this.markDirty(child);
         this.#registerKey(view, child);
       }
+      this.#runTo = pendingChildren.length;
       return;
     }
     // Now, we have both view.children & pendingChildren
@@ -392,12 +396,13 @@ export class Engine {
       oldChildren[i]!.pos = i;
     }
 
-    // Mount new children
     for (let i = oldLen; i < newLen; i++) {
       oldChildren[i] = pending[i]!;
       pending[i]!.pos = i;
-      this.initViewBody(pending[i]!);
-      this.markDirty(pending[i]!);
+    }
+    if (newLen > oldLen) {
+      this.#runFrom = oldLen;
+      this.#runTo = newLen;
     }
 
     // Dispose removed children
@@ -441,10 +446,10 @@ export class Engine {
     if (i > oldEnd) {
       // All remaining pending are insertions
       for (let j = i; j <= newEnd; j++) {
-        this.initViewBody(pending[j]!);
-        this.markDirty(pending[j]!);
         this.#registerKey(view, pending[j]!);
       }
+      this.#runFrom = i;
+      this.#runTo = newEnd + 1;
       // Rebuild children: head (already patched) + insertions + tail.
       // Pre-sized array, indexed write — no intermediate slices/spreads.
       const tailStart = oldEnd + 1;
@@ -651,6 +656,47 @@ export class Engine {
     parent.keyToView.set(child.userKey, child);
   }
 
+  // -- Mounting ---------------------------------------------------------------
+
+  /** Depth-first: create pre-order, attach post-order. */
+  #mountTree(view: ViewRecord, cbs: (() => void)[]): void {
+    // Makes state.set() inside the viewFn a no-op
+    view.flags |= F_DIRTY;
+    this.initViewBody(view);
+    this.reconcile(view);
+    this.renderer.render(view);
+    // Clear before descending so descendants can re-queue this view
+    view.flags &= ~(F_DIRTY | F_MOVED);
+    if (view.body?.onMount) {
+      const b = view.body;
+      cbs.push(() => b.onMount!());
+    }
+    const children = view.children;
+    if (children) {
+      for (let i = 0; i < children.length; i++) {
+        this.#mountTree(children[i]!, cbs);
+      }
+    }
+    this.renderer.attach?.(view);
+  }
+
+  /** New siblings share one anchor, computed for the first. */
+  #mountRun(
+    parent: ViewRecord,
+    from: number,
+    to: number,
+    cbs: (() => void)[],
+  ): void {
+    const children = parent.children!;
+    let anchor: unknown = undefined;
+    for (let i = from; i < to; i++) {
+      const child = children[i]!;
+      anchor = this.renderer.beginMount?.(child, anchor);
+      this.#mountTree(child, cbs);
+      this.renderer.endMount?.(child);
+    }
+  }
+
   // -- Render loop ------------------------------------------------------------
 
   render(): void {
@@ -671,24 +717,30 @@ export class Engine {
         // up in this same pass instead of being lost.
         this.#dirtyQueue.delete(view);
         if (view.flags & F_DISPOSED) continue;
-        this.initViewBody(view);
-        const isNew = !view.renderRef;
-        if (!isNew) view.body?.onUpdateBefore?.();
+
+        if (!view.renderRef) {
+          this.renderer.beginMount?.(view);
+          this.#mountTree(view, cbs);
+          this.renderer.endMount?.(view);
+          continue;
+        }
+
+        view.body?.onUpdateBefore?.();
 
         if (view.flags & F_DIRTY) {
           // Full re-render
           this.reconcile(view);
+          const runFrom = this.#runFrom;
+          const runTo = this.#runTo;
           this.renderer.render(view);
           view.flags &= ~F_DIRTY;
           view.flags &= ~F_MOVED;
 
-          if (isNew && view.body?.onMount) {
-            const b = view.body;
-            cbs.push(() => b.onMount!());
-          } else if (!isNew && view.body?.onUpdateAfter) {
+          if (view.body?.onUpdateAfter) {
             const b = view.body;
             cbs.push(() => b.onUpdateAfter!());
           }
+          if (runTo > runFrom) this.#mountRun(view, runFrom, runTo, cbs);
         } else {
           // Move only
           this.renderer.render(view);
