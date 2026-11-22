@@ -25,8 +25,7 @@ const Counter = view(({ use }) => {
 ### Rules
 
 - Call `use()` **before** returning the ViewBody, never inside `render()`.
-- Call order must be stable across re-renders (same as React hooks). Do not call `use()` inside conditionals or loops.
-- On the first render, `use(initial)` creates a new `Reactive<T>` instance. On subsequent renders, it returns the existing instance at the same position (the `initial` argument is ignored).
+- The view function body runs **once** per view instance, so `use(initial)` creates its `Reactive<T>` exactly once. Re-renders only re-run `render()`; the `initial` argument is never re-read (later prop changes don't reset state).
 
 ## Reading state
 
@@ -73,7 +72,7 @@ Like `.set()`, the update is applied immediately and a re-render is scheduled.
 
 ### Async updates
 
-`.update()` also accepts async functions. The value is applied and render is scheduled when the promise resolves:
+`.update()` also accepts async functions. The value is applied and render is scheduled when the promise resolves. Further `.update()` calls made while one is in flight chain onto its result; a `.set()` cancels any in-flight async updates:
 
 ```ts
 const data = use<string[]>([]);

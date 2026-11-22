@@ -20,16 +20,14 @@ Store instances are typically defined at module scope and imported where needed.
 Use `use(store)` inside a view function to subscribe and get a reactive accessor:
 
 ```ts
-import { view, div, text } from "creo";
+import { view, button } from "creo";
 
 const ThemedButton = view(({ use }) => {
   const theme = use(ThemeStore); // re-renders when ThemeStore changes
 
   return {
     render() {
-      button({ class: theme.get() === "dark" ? "btn-dark" : "btn-light" }, () => {
-        text("Click me");
-      });
+      button({ class: theme.get() === "dark" ? "btn-dark" : "btn-light" }, "Click me");
     },
   };
 });
@@ -58,7 +56,7 @@ ThemeStore.update(current => current === "light" ? "dark" : "light");
 ## Complete example
 
 ```ts
-import { createApp, store, view, div, button, span, text, HtmlRender } from "creo";
+import { createApp, store, view, div, button, span, HtmlRender, _ } from "creo";
 
 // 1. Create the store
 const CounterStore = store.new(0);
@@ -70,7 +68,7 @@ const IncrementButton = view(({ use }) => {
 
   return {
     render() {
-      button({ on: { click: increment } }, () => { text("+1"); });
+      button({ on: { click: increment } }, "+1");
     },
   };
 });
@@ -81,9 +79,7 @@ const DisplayCount = view(({ use }) => {
 
   return {
     render() {
-      span({}, () => {
-        text(`Count: ${counter.get()}`);
-      });
+      span(_, `Count: ${counter.get()}`);
     },
   };
 });
@@ -91,7 +87,7 @@ const DisplayCount = view(({ use }) => {
 // 4. App
 const App = view(() => ({
   render() {
-    div({}, () => {
+    div(_, () => {
       IncrementButton();
       DisplayCount();
     });
@@ -133,3 +129,4 @@ function resetStore<T>(s: Store<T>, value: T): void {
 | `.set(value: T): void` | Set a new value, re-render all subscribers |
 | `.update(fn: (current: T) => T): void` | Apply a sync transform, re-render subscribers |
 | `.update(fn: (current: T) => Promise<T>): void` | Apply an async transform, re-render on resolve |
+| `.subscribe(cb: () => void): () => void` | Listen for changes outside views; returns an unsubscribe function |

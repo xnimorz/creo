@@ -69,19 +69,19 @@ Vercel treats files in `/api` as serverless functions. The `[[...route]]` catch-
 ```ts
 // api/[[...route]].ts
 import { handle } from "hono/vercel";
-import app from "../src/server";
+import { app } from "../src/server";
 
 export const config = { runtime: "nodejs" };
 export default handle(app);
 ```
 
-Make sure `src/server.ts` exports the Hono `app` as its default export:
+Make sure `src/server.ts` also exports the Hono `app` as a named export (the generated file only has the default export):
 
 ```ts
 // src/server.ts
 import { Hono } from "hono";
 
-const app = new Hono();
+export const app = new Hono();
 app.get("/api/health", (c) => c.json({ ok: true }));
 
 // Still runnable locally as a Bun server:

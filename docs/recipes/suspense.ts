@@ -70,7 +70,7 @@ const App = view(({ use }) => {
           },
         });
 
-        button({ onClick: reload }, "Get another");
+        button({ on: { click: reload } }, "Get another");
       });
     },
   };

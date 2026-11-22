@@ -16,10 +16,13 @@ type SuspenseProps<T> = {
   key?: unknown; // pass a key to force reload when dependencies change
 };
 
-export const Suspense = view(<T,>({ props, use }: any) => {
-  type Status = "loading" | "ok" | "error";
+type Status = "loading" | "ok" | "error";
+
+// Views can't be generic, so the data type is erased to `any` here;
+// callers annotate it in `children`.
+export const Suspense = view<SuspenseProps<any>>(({ props, use }) => {
   const status = use<Status>("loading");
-  const data = use<T | null>(null);
+  const data = use<unknown>(null);
   const err = use<Error | null>(null);
 
   const run = async () => {

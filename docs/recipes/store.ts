@@ -26,8 +26,8 @@ const Controls = view(() => {
   return {
     render() {
       div({ class: "controls" }, () => {
-        button({ onClick: bump }, "Bump count");
-        button({ onClick: flip }, "Flip theme");
+        button({ on: { click: bump } }, "Bump count");
+        button({ on: { click: flip } }, "Flip theme");
       });
     },
   };

@@ -30,7 +30,7 @@ const CheckboxDemo = view(({ use }) => {
       div({ class: "card" }, () => {
         h2(_, "Checkbox");
         div({ class: "row" }, () => {
-          input({ id: "tos", type: "checkbox", checked: accepted.get(), onChange });
+          input({ id: "tos", type: "checkbox", checked: accepted.get(), on: { change: onChange } });
           label({ for: "tos", class: "label" }, "I accept the terms");
           span(
             { class: accepted.get() ? "tag on" : "tag" },
@@ -38,7 +38,7 @@ const CheckboxDemo = view(({ use }) => {
           );
         });
         div({ class: "row" }, () => {
-          button({ onClick: force }, "Toggle from state");
+          button({ on: { click: force } }, "Toggle from state");
         });
         p({ class: "note" }, "Click the label or the box — the <label for=tos> association forwards the click to the input.");
       });
@@ -71,7 +71,7 @@ const RadioDemo = view(({ use }) => {
               type: "radio",
               name: "plan",
               checked: plan.get() === opt.id,
-              onChange: onChange(opt.id),
+              on: { change: onChange(opt.id) },
             });
             label({ for: `plan-${opt.id}`, class: "label" }, opt.label);
           });
@@ -79,7 +79,7 @@ const RadioDemo = view(({ use }) => {
         div({ class: "row" }, () => {
           span({ class: "tag on" }, `selected: ${plan.get()}`);
         });
-        p({ class: "note" }, "Selecting a radio fires onChange with e.checked === true on the new choice. The next render writes el.checked = false on the others, even though the prop didn't change for this view.");
+        p({ class: "note" }, "Selecting a radio fires `change` with e.checked === true on the new choice. The next render writes el.checked = false on the others, even though the prop didn't change for this view.");
       });
     },
   };
@@ -103,29 +103,29 @@ const MediaDemo = view(({ use }) => {
           controls: true,
           muted: videoMuted.get(),
           width: 320,
-          onVolumeChange: syncVideo,
+          on: { volumeChange: syncVideo },
         });
         div({ class: "row" }, () => {
-          button({ onClick: toggleVideo }, "Toggle video mute");
+          button({ on: { click: toggleVideo } }, "Toggle video mute");
           span({ class: videoMuted.get() ? "tag" : "tag on" }, `muted: ${videoMuted.get()}`);
         });
         audio({
           src: AUDIO_SRC,
           controls: true,
           muted: audioMuted.get(),
-          onVolumeChange: syncAudio,
+          on: { volumeChange: syncAudio },
         });
         div({ class: "row" }, () => {
-          button({ onClick: toggleAudio }, "Toggle audio mute");
+          button({ on: { click: toggleAudio } }, "Toggle audio mute");
           span({ class: audioMuted.get() ? "tag" : "tag on" }, `muted: ${audioMuted.get()}`);
         });
-        p({ class: "note" }, "Toggle our button OR the native speaker icon — onVolumeChange syncs el.muted back into state, and the next render writes the live property (not the inert defaultMuted attribute).");
+        p({ class: "note" }, "Toggle our button OR the native speaker icon — the `volumeChange` handler syncs el.muted back into state, and the next render writes the live property (not the inert defaultMuted attribute).");
       });
     },
   };
 });
 
-// 4. Focus / blur — capture-phase delegation makes onFocus/onBlur fire.
+// 4. Focus / blur — capture-phase delegation makes on.focus / on.blur fire.
 const FocusDemo = view(({ use }) => {
   const focused = use<string | null>(null);
   const log = use<string[]>([]);
@@ -143,10 +143,10 @@ const FocusDemo = view(({ use }) => {
         h2(_, "Focus / blur");
         div({ class: "row" }, () => {
           div({ class: which === "A" ? "ring focused" : "ring" }, () => {
-            input({ class: "txt", placeholder: "field A", onFocus: onFocusA, onBlur: onBlurA });
+            input({ class: "txt", placeholder: "field A", on: { focus: onFocusA, blur: onBlurA } });
           });
           div({ class: which === "B" ? "ring focused" : "ring" }, () => {
-            input({ class: "txt", placeholder: "field B", onFocus: onFocusB, onBlur: onBlurB });
+            input({ class: "txt", placeholder: "field B", on: { focus: onFocusB, blur: onBlurB } });
           });
         });
         div({ class: "row" }, () => {
@@ -172,11 +172,11 @@ const ControlledDemo = view(({ use }) => {
       div({ class: "card" }, () => {
         h2(_, "Controlled input drift");
         div({ class: "row" }, () => {
-          input({ class: "txt", type: "text", value: value.get(), onInput });
+          input({ class: "txt", type: "text", value: value.get(), on: { input: onInput } });
           span({ class: "tag" }, `state: ${value.get()}`);
         });
         div({ class: "row" }, () => {
-          button({ onClick: reassert }, "Re-assert state value");
+          button({ on: { click: reassert } }, "Re-assert state value");
         });
         p({ class: "note" }, "Type extra characters, then click Re-assert. The input snaps back to the state value even though state.set was called with the same string.");
       });

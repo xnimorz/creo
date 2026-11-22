@@ -7,14 +7,14 @@ Creo is a lightweight, imperative UI framework for building reactive interfaces 
 Creo takes a different approach from JSX-based frameworks. Instead of describing UI as a tree of elements returned from render functions, Creo uses **imperative render streams** -- you call primitives as functions, and the framework builds the virtual DOM from those calls.
 
 ```ts
-import { view, div, button, text } from "creo";
+import { view, div, h1, p, _ } from "creo";
 
-const App = view((ctx) => {
+const App = view(() => {
   return {
     render() {
       div({ class: "app" }, () => {
-        h1({}, () => { text("Hello, Creo"); });
-        p({}, () => { text("An imperative UI framework."); });
+        h1(_, "Hello, Creo");
+        p(_, "An imperative UI framework.");
       });
     },
   };
@@ -25,14 +25,14 @@ const App = view((ctx) => {
 
 - **No JSX, no compiler.** Render functions are plain TypeScript. All control flow (if/else, for loops, ternaries) works naturally.
 - **Immediate state.** Calling `.set()` or `.update()` applies the value instantly. No stale closures, no batching surprises.
-- **Explicit lifecycle.** Named hooks (`mount.before`, `mount.after`, `update.before`, `update.after`) replace dependency-array guessing.
-- **Renderer-agnostic.** The same component tree can target the DOM (`HtmlRender`), a JSON structure (`JsonRender`), or an HTML string (`StringRender`). Write your own renderer by implementing the `IRender` interface.
+- **Explicit lifecycle.** Named hooks (`onMount`, `shouldUpdate`, `onUpdateBefore`, `onUpdateAfter`, `dispose`) replace dependency-array guessing.
+- **Renderer-agnostic.** The same component tree can target the DOM (`HtmlRender`), a JSON structure (`JsonRender`), or an HTML string (`HtmlStringRender`). Write your own renderer by implementing the `IRender` interface.
 - **Lightweight.** No virtual DOM diffing library, no template compiler. Reconciliation is built into the engine with keyed and positional matching.
 
 ## Quick taste
 
 ```ts
-import { createApp, view, div, button, text, HtmlRender } from "creo";
+import { createApp, view, div, button, text, HtmlRender, _ } from "creo";
 
 const Counter = view<{ initial: number }>(({ props, use }) => {
   const count = use(props().initial);
@@ -40,9 +40,9 @@ const Counter = view<{ initial: number }>(({ props, use }) => {
 
   return {
     render() {
-      div({}, () => {
+      div(_, () => {
         text(count.get());
-        button({ on: { click: increment } }, () => { text("+1"); });
+        button({ on: { click: increment } }, "+1");
       });
     },
   };
@@ -56,11 +56,11 @@ createApp(
 
 ## Documentation
 
-- [Getting Started](./getting-started.md) -- installation, first app
-- [view()](./view.md) -- defining components
-- [State](./state.md) -- reactive state management
-- [Events](./events.md) -- handling user interactions
-- [Primitives](./primitives.md) -- built-in HTML elements and custom primitives
-- [Store](./store.md) -- global/shared state (context pattern)
-- [Renderers](./renderers.md) -- HtmlRender, JsonRender, StringRender, custom renderers
-- [Lifecycle](./lifecycle.md) -- mount, update, and disposal hooks
+- [Getting Started](#/getting-started) -- installation, first app
+- [view()](#/view) -- defining components
+- [State](#/state) -- reactive state management
+- [Events](#/events) -- handling user interactions
+- [Primitives](#/primitives) -- built-in HTML elements and custom primitives
+- [Store](#/store) -- global/shared state (context pattern)
+- [Renderers](#/renderers) -- HtmlRender, JsonRender, HtmlStringRender, custom renderers
+- [Lifecycle](#/lifecycle) -- mount, update, and disposal hooks

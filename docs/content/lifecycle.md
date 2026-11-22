@@ -10,6 +10,7 @@ Creo provides explicit, named lifecycle hooks on the `ViewBody` object. There ar
 | `shouldUpdate(nextProps)` | Before a re-render, to decide whether it should proceed |
 | `onUpdateBefore` | Before each re-render (not called on first render) |
 | `onUpdateAfter` | After each re-render (not called on first render) |
+| `dispose` | When the view is removed from the tree |
 
 All hooks are optional properties on the object returned from a view function.
 
@@ -69,16 +70,17 @@ Runs synchronously before each re-render (not on the first render). Use it for p
 ```ts
 const Animated = view(({ use }) => {
   const value = use(0);
-  let prevValue = 0;
+  let shown = 0; // value as of the previous render
+  let changed = false;
 
   return {
     onUpdateBefore() {
-      prevValue = value.get();
+      // `value` already holds the new value (set() is immediate)
+      changed = shown !== value.get();
+      shown = value.get();
     },
     render() {
-      div({ class: prevValue !== value.get() ? "changed" : "" }, () => {
-        text(String(value.get()));
-      });
+      div({ class: changed ? "changed" : "" }, String(value.get()));
     },
   };
 });
@@ -86,7 +88,7 @@ const Animated = view(({ use }) => {
 
 ## onUpdateAfter
 
-Runs synchronously after each re-render (not on the first render). The DOM/output reflects the new state:
+Runs after each re-render (not on the first render). Like `onMount`, these callbacks are batched and run once the whole render pass has finished, so the DOM/output reflects the new state:
 
 ```ts
 const WordCount = view<{ text: string }>(({ props, use }) => {
@@ -95,7 +97,9 @@ const WordCount = view<{ text: string }>(({ props, use }) => {
   return {
     onUpdateAfter() {
       // Props just changed; derive a value from them and push it somewhere.
-      count.set(props().text.trim().split(/\s+/).filter(Boolean).length);
+      // Guard the set: set() always schedules a re-render, which would loop.
+      const n = props().text.trim().split(/\s+/).filter(Boolean).length;
+      if (n !== count.get()) count.set(n);
       console.log(`re-rendered with ${count.get()} words`);
     },
     render() {
@@ -112,21 +116,25 @@ const WordCount = view<{ text: string }>(({ props, use }) => {
 
 ## Cleanup
 
-When a view is removed from the tree (its parent no longer renders it), the view and all its descendants are disposed automatically during reconciliation. The engine calls the renderer's `unmount` to clean up output artifacts and removes the view from the dirty queue.
+When a view is removed from the tree (its parent no longer renders it), the view and all its descendants are disposed automatically during reconciliation. Descendants are disposed before their ancestors. For each view the engine calls its `dispose` hook, sets the consumer's `ref` to `null`, drops its store subscriptions, calls the renderer's `unmount` to clean up output artifacts, and removes the view from the dirty queue.
 
-There is no dedicated unmount hook. For cleanup of resources (timers, subscriptions, event listeners) started in `onMount`, tie them to module-scoped stores or rely on `setInterval`/`setTimeout` completing on page unload. If you need guaranteed teardown, pair the resource with a reactive `store` and clear it from a parent view when the child is conditionally removed.
+Use `dispose` to tear down resources (timers, subscriptions, event listeners) started in `onMount`:
 
 ```ts
 const Poller = view(({ use }) => {
   const data = use("");
+  let timer: ReturnType<typeof setInterval> | undefined;
 
   return {
     onMount() {
-      setInterval(() => {
+      timer = setInterval(() => {
         fetch("/api/status")
           .then(r => r.text())
           .then(t => data.set(t));
       }, 5000);
+    },
+    dispose() {
+      clearInterval(timer);
     },
     render() {
       text(data.get());

@@ -55,6 +55,7 @@ my-app/
 |--------|---------|-------------|
 | `dev` | `vite` | Frontend dev server only |
 | `build` | `vite build` | Build frontend to `dist/` |
+| `preview` | `vite preview` | Preview the built frontend |
 | `tauri:dev` | `tauri dev` | Full desktop app with hot reload |
 | `tauri:build` | `tauri build` | Production desktop build |
 

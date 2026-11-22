@@ -386,7 +386,7 @@ const PromotionDialog = view<{
     div({ class: "promo-overlay" }, () => {
       div({ class: "promo-dialog" }, () => {
         for (const t of ["Q", "R", "B", "N"] as PieceType[]) {
-          button({ class: "promo-btn", onClick: () => onSelect(t) },
+          button({ class: "promo-btn", on: { click: () => onSelect(t) } },
             pieceChar({ color, type: t }));
         }
       });
@@ -417,6 +417,7 @@ const SquareView = view<{
     props().onPointerDown(e);
   };
   const handleUp = () => props().onPointerUp();
+  const squareEvents = { pointerDown: handleDown, pointerUp: handleUp };
 
   return {
     render() {
@@ -432,7 +433,7 @@ const SquareView = view<{
       ].filter(Boolean).join(" ");
 
       div(
-        { class: cls, onPointerDown: handleDown, onPointerUp: handleUp },
+        { class: cls, on: squareEvents },
         () => {
           if (p.piece) {
             span(
@@ -561,6 +562,8 @@ const App = view(({ use }) => {
     lastMove.set(null);
   };
 
+  const appEvents = { pointerMove: handlePointerMove, pointerUp: handlePointerUp };
+
   return {
     render() {
       const g = game.get();
@@ -577,13 +580,12 @@ const App = view(({ use }) => {
       div(
         {
           class: d ? "chess-app dragging-active" : "chess-app",
-          onPointerMove: handlePointerMove,
-          onPointerUp: handlePointerUp,
+          on: appEvents,
         },
         () => {
           div({ class: "header" }, () => {
             span({ class: "title" }, "Chess");
-            button({ class: "reset-btn", onClick: resetGame }, "New Game");
+            button({ class: "reset-btn", on: { click: resetGame } }, "New Game");
           });
 
           StatusBar({ game: g });

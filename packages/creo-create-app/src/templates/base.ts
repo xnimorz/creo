@@ -127,7 +127,7 @@ createApp(
 }
 
 export function appTs(): string {
-  return `import { view, div, h1, button, text } from "creo";
+  return `import { view, div, h1, button, _ } from "creo";
 
 export const App = view(({ use }) => {
   const count = use(0);
@@ -135,13 +135,9 @@ export const App = view(({ use }) => {
 
   return {
     render() {
-      div({}, () => {
-        h1({}, () => {
-          text("Creo App");
-        });
-        button({ on: { click: increment } }, () => {
-          text(\`Count: \${count.get()}\`);
-        });
+      div(_, () => {
+        h1(_, "Creo App");
+        button({ on: { click: increment } }, \`Count: \${count.get()}\`);
       });
     },
   };

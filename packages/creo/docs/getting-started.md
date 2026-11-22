@@ -21,11 +21,12 @@ Creo is a pure JavaScript/TypeScript package with no runtime dependencies. It sh
 
 Components are created with `view()`. The function receives a **context object** (here named `ctx`) and returns a `ViewBody` — an object containing at minimum a `render()` function and, optionally, lifecycle hooks (`onMount`, `onUpdateAfter`, etc.).
 
-The context is how your component reads inputs and creates state. It has three members:
+The context is how your component reads inputs and creates state. It has four members:
 
 - **`ctx.props()`** — a function that returns the current props. Always call it (don't destructure) so you read the latest values on every render.
 - **`ctx.use(initial)`** — creates reactive local state, or subscribes to a global `store`. Must be called in the view body, not inside `render()`.
-- **`ctx.slot`** — the children the parent passed in. Call it (`ctx.slot?.()`) to render them.
+- **`ctx.slot`** — the children the parent passed in. Call it (`ctx.slot()`) or pass it as a primitive's slot to render them; it's a no-op when the caller passed none.
+- **`ctx.ref(api)`** — publishes an API object into the consumer's `ref` prop (see [view()](#/view)).
 
 Most code destructures what it needs: `({ props, use, slot }) => ...`.
 
@@ -125,7 +126,7 @@ Notice the two slot forms in play:
 
 As a rule: reach for a function slot when you need to render more than one thing or use control flow (`if`, `for`); use a string slot whenever a single piece of text is enough.
 
-`use()` calls must appear in the body of the view function (before `return`), never inside `render()`. Call order must be stable across re-renders (same rule as React hooks).
+`use()` calls must appear in the body of the view function (before `return`), never inside `render()`. The view function body runs once per view instance — only `render()` re-runs — so each `use()` call creates its state exactly once.
 
 ## Composing components
 
@@ -151,7 +152,7 @@ Card(_, () => {
 When a component does not need children, omit the second argument:
 
 ```ts
-Counter({ initial: 0 });
+Counter();
 ```
 
 ## Full example

@@ -87,14 +87,14 @@ Creo allows any renderer overrides.
 
 - **`HtmlRender`** — DOM output for browsers
 - **`JsonRender`** — JSON AST for testing and serialization
-- **`HtmlStringRenderer`** — HTML strings for SSR
+- **`HtmlStringRender`** — HTML strings for SSR
 
 ```ts
 // Browser
 createApp(() => App(), new HtmlRender(document.getElementById("app")!)).mount();
 
 // Server
-const renderer = new StringRender();
+const renderer = new HtmlStringRender();
 const engine = new Engine(renderer);
 engine.createRoot(() => App(), {});
 engine.render();
@@ -113,7 +113,7 @@ const Counter = view<{ initial: number }>(({ props, use }) => {
 
   return {
     render() {
-      button({ onClick: increment }, () => {
+      button({ on: { click: increment } }, () => {
         text(count.get());
       });
     },
@@ -154,7 +154,7 @@ const Toggle = view(({ use }) => {
 
   return {
     render() {
-      button({ onClick: toggle }, () => {
+      button({ on: { click: toggle } }, () => {
         text(on.get() ? "ON" : "OFF");
       });
     },
@@ -267,11 +267,11 @@ div(_, () => { ... });   // not div({}, () => { ... })
 Pass strings directly as slots instead of wrapping in `() => text(...)`:
 
 ```ts
-button({ onClick: handler }, "Click me");   // not () => text("Click me")
-li(_, "Item text");                         // not () => text("Item text")
+button({ on: { click: handler } }, "Click me"); // not () => text("Click me")
+li(_, "Item text");                             // not () => text("Item text")
 ```
 
-Use `text()` only for dynamic values or when mixing text with other elements in a function slot.
+Use `text()` only for numbers (string slots take strings, static or dynamic) or when mixing text with other elements in a function slot.
 
 ## Create App
 
