@@ -6,12 +6,9 @@ const root = import.meta.dir;
 const outDir = resolve(root, "dist");
 const repoRoot = resolve(root, "../..");
 
-// Clean
 await $`rm -rf ${outDir}`;
 
-// Copy guidance docs into the package so they ship in the npm tarball.
-// Source-of-truth lives at the repo root / under docs/; we mirror on every
-// build so the published package and the repo never drift.
+// Mirror repo docs into the package so the npm tarball never drifts
 await copyFile(resolve(repoRoot, "CHANGELOG.md"), resolve(root, "CHANGELOG.md"));
 await copyFile(resolve(repoRoot, "AGENTS.md"), resolve(root, "AGENTS.md"));
 
@@ -29,7 +26,6 @@ async function copyFile(src: string, dest: string): Promise<void> {
   console.log(`  copied ${relative(root, dest)}`);
 }
 
-// 1. Bundle JS (ESM) via Bun
 const result = await Bun.build({
   entrypoints: [resolve(root, "src/index.ts")],
   outdir: outDir,
@@ -46,7 +42,7 @@ if (!result.success) {
   process.exit(1);
 }
 
-// 2. Emit .d.ts via tsc, then resolve @/ path aliases
+// Resolve @/ aliases in emitted .d.ts
 await $`bunx tsc -p tsconfig.build.json`;
 await $`bunx tsc-alias -p tsconfig.build.json`;
 

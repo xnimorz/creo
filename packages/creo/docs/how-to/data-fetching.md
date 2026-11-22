@@ -32,7 +32,7 @@ const UserProfile = view<{ id: string }>(({ props, use }) => {
       if (loading.get()) return Spinner();
       if (error.get()) return ErrorBanner({ message: error.get()! });
       const u = user.get();
-      if (!u) return null;
+      if (!u) return;
       UserCard({ user: u });
     },
   };
@@ -52,7 +52,7 @@ const refresh = () => user.update(async (current) => {
 
 ## Refetching on prop change
 
-Use `shouldUpdate` combined with `onUpdateAfter` to refetch when a prop changes:
+Use `onUpdateAfter` to refetch when a prop changes:
 
 ```ts
 const UserProfile = view<{ id: string }>(({ props, use }) => {

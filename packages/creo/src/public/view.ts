@@ -6,14 +6,13 @@ import type { $primitive } from "./primitive";
 import type { Wildcard } from "@/internal/wildcard";
 
 // ---------------------------------------------------------------------------
-// Refs — used both for primitive elements and for view-exposed APIs.
+// Refs
 // ---------------------------------------------------------------------------
 
 export type RefCallback<T> = (value: T | null) => void;
 export type RefObject<T> = { current: T | null };
 export type Ref<T> = RefCallback<T> | RefObject<T>;
 
-/** Apply a value (or null) to either ref shape. Engine + renderer share this. */
 export function applyRef<T>(ref: Maybe<Ref<T>>, value: T | null): void {
   if (!ref) return;
   if (typeof ref === "function") ref(value);
@@ -33,16 +32,12 @@ export type ViewBody<Props> = {
   dispose?: () => void;
 };
 
-/** Slot callback — passed by the caller at the call site. */
 export type Slot = () => void;
 
-/** What callers may pass as a slot: a callback or a plain string (rendered as text). */
+/** A string slot renders as text. */
 export type SlotContent = Slot | string;
 
-/**
- * Setter handed to the viewFn for publishing an api into the consumer's `ref`.
- * Typically called once during the body. Subsequent calls overwrite.
- */
+/** Publishes an api into the consumer's `ref`; later calls overwrite. */
 export type RefSetter<Api> = (value: Api) => void;
 
 export type ViewFn<Props, Api> = {
@@ -55,11 +50,7 @@ export type ViewFn<Props, Api> = {
   [$primitive]?: string;
 };
 
-/**
- * Caller-facing props type. Allows `void` when Props is void or all-optional.
- * `ref` is added alongside `key`; its element type is whatever the view
- * publishes via `ctx.ref(...)`.
- */
+/** Caller-facing props; `void` allowed when Props is void or all-optional. */
 type ViewProps<Props, Api> = Props extends void
   ? { key?: Key; ref?: Ref<Api> } | void
   : {} extends Props

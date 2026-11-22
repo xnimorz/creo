@@ -18,10 +18,7 @@ export const Layout = view(({ slot, use }) => {
       const currentSlug = route.get().path.replace(/^\/+/, "");
       const docShell = isDocRoute(currentSlug);
 
-      // NOTE: structure is intentionally stable across routes. Sidebar + body
-      // frame are toggled via CSS classes rather than conditional rendering, so
-      // the slot (RouterView) is never wrapped by a primitive that gets
-      // disposed on route transitions.
+      // Stable structure (CSS toggles, not conditionals) so RouterView's host is never disposed
       const layoutClass =
         "layout" +
         (mobileOpen.get() ? " nav-open" : "") +

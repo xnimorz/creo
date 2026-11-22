@@ -7,10 +7,12 @@
 ```ts
 function view<Props = void, Api = void>(
   viewFn: ViewFn<Props, Api>
-): (props: Props & { key?: Key }, slot?: Slot) => void;
+): (props: Props & { key?: Key; ref?: Ref<Api> }, slot?: SlotContent) => void;
 ```
 
-When `Props` is `void` (no props), the returned function can be called with no arguments:
+`SlotContent` is `(() => void) | string` — a string slot renders as a text node.
+
+When `Props` is `void` (no props) or all its fields are optional, the returned function can be called with no arguments:
 
 ```ts
 const App = view((ctx) => ({
@@ -22,13 +24,14 @@ App(); // no args needed
 
 ## ViewFn and context
 
-The function passed to `view()` receives a **context object** (`ctx`) with three fields:
+The function passed to `view()` receives a **context object** (`ctx`) with four fields:
 
 ```ts
 const MyComponent = view<{ title: string }>((ctx) => {
-  // ctx.props    -- function that returns the current props object
-  // ctx.use      -- factory to create reactive state or subscribe to stores
-  // ctx.children -- pre-collected PendingView[] from the parent slot
+  // ctx.props -- function that returns the current props object
+  // ctx.use   -- factory to create reactive state or subscribe to stores
+  // ctx.slot  -- renders the children passed by the caller
+  // ctx.ref   -- publishes an API object into the consumer's `ref`
 
   return {
     render() { /* ... */ },
@@ -43,7 +46,7 @@ A function that returns the current props passed by the parent. Call `ctx.props(
 ```ts
 const Label = view<{ text: string }>((ctx) => ({
   render() {
-    span({}, () => { text(ctx.props().text); });
+    span(_, ctx.props().text);
   },
 }));
 ```
@@ -58,7 +61,7 @@ const Good = view<{ title: string }>((ctx) => ({
 
 ### ctx.use
 
-A factory function to create reactive state or subscribe to stores. See [State](./state.md) and [Store](./store.md).
+A factory function to create reactive state or subscribe to stores. See [State](#/state) and [Store](#/store).
 
 ```ts
 const count = ctx.use(0);            // Reactive<number> — local state
@@ -66,40 +69,40 @@ const items = ctx.use<string[]>([]); // Reactive<string[]> — local state
 const theme = ctx.use(ThemeStore);   // Reactive<string> — store subscription
 ```
 
-### ctx.children
+### ctx.slot
 
-An array of `PendingView` objects representing the children passed by the caller's slot. Pass `ctx.children` directly to a primitive's second argument to render them:
+A function that renders the children passed by the caller's slot. Call `ctx.slot()` inside `render()`, or pass it directly as a primitive's second argument:
 
 ```ts
 const Wrapper = view((ctx) => ({
   render() {
-    div({ class: "wrapper" }, ctx.children);
+    div({ class: "wrapper" }, ctx.slot);
   },
 }));
 ```
 
-If the caller provided no slot, `ctx.children` is an empty array.
+If the caller provided no slot, `ctx.slot()` renders nothing.
+
+### ctx.ref
+
+Publishes an API object into the consumer's `ref` prop. See "Exposing an API via `ref`" below.
 
 ## ViewBody
 
 The viewFn must return a `ViewBody` object. The only required field is `render`:
 
 ```ts
-type ViewBody<Props, Api> = {
+type ViewBody<Props> = {
   render: () => void;
-  mount?: {
-    before?: () => void;
-    after?: () => void;
-  };
-  update?: {
-    should?: (nextProps: Props) => boolean;
-    before?: () => void;
-    after?: () => void;
-  };
+  onMount?: () => void;
+  shouldUpdate?: (nextProps: Props) => boolean;
+  onUpdateBefore?: () => void;
+  onUpdateAfter?: () => void;
+  dispose?: () => void;
 };
 ```
 
-When `Api` is provided (not `void`), ViewBody also includes an `api` field. See [Exposing an API](#exposing-an-api) below.
+The `Api` type parameter is not part of ViewBody — a view publishes its API by calling `ctx.ref(...)`. See "Exposing an API via `ref`" below.
 
 ### render()
 
@@ -108,7 +111,7 @@ Called on every render cycle. Inside `render()`, call primitives and child compo
 ```ts
 render() {
   div({ class: "header" }, () => {
-    h1({}, () => { text("Title"); });
+    h1(_, "Title");
   });
   div({ class: "body" }, () => {
     text("Content");
@@ -123,7 +126,7 @@ render() {
   if (isEditing.get()) {
     input({ value: draft.get(), on: { input: handleInput } });
   } else {
-    span({}, () => { text(value.get()); });
+    span(_, () => { text(value.get()); });
   }
 
   for (const item of items.get()) {
@@ -134,7 +137,7 @@ render() {
 
 ### Lifecycle hooks
 
-See [Lifecycle](./lifecycle.md) for details on `mount` and `update`.
+See [Lifecycle](#/lifecycle) for details on `onMount`, `shouldUpdate`, `onUpdateBefore`, `onUpdateAfter`, and `dispose`.
 
 ## Calling components
 
@@ -148,7 +151,7 @@ MyComponent();
 Counter({ initial: 5 });
 
 // With children (slot)
-Card({}, () => {
+Card(_, () => {
   text("Inside the card");
 });
 
@@ -176,7 +179,7 @@ provider side: the renderer pushes the DOM `Element` into a primitive's ref;
 inside a composite, you push an API object yourself by calling `ctx.ref(...)`.
 
 ```ts
-import { view, type RefObject } from "creo";
+import { view, input, type RefObject } from "creo";
 
 const TextInput = view<{ placeholder: string }, { focus: () => void }>(
   ({ props, ref }) => {

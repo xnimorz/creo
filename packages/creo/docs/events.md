@@ -7,7 +7,7 @@ Creo collects event handlers under a single `on` prop on primitives.
 Define event handler functions in the view function body, before returning the ViewBody. Reference them in render:
 
 ```ts
-import { view, button, input, text } from "creo";
+import { view, button, input } from "creo";
 import type { PointerEventData, InputEventData } from "creo";
 
 const MyForm = view((ctx) => {
@@ -28,7 +28,7 @@ const MyForm = view((ctx) => {
         placeholder: "Type here...",
         on: { input: handleInput },
       });
-      button({ on: { click: handleClick } }, () => { text("Submit"); });
+      button({ on: { click: handleClick } }, "Submit");
     },
   };
 });
@@ -47,6 +47,7 @@ Event handlers live under a single `on` key. Event names are the camelCase form 
 | `pointerDown` | Pointer button pressed | `PointerEventData` |
 | `pointerUp` | Pointer button released | `PointerEventData` |
 | `pointerMove` | Pointer moved | `PointerEventData` |
+| `pointerCancel` | Pointer interaction cancelled | `PointerEventData` |
 | `pointerEnter` / `pointerLeave` | Hover boundary (per-target, no walk) | `PointerEventData` |
 | `pointerOver` / `pointerOut` | Hover boundary (bubbling) | `PointerEventData` |
 | `contextmenu` | Right-click / context menu | `PointerEventData` |
@@ -67,6 +68,7 @@ Event handlers live under a single `on` key. Event names are the camelCase form 
 | `command` | Invoker Commands API receiver | `CommandEventData` |
 | `scroll` | Scrolled (passive) | `ScrollEventData` |
 | `load` / `error` | Resource loaded or failed | `LoadEventData` / `ErrorEventData` |
+| `play` / `pause` / `ended` / `timeUpdate` / `volumeChange` / `loadedMetadata` / `loadedData` / `canPlay` / `canPlayThrough` / `durationChange` / `rateChange` / `seeking` / `seeked` / `stalled` / `waiting` | Media playback (on `<audio>` / `<video>`) | `MediaEventData` |
 
 ## Event data types
 
@@ -85,10 +87,19 @@ type BaseEventData = {
 type PointerEventData = BaseEventData & {
   x: number;  // clientX
   y: number;  // clientY
+  pointerId: number;
+  pointerType: "mouse" | "touch" | "pen" | "";
+  button: number;
+  buttons: number;
+  target: HTMLElement;
+  currentTarget: HTMLElement; // element the handler is bound to
+  capture: () => void;        // setPointerCapture on currentTarget
+  release: () => void;        // releasePointerCapture on currentTarget
+  nativeEvent: Event;         // underlying DOM event (escape hatch)
 };
 ```
 
-Used by `click`, `dblclick`, `pointerDown`, `pointerUp`, `pointerMove`.
+Used by `click`, `dblclick`, `contextmenu`, and all `pointer*` events. `WheelEventData` and `DragEventData` extend it.
 
 ### KeyEventData
 
@@ -105,7 +116,8 @@ Used by `keyDown`, `keyUp`.
 
 ```ts
 type InputEventData = BaseEventData & {
-  value: string;  // current input value
+  value: string;    // current input value
+  checked: boolean; // checkbox / radio state
 };
 ```
 
@@ -121,7 +133,7 @@ Used by `focus`, `blur`. Contains only the base methods.
 
 ## Event type maps
 
-Creo defines two event maps that determine which events a primitive supports:
+Creo defines event maps that determine which events a primitive supports:
 
 ### ContainerEvents
 
@@ -134,10 +146,30 @@ type ContainerEvents = {
   pointerDown: (e: PointerEventData) => void;
   pointerUp: (e: PointerEventData) => void;
   pointerMove: (e: PointerEventData) => void;
+  pointerCancel: (e: PointerEventData) => void;
+  pointerEnter: (e: PointerEventData) => void;
+  pointerLeave: (e: PointerEventData) => void;
+  pointerOver: (e: PointerEventData) => void;
+  pointerOut: (e: PointerEventData) => void;
+  wheel: (e: WheelEventData) => void;
+  contextmenu: (e: PointerEventData) => void;
   keyDown: (e: KeyEventData) => void;
   keyUp: (e: KeyEventData) => void;
   focus: (e: FocusEventData) => void;
   blur: (e: FocusEventData) => void;
+  scroll: (e: ScrollEventData) => void;
+  load: (e: LoadEventData) => void;
+  error: (e: ErrorEventData) => void;
+  dragStart: (e: DragEventData) => void;
+  dragEnd: (e: DragEventData) => void;
+  dragOver: (e: DragEventData) => void;
+  dragEnter: (e: DragEventData) => void;
+  dragLeave: (e: DragEventData) => void;
+  drop: (e: DragEventData) => void;
+  copy: (e: ClipboardEventData) => void;
+  cut: (e: ClipboardEventData) => void;
+  paste: (e: ClipboardEventData) => void;
+  command: (e: CommandEventData) => void;
 };
 ```
 
@@ -149,8 +181,15 @@ Extends `ContainerEvents` with input-specific events. Applies to `input`, `texta
 type FormEvents = ContainerEvents & {
   input: (e: InputEventData) => void;
   change: (e: InputEventData) => void;
+  invalid: (e: BaseEventData) => void;
 };
 ```
+
+### Other maps
+
+- `FormSubmitEvents` — `ContainerEvents` plus `submit` / `reset`. Applies to `form`.
+- `MediaEvents` — `ContainerEvents` plus the media playback events. Applies to `audio`, `video`.
+- `DisclosureEvents` — `ContainerEvents` plus `toggle` / `beforeToggle`. Applies to `details`, `dialog`.
 
 ## Examples
 
@@ -233,6 +272,7 @@ Built-in commands include `show-modal`, `close`, `request-close`, `show-popover`
 ### Drag and drop
 
 ```ts
+import { view, div } from "creo";
 import type { DragEventData } from "creo";
 
 const Draggable = view(() => {
@@ -264,7 +304,7 @@ const NoContextMenu = view((ctx) => ({
     div(
       {
         on: {
-          click: (e: PointerEventData) => {
+          contextmenu: (e: PointerEventData) => {
             e.preventDefault();
             e.stopPropagation();
           },
@@ -284,7 +324,8 @@ The renderer short-circuits the per-event diff when `prev.on === next.on`. Two p
 
 ```ts
 // Pattern A — declare the events object once, reuse it across renders.
-const Counter = view(() => {
+const Counter = view(({ use }) => {
+  const count = use(0);
   const inc = () => count.update(n => n + 1);
   const events = { click: inc };
 

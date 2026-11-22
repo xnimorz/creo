@@ -68,9 +68,7 @@ function matchRoute(
 function getHashPath(): string {
   const hash = window.location.hash;
   if (!hash || hash === "#" || hash === "#!") return "/";
-  // Strip leading # or #!
   const raw = hash.startsWith("#!") ? hash.slice(2) : hash.slice(1);
-  // Normalize: ensure leading slash, strip trailing slash (except root)
   const normalized = raw.startsWith("/") ? raw : "/" + raw;
   return normalized.length > 1 && normalized.endsWith("/")
     ? normalized.slice(0, -1)
@@ -82,13 +80,11 @@ function getHashPath(): string {
 // ---------------------------------------------------------------------------
 
 export function createRouter(config: RouterConfig) {
-  // Compile routes once
   const compiled: CompiledRoute[] = config.routes.map((r) => ({
     ...compilePath(r.path),
     view: r.view,
   }));
 
-  // Resolve a path to a Route object
   const resolve = (path: string): Route => {
     const result = matchRoute(path, compiled);
     return result
@@ -96,26 +92,21 @@ export function createRouter(config: RouterConfig) {
       : { path, params: {} };
   };
 
-  // Find the view for a path (or fallback)
   const findView = (path: string): (() => void) => {
     const result = matchRoute(path, compiled);
     return result ? result.view : config.fallback;
   };
 
-  // Route store — single source of truth
   const routeStore: Store<Route> = store.new(resolve(getHashPath()));
 
-  // Listen to hash changes (back/forward, manual edits)
   window.addEventListener("hashchange", () => {
     routeStore.set(resolve(getHashPath()));
   });
 
-  // Programmatic navigation
   const navigate = (path: string): void => {
     window.location.hash = "#" + path;
   };
 
-  // RouterView — subscribes to store, renders matched route
   const RouterView = view(({ use }) => {
     const route = use(routeStore);
 
@@ -126,7 +117,6 @@ export function createRouter(config: RouterConfig) {
     };
   });
 
-  // Link — renders an <a> with click interception
   const Link = view<{ href: string; class?: string }>(({ props, slot }) => {
     const handleClick = (e: PointerEventData) => {
       e.preventDefault();

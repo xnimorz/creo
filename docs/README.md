@@ -65,5 +65,5 @@ The Vite config uses `base: "./"` so the build works at any path.
 
 - Editor: CodeMirror 6 with TypeScript highlighting + the one-dark theme.
 - Compile: `sucrase` strips TypeScript types in the browser.
-- Runtime: the compiled JS runs inside a sandboxed iframe (srcdoc) with an import map that resolves `creo` and `creo-router` from `esm.sh`. Errors from module loading or execution are caught via `error` / `unhandledrejection` listeners.
-- The playground always targets the published version of Creo (see `CREO_VERSION` in `src/views/Playground.ts`), not the workspace source, so recipes keep working when deployed.
+- Runtime: the compiled JS runs inside a sandboxed iframe (srcdoc) with an import map that resolves `creo` and `creo-router` to the workspace builds (`packages/creo/dist`, `packages/creo-router/dist`, bundled as `?url` assets). Errors from module loading or execution are caught via `error` / `unhandledrejection` listeners.
+- Because of that, build the packages (`bun run build` at the repo root) before running or building the docs site; the playground tracks the workspace source, not the published version.

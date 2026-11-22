@@ -12,13 +12,12 @@ export function shallowEqual(a: Wildcard, b: Wildcard): boolean {
     return false;
   }
 
-  // Single-walk-with-count: avoid Object.keys() allocations and the slower
-  // Object.is semantics (NaN/-0 distinctions don't matter for props).
+  // Count keys instead of Object.keys() to avoid allocations
   let countA = 0;
   for (const key in a) {
     countA++;
     if (a[key] === b[key]) continue;
-    // One-level deeper for the conventional event-handler object.
+    // `on` handler object compared one level deep
     if (key === "on" && shallowEqual(a[key], b[key])) continue;
     return false;
   }
@@ -26,8 +25,6 @@ export function shallowEqual(a: Wildcard, b: Wildcard): boolean {
   let countB = 0;
   for (const _ in b) {
     countB++;
-    // Early bail: b has at least one key not in a (since all a's keys
-    // matched, any extra in b means counts must diverge).
     if (countB > countA) return false;
   }
 

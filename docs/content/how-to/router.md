@@ -28,7 +28,7 @@ const { routeStore, navigate, RouterView, Link } = createRouter({
 Routes support:
 
 - Static segments: `/about`
-- Dynamic params: `/users/:id`, read via `route.params.id`
+- Dynamic params: `/users/:id`, read via `route.get().params.id`
 
 ## Rendering
 

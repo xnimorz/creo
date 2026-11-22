@@ -6,7 +6,6 @@ import { scaffold } from "./scaffold";
 async function main(): Promise<void> {
   console.log("\ncreo-create-app\n");
 
-  // Project name from CLI arg or prompt
   let name = process.argv[2] || "";
   if (!name) {
     name = await askText("Project name", "my-creo-app");
@@ -20,16 +19,13 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  // Server setup
   const withServer = await askYesNo("Include a server (Hono)?", false);
 
   closePrompt();
 
-  // Scaffold
   console.log("");
   scaffold({ name, dir, withServer });
 
-  // Summary
   console.log(`\u2713 Created "${name}" in ${dir}\n`);
 
   if (withServer) {

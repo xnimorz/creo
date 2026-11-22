@@ -18,8 +18,8 @@ createApp(() => App(), new HtmlRender(container)).mount();
 `HtmlRender` handles:
 - Creating and updating DOM elements
 - Attribute diffing (only changed attributes are touched)
-- Event listener binding and cleanup
-- DOM properties (`value`, `checked`, `selected`) set directly instead of via `setAttribute`
+- Event handling (`on: { ... }`) via delegated listeners on the container
+- DOM properties (`value`, `checked`, `selected`, `indeterminate`, `muted`) set directly instead of via `setAttribute`
 - Keyed reordering of child nodes
 - Boolean attribute handling (`disabled`, `hidden`, etc.)
 - `autofocus` support on mount
@@ -30,19 +30,24 @@ Produces a JSON tree representation of the UI. Useful for testing and serializat
 
 ```ts
 import { createApp, JsonRender } from "creo";
-import type { JsonNode } from "creo";
+import type { JsonNode, Maybe } from "creo";
 
 const renderer = new JsonRender();
 createApp(() => App(), renderer).mount();
 
-const tree: JsonNode | undefined = renderer.root;
+const tree: Maybe<JsonNode> = renderer.root;
 // {
-//   type: "div",
-//   props: { class: "app" },
-//   children: [ ... ],
-//   key: undefined
+//   type: "composite",   // the app root -- every composite view is a "composite" node
+//   props: {},
+//   children: [
+//     { type: "composite", props: {}, children: [   // App()
+//       { type: "div", props: { class: "app" }, children: [ ... ] },
+//     ] },
+//   ],
 // }
 ```
+
+Primitives use their tag as `type`; text nodes are `{ type: "text", props: { content } }`.
 
 The `JsonNode` type:
 
@@ -55,21 +60,21 @@ type JsonNode = {
 };
 ```
 
-### StringRender
+### HtmlStringRender
 
 Produces an HTML string from the virtual DOM. Useful for server-side rendering.
 
 ```ts
-import { createApp, StringRender } from "creo";
+import { createApp, HtmlStringRender } from "creo";
 
-const renderer = new StringRender();
+const renderer = new HtmlStringRender();
 createApp(() => App(), renderer).mount();
 
 const html: string = renderer.renderToString();
 // "<div><h1>Hello</h1><p>World</p></div>"
 ```
 
-`StringRender` is pull-based -- `render()` and `unmount()` are essentially no-ops. Call `renderToString()` to walk the virtual DOM and build the HTML string on demand.
+`HtmlStringRender` is pull-based -- `render()` and `unmount()` are essentially no-ops. Call `renderToString()` to walk the virtual DOM and build the HTML string on demand (composite views are transparent; the output matches `HtmlRender`'s `innerHTML`).
 
 ## The IRender interface
 
@@ -77,89 +82,64 @@ All renderers implement `IRender<Output>`:
 
 ```ts
 interface IRender<Output> {
-  /** Create output if view is new, or update if existing. */
-  render(view: BaseView): void;
+  /** Set by the Engine constructor. */
+  engine: Engine;
+
+  /** Create output if view has no renderRef, else update. */
+  render(view: ViewRecord): void;
 
   /** Remove a view's output artifacts. Called on disposal. */
-  unmount(view: BaseView): void;
+  unmount(view: ViewRecord): void;
 
-  /** Register render handlers for custom primitive components. */
-  registerPrimitive(
-    entries: [PrimitiveComponent<any, any>, PrimitiveRenderHandler<Output>][],
-  ): void;
+  /**
+   * Optional: beginMount(root) → render() pre-order, attach() post-order → endMount(root).
+   * `anchor` undefined = compute; the returned anchor is reused for following siblings.
+   */
+  beginMount?(root: ViewRecord, anchor?: unknown): unknown;
+  attach?(view: ViewRecord): void;
+  endMount?(root: ViewRecord): void;
+
+  /** Optional: live output drifted from shallow-equal props (e.g. user typed into an input). */
+  shouldReassert?(view: ViewRecord, nextProps: unknown): boolean;
 }
 ```
 
-The `Output` type parameter describes what each primitive produces (e.g., `HTMLElement | Text` for HtmlRender, `JsonNode` for JsonRender, `string` for StringRender).
+The `Output` type parameter describes what each primitive produces (e.g., `HTMLElement | Text` for HtmlRender, `JsonNode` for JsonRender, `string` for HtmlStringRender).
+
+`render()` is called for every view, composite or primitive. Mounting a new subtree is depth-first: `render()` runs pre-order (parent before children) and `attach()` post-order, so a renderer can build a detached subtree and insert it once -- that is what `HtmlRender` does. Renderers that don't need this (`JsonRender`, `HtmlStringRender`) omit the optional hooks.
 
 ## Custom renderers
 
 To create a custom renderer, implement `IRender<YourOutput>`:
 
 ```ts
-import type { IRender, PrimitiveRenderHandler } from "creo";
-import type { PrimitiveComponent } from "creo";
-import type { BaseView } from "creo"; // available via internal types
+import { $primitive } from "creo";
+import type { IRender, Engine } from "creo";
+
+// ViewRecord isn't exported; derive it from the interface
+type ViewRecord = Parameters<IRender<unknown>["render"]>[0];
 
 class CanvasRender implements IRender<void> {
+  engine!: Engine;
   private ctx: CanvasRenderingContext2D;
 
   constructor(canvas: HTMLCanvasElement) {
     this.ctx = canvas.getContext("2d")!;
   }
 
-  render(view: BaseView): void {
-    // Draw or update based on view.props, view.renderRef, etc.
+  render(view: ViewRecord): void {
+    const tag = view.viewFn[$primitive]; // undefined for composite views
+    // Draw or update based on tag, view.props, view.renderRef, etc.
   }
 
-  unmount(view: BaseView): void {
+  unmount(view: ViewRecord): void {
     // Clean up any resources
     view.renderRef = undefined;
   }
-
-  registerPrimitive(
-    entries: [PrimitiveComponent<any, any>, PrimitiveRenderHandler<void>][],
-  ): void {
-    // Store handlers for custom primitives
-  }
 }
 ```
 
-## Registering custom primitives
-
-When you create a primitive with `primitive()` (not `html()`), you must register a render handler on the renderer so it knows how to produce output:
-
-```ts
-import { primitive, createApp, HtmlRender } from "creo";
-
-// Define a custom primitive
-const sparkline = primitive<{ data: number[]; width: number; height: number }>();
-
-// Create renderer and register the handler
-const renderer = new HtmlRender(document.getElementById("app")!);
-renderer.registerPrimitive([
-  [sparkline, {
-    render(view) {
-      const canvas = document.createElement("canvas");
-      canvas.width = view.props.width;
-      canvas.height = view.props.height;
-      // draw sparkline on canvas...
-      return canvas;
-    },
-  }],
-]);
-
-// Now sparkline() can be used in render functions
-createApp(() => App(), renderer).mount();
-```
-
-The `PrimitiveRenderHandler<Output>` interface:
-
-```ts
-interface PrimitiveRenderHandler<Output> {
-  render(view: BaseView): Output;
-}
-```
+There is no primitive registry: the tag passed to `html(tag)` is the only thing a renderer sees, so custom "primitives" are just `html("sparkline")` with a renderer that branches on `view.viewFn[$primitive]`.
 
 ## Scheduler integration
 

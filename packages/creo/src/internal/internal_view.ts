@@ -28,21 +28,18 @@ export type ViewRecord<
   userKey: Maybe<Key>;
   props: Props;
   slot: Maybe<SlotContent>;
-  // Once ViewRecord moves from Pending to Real state,
-  // it will cache the body of the view, so that ViewFn is called once per View Lifecycle
+  // Cached so viewFn runs once per lifecycle
   body: Maybe<ViewBody<Props>>;
-  // Provided by higher component slot — we calculate children and keep their refs here
+  // Slot children, pre-collected
   sc: Maybe<ViewRecord[]>;
-  // Each renderer provides its own RenderRef type, associated with how the renderer works
+  // Renderer-specific
   renderRef: Maybe<RenderRef>;
 
   flags: BitFlags;
 
   children: Maybe<ViewRecord[]>;
 
-  /** Position in `parent.children`. Maintained by the reconciler so the
-   * renderer can find the next-sibling insertion anchor without an O(n)
-   * `indexOf` scan. -1 means "not yet placed by a reconcile pass". */
+  /** Index in `parent.children`; -1 until placed. */
   pos: number;
 
   keyToView: Maybe<Map<Key, ViewRecord>>;
@@ -50,13 +47,10 @@ export type ViewRecord<
 
   parent: Maybe<ViewRecord>;
 
-  /** The primitive whose .children contains the live sc items after reconcile. */
+  /** Primitive whose .children holds the live sc items. */
   scHost: Maybe<ViewRecord>;
 
-  /**
-   * Last value the viewFn passed to `ctx.ref(...)`. Stored so the engine
-   * can re-apply it when the consumer's `ref` prop changes between renders.
-   */
+  /** Last `ctx.ref(...)` value, re-applied when the consumer's `ref` changes. */
   publicRef: Maybe<unknown>;
 };
 
@@ -64,7 +58,7 @@ export type ViewRecord<
 // Utilities
 // ---------------------------------------------------------------------------
 
-/** Structural change: viewFn, key, or count differs. Does NOT check props. */
+/** viewFn, key, or count differs. Ignores props. */
 export function hasScStructuralChange(
   prev: Maybe<ViewRecord[]>,
   next: Maybe<ViewRecord[]>,

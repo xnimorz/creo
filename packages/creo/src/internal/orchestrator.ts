@@ -1,13 +1,7 @@
 import type { Maybe } from "@/functional/maybe";
 import type { Engine } from "@/internal/engine";
 
-/**
- * Orchestrator is the high-level class, that handles the oveall operations for the UI engine
- *  1. When View is rendered or updated, orchestrator is responsible of bringing the renderer, virtual dom and engine together
- *  2. Keeps track on current views / stores in the app
- *  3. Keeps track on which views need to be updated, which onces are in updating process
- *  4. Sets the current orchestrator scope (e.g. if the app has several Creo renderers)
- */
+/** Tracks the active engine (an app may run several). */
 class Orchestrator {
   #currentEngine: Maybe<Engine>;
 

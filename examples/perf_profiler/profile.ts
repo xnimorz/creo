@@ -101,12 +101,10 @@ const Row = view<{
   onSelect: () => void;
   onRemove: () => void;
 }>((ctx) => ({
-  update: {
-    should(next: any) {
-      return (
-        next.item.label !== ctx.props().item.label || next.selected !== ctx.props().selected
-      );
-    },
+  shouldUpdate(next) {
+    return (
+      next.item.label !== ctx.props().item.label || next.selected !== ctx.props().selected
+    );
   },
   render() {
     tr({ class: ctx.props().selected ? "danger" : "" }, () => {
@@ -210,10 +208,8 @@ console.log(
   `After clear:     views=${countViews(rootView!)} TRs=${container.getElementsByTagName("tr").length}`,
 );
 
-// _prevDom removed — no longer applicable
 console.log(`\n_prevDom: removed ✓`);
 
-// _vdomNode removed — no longer applicable
 console.log(`Stale _vdomNode: removed ✓`);
 
 // ========== Performance ==========

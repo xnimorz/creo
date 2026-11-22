@@ -4,10 +4,8 @@ import { resolve } from "path";
 const root = import.meta.dir;
 const outDir = resolve(root, "dist");
 
-// Clean
 await $`rm -rf ${outDir}`;
 
-// 1. Bundle JS (ESM) via Bun
 const result = await Bun.build({
   entrypoints: [resolve(root, "src/index.ts")],
   outdir: outDir,
@@ -23,13 +21,11 @@ if (!result.success) {
   process.exit(1);
 }
 
-// Prepend shebang for CLI usage
 const outFile = resolve(outDir, "index.js");
 const content = await Bun.file(outFile).text();
 await Bun.write(outFile, `#!/usr/bin/env node\n${content}`);
 await $`chmod +x ${outFile}`;
 
-// 2. Emit .d.ts via tsc
 await $`npx tsc -p tsconfig.build.json`;
 
 console.log("\n\u2713 Build complete \u2192 dist/");

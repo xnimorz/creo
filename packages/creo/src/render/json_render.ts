@@ -20,7 +20,6 @@ export type JsonNode = {
 // ---------------------------------------------------------------------------
 
 export class JsonRender implements IRender<JsonNode> {
-  /** The root JSON node after mount. */
   root: Maybe<JsonNode>;
 
   engine!: Engine;
@@ -34,7 +33,6 @@ export class JsonRender implements IRender<JsonNode> {
     const existing = view.renderRef as Maybe<JsonNode>;
 
     if (!existing) {
-      // Mount
       const node = this.buildNode(view);
       if (!view.parent) {
         this.root = node;
@@ -42,7 +40,6 @@ export class JsonRender implements IRender<JsonNode> {
       }
       const parentNode = view.parent.renderRef as Maybe<JsonNode>;
       if (parentNode) {
-        // view.pos is maintained by the reconciler — no indexOf scan.
         const idx = view.pos;
         if (idx >= 0 && idx < parentNode.children.length) {
           parentNode.children.splice(idx, 0, node);
@@ -53,13 +50,10 @@ export class JsonRender implements IRender<JsonNode> {
       return;
     }
 
-    // Update: reposition + patch props
     if (view.parent) {
       const parentNode = view.parent.renderRef as Maybe<JsonNode>;
       if (parentNode) {
         const targetIdx = view.pos;
-        // Skip the indexOf scan entirely when the node is already in
-        // place (the steady-state for non-moved updates).
         if (targetIdx >= 0 && parentNode.children[targetIdx] !== existing) {
           const oldIdx = parentNode.children.indexOf(existing);
           if (oldIdx !== -1) {
@@ -84,8 +78,7 @@ export class JsonRender implements IRender<JsonNode> {
     const parentNode = view.parent.renderRef as Maybe<JsonNode>;
     if (parentNode) {
       const children = parentNode.children;
-      // view.pos is maintained by the reconciler
-      // We perform it first and then fallback for indexOf
+      // Try view.pos first, fall back to indexOf
       let idx = view.pos;
       if (idx < 0 || idx >= children.length || children[idx] !== childNode) {
         idx = children.indexOf(childNode);

@@ -6,10 +6,7 @@ import { consumePendingAnchor, scrollToAnchor } from "../anchor";
 
 let anchorListenerAttached = false;
 
-// Intercept in-page anchor clicks so they scroll without clobbering the
-// hash-based route. Matches both `.markdown-body a[href^="#"]` (heading
-// anchors) and `.doc-toc a[href^="#"]` (right sidebar TOC), but not
-// `#/route` links.
+// Scroll in-page anchors (headings, TOC) without clobbering the hash route
 const attachAnchorListener = () => {
   if (anchorListenerAttached) return;
   anchorListenerAttached = true;
@@ -17,7 +14,7 @@ const attachAnchorListener = () => {
     const target = e.target as HTMLElement | null;
     if (!target) return;
 
-    // Package-manager tab widget (used by install instructions, etc.)
+    // Package-manager tabs
     const tab = target.closest<HTMLElement>(".pkg-tab[data-pkg]");
     if (tab) {
       const root = tab.closest<HTMLElement>(".pkg-tabs");
@@ -52,13 +49,10 @@ const onDocMount = () => {
   const pending = consumePendingAnchor();
   if (!pending) return;
 
-  // Scroll after the next paint so RawHtml has injected the markdown and
-  // headings with ids exist. Retry once after fonts/images settle so the
-  // heading stays aligned even if layout reflows.
+  // After paint so headings exist; re-align after load for late reflows
   const doScroll = () => scrollToAnchor(pending, false);
   requestAnimationFrame(() => {
     doScroll();
-    // Re-align after the load event in case late reflows shifted things.
     if (document.readyState !== "complete") {
       window.addEventListener("load", doScroll, { once: true });
     } else {

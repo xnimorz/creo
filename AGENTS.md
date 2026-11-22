@@ -16,7 +16,7 @@ packages/creo/                   — Core creo framework
   src/public/store.ts            — Store (global reactive state)
   src/public/app.ts              — createApp() entry point
   src/public/primitives/         — HTML element factories (div, span, text, etc.)
-  src/public/primitive.ts        — $primitive symbol, EventHandlerProps
+  src/public/primitive.ts        — $primitive symbol, PrimitiveProps (events under `on`)
   src/render/html_render.ts      — DOM renderer (event delegation, attribute diffing)
   src/render/json_render.ts      — JSON AST renderer (testing)
   src/render/string_render.ts    — HTML string renderer (SSR)
@@ -26,6 +26,7 @@ packages/creo/                   — Core creo framework
 packages/creo-router/            — Hash-based router (separate package)
 packages/creo-create-app/        — CLI scaffolding tool
 packages/creo-create-tauri-app/  — CLI scaffolding tool (Tauri)
+packages/creo-create-electron-app/ — CLI scaffolding tool (Electron)
 scripts/version.ts               — Version bump orchestrator
 scripts/publish.ts               — Build + publish orchestrator
 ```
@@ -51,13 +52,13 @@ Composites that receive a slot track `view.scHost` — the primitive whose `.chi
 `#patchOrReplace` passes `pendView.sc` to `nextProps` as `preCollectedSc`, avoiding double slot evaluation. The sc items get re-parented to the old view.
 
 ### Event delegation
-HTML renderer uses Inferno-style delegation: one listener per event type on the container element. Handlers are stored on elements via `Symbol.for("creo.ev")`. Zero closures per element — handler mapping happens at dispatch time.
+Primitive handlers live under a single `on: { click, keyDown, ... }` prop (no flat `onClick` props — those would just become string attributes). HTML renderer uses Inferno-style delegation: one listener per event type on the container element. Handlers are stored on elements via `Symbol.for("creo.ev")`. Zero closures per element — handler mapping happens at dispatch time.
 
 ### textContent shortcut
 When a primitive has a single text child, the renderer sets `element.textContent` directly instead of creating a Text node. The text child gets `F_TEXT_CONTENT` flag.
 
 ### Dispose optimization
-When a primitive with DOM is disposed, its children go through `#disposeVirtual` (skips `renderer.unmount`) since removing the parent element removes all descendants from DOM automatically.
+`dispose(view)` is iterative (no recursion, so deep trees can't overflow) and tears nodes down children-first through a single `#disposeNode(view, virtual)`. Descendants of a primitive that has DOM are marked `virtual` and skip `renderer.unmount`, since removing the parent element removes all descendants from DOM automatically.
 
 ## Flags (internal_view.ts)
 
@@ -67,6 +68,7 @@ F_DIRTY        = 1 << 1 — Needs reconcile + render
 F_MOVED        = 1 << 2 — Position changed, needs DOM repositioning
 F_PRIMITIVE    = 1 << 3 — Is an HTML element/text, not a composite
 F_TEXT_CONTENT = 1 << 4 — Text rendered via parent's textContent
+F_DISPOSED     = 1 << 5 — Disposed; markDirty / render loop skip it
 ```
 
 ## Render Loop Flow
@@ -75,19 +77,34 @@ F_TEXT_CONTENT = 1 << 4 — Text rendered via parent's textContent
 markDirty(view) → add to #dirtyQueue Set → schedule()
                                               ↓
 render() processes #dirtyQueue:
-  for each view in Set (visits items added during iteration):
-    1. initViewBody(view) — if F_PENDING, call viewFn once
-    2. isNew = !view.renderRef
-    3. if F_DIRTY:
-       a. reconcile(view) — collect pending children, diff with old
-       b. renderer.render(view) — mount or update DOM
+  for each view in Set (deleted as processed, so re-adds during the pass are still visited):
+    0. skip if F_DISPOSED
+    1. if !view.renderRef (new): beginMount → #mountTree(view) → endMount
+    2. else if F_DIRTY:
+       a. reconcile(view) — collect pending children, diff with old;
+          records a contiguous run of brand-new children (#runFrom/#runTo)
+       b. renderer.render(view) — update DOM
        c. clear F_DIRTY, F_MOVED
-    4. else (F_MOVED only):
+       d. #mountRun — mount the run, all before one shared anchor
+    3. else (F_MOVED only):
        a. renderer.render(view) — reposition DOM
        b. clear F_MOVED
-  #dirtyQueue.clear()
   fire deferred callbacks (onMount, onUpdateAfter)
+
+#mountTree(view) — synchronous, depth-first:
+  initViewBody → reconcile → renderer.render (create, pre-order)
+  → onMount queued → children mounted recursively → renderer.attach (post-order)
 ```
+
+### Fresh-subtree mounting
+New subtrees never go through the dirty queue node-by-node. `HtmlRender`
+creates elements in `render()` but inserts them in `attach()`: inside the
+subtree they `appendChild` into a still-detached parent, and only the
+top-level nodes are inserted into the live DOM before the anchor computed
+in `beginMount`. Element refs and `autofocus` are deferred to `endMount`,
+when the subtree is in the document. Only new views from the middle diff and
+viewFn replacements are still queued individually, since they must wait for
+sibling moves. onMount order is depth-first, parent before children.
 
 ## Reconciliation Algorithm
 
@@ -129,7 +146,7 @@ Export from `packages/creo/src/index.ts`.
 - `html_render.ts` — DOM operations, event delegation, attribute diffing
 - `findParentDom(view)` walks parent chain for nearest primitive element
 - `findInsertionPoint(view)` scans siblings + recurses up for composites
-- After changes, verify with both todo and router examples
+- After changes, verify with the todo playground recipes and `examples/router`
 
 ## Conventions
 
@@ -143,14 +160,14 @@ h1(_, "Title");          // not h1({}, "Title")
 ### Inline Strings
 Prefer passing strings directly as slots instead of wrapping in `() => text(...)`. The engine auto-wraps strings into text nodes:
 ```ts
-button({ on: { click: handler } }, "Click me");  // not () => text("Click me")
-li(_, "Item text");                         // not () => text("Item text")
-span({ class: "label" }, title);            // string variable works too
+button({ on: { click: handler } }, "Click me"); // not () => text("Click me")
+li(_, "Item text");                             // not () => text("Item text")
+span({ class: "label" }, title);                // string variable works too
 ```
-Use `text()` only for dynamic values or when mixing text with other elements inside a function slot.
+Use `text()` only for numbers (string slots take strings, static or dynamic) or when mixing text with other elements inside a function slot.
 
 ### Changing ViewRecord shape
 - Update type in `internal_view.ts`
 - Update `newView()` in `engine.ts` (initializes all fields)
-- Update `#disposeVirtual()` if new field needs cleanup
+- Update `#disposeNode()` if new field needs cleanup
 - JSON/String renderers may need updates if they access the field

@@ -74,8 +74,6 @@ button:hover { background: #f3f4f6; border-color: #4a90d9; color: #4a90d9; }
 audio, video { max-width: 100%; display: block; margin-bottom: 8px; }
 `;
 
-// Advanced todo with drag-and-drop reordering — CSS lifted from
-// examples/todo/index.html.
 const advancedTodoCss = `
 body { font: 15px system-ui, sans-serif; padding: 24px; background: #f5f5f5; color: #1a1a1a; display: flex; justify-content: center; }
 .app { max-width: 480px; width: 100%; }
@@ -114,7 +112,6 @@ h1 { font-size: 24px; margin-bottom: 16px; }
 .empty { padding: 24px 16px; text-align: center; color: #999; font-size: 14px; }
 `;
 
-// Editable table — CSS lifted from examples/table/index.html.
 const tableCss = `
 body { font: 15px system-ui, sans-serif; padding: 24px; background: #f5f5f5; color: #1a1a1a; }
 .toolbar { display: flex; gap: 8px; margin-bottom: 16px; }
@@ -133,7 +130,6 @@ body { font: 15px system-ui, sans-serif; padding: 24px; background: #f5f5f5; col
 .cell-input { min-width: 120px; width: 120px; padding: 8px 12px; font-size: 14px; border: none; outline: 2px solid #4a90d9; outline-offset: -2px; min-height: 36px; font-family: inherit; background: #fff; }
 `;
 
-// Chess — CSS lifted from examples/chess/index.html.
 const chessCss = `
 body { font: 15px system-ui, -apple-system, sans-serif; padding: 32px; background: #1a1a2e; color: #eee; display: flex; justify-content: center; min-height: 100vh; margin: 0; }
 .chess-app { display: flex; flex-direction: column; align-items: center; gap: 12px; user-select: none; }

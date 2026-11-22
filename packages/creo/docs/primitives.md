@@ -7,15 +7,15 @@ Primitives are the leaf-level building blocks in Creo. They correspond to HTML e
 Creo exports pre-defined primitives for all standard HTML elements. Import them directly:
 
 ```ts
-import { div, span, p, h1, button, input, text } from "creo";
+import { div, span, p, h1, button, input, text, _ } from "creo";
 ```
 
 ### Calling primitives
 
 Primitives accept two optional arguments:
 
-1. **Props** -- an object with HTML attributes and event handlers.
-2. **Slot** -- a `() => void` callback for child content, or a `PendingView[]` for passthrough children.
+1. **Props** -- an object with HTML attributes, plus event handlers under `on: { ... }`. Pass `_` when there are none.
+2. **Slot** -- a `() => void` callback for child content, or a string (shorthand for `() => text("...")`).
 
 ```ts
 // No props, no children
@@ -28,14 +28,17 @@ img({ src: "/logo.png", alt: "Logo" });
 
 // Props and children
 div({ class: "card", id: "main" }, () => {
-  h1({}, () => { text("Title"); });
-  p({}, () => { text("Content goes here."); });
+  h1(_, "Title");
+  p(_, "Content goes here.");
 });
 
-// Children only (pass undefined or omit props)
-div({}, () => {
+// Children only (pass _ for props)
+div(_, () => {
   text("Hello");
 });
+
+// Props and event handlers
+button({ class: "btn", on: { click: handleClick } }, "Save");
 ```
 
 ### text()
@@ -72,6 +75,10 @@ text(count.get());
 
 `abbr`, `b`, `bdi`, `bdo`, `cite`, `data`, `dfn`, `i`, `kbd`, `mark`, `q`, `rp`, `rt`, `ruby`, `s`, `samp`, `sub`, `sup`, `time`, `u`, `varEl`, `wbr`
 
+### Demarcating edits
+
+`del`, `ins` (with `cite`, `datetime`)
+
 ### Lists
 
 `ul`, `ol`, `li`, `dl`, `dt`, `dd`
@@ -84,7 +91,7 @@ text(count.get());
 
 `form`, `button`, `input`, `textarea`, `select`, `option`, `fieldset`, `legend`, `datalist`, `optgroup`, `output`, `progress`, `meter`
 
-Form elements like `input`, `textarea`, and `select` support `FormEvents` (includes `input`, `change`, `invalid`). `<form>` supports `FormSubmitEvents` (adds `submit`, `reset`). Other elements use `ContainerEvents`.
+Form elements like `input`, `textarea`, and `select` support `FormEvents` (includes `input`, `change`, `invalid`). `<form>` supports `FormSubmitEvents` (adds `submit`, `reset`). `video` / `audio` use `MediaEvents`, `details` / `dialog` use `DisclosureEvents` (adds `toggle`, `beforeToggle`). Other elements use `ContainerEvents`.
 
 `<button>` also accepts the Invoker Commands and Popover API attributes:
 
@@ -93,7 +100,7 @@ Form elements like `input`, `textarea`, and `select` support `FormEvents` (inclu
 - `popovertarget` — id of a popover element
 - `popovertargetaction` — `"show"`, `"hide"`, or `"toggle"`
 
-The receiving element handles a `command` event (`CommandEventData`) via the standard `on:` system. See [Events](./events.md#invoker-commands-command--commandfor) for an example.
+The receiving element handles a `command` event (`CommandEventData`) via the standard `on:` system. See [Events](#/events#invoker-commands-command-commandfor) for an example.
 
 ### Media
 
@@ -111,6 +118,10 @@ The receiving element handles a `command` event (`CommandEventData`) via the sta
 
 `figure`, `figcaption`
 
+### Scripting
+
+`script`, `noscript`, `template`, `slot` (the HTML `<slot>` element -- not the view `slot` callback)
+
 ## HtmlAttrs
 
 All built-in primitives share a common attribute base:
@@ -126,15 +137,16 @@ type HtmlAttrs = {
   role?: string;
   draggable?: boolean;
   popover?: string;  // Popover API: "auto" | "manual" | "hint"
+  ref?: Ref<Element>;  // DOM element after mount, null after unmount
   [attr: string]: unknown;  // open index signature for any HTML attribute
 };
 ```
 
-The open index signature means you can pass any attribute -- Creo will set it via `setAttribute`.
+The open index signature means you can pass any attribute -- Creo will set it via `setAttribute`. Event handlers are not attributes: a flat `onClick` prop still typechecks but ends up as a dead string attribute. Put handlers under `on: { click }`.
 
 ## The html() factory
 
-`html(tag)` creates a primitive for any HTML tag at runtime. All built-in primitives are created this way:
+`html(tag)` creates a primitive for any tag at runtime. All built-in primitives are created this way:
 
 ```ts
 import { html } from "creo";
@@ -157,23 +169,9 @@ const video = html<
 >("video");
 ```
 
-`html()` caches primitives by tag name -- calling `html("div")` twice returns the same primitive.
+`html()` does not cache -- each call creates a new primitive, so define them once at module level.
 
-## The primitive() factory
-
-For completely custom primitives (not backed by an HTML tag), use `primitive()`:
-
-```ts
-import { primitive } from "creo";
-import type { PrimitiveComponent } from "creo";
-
-type CanvasAttrs = { width: number; height: number };
-type CanvasEvents = { click: (e: PointerEventData) => void };
-
-const myCanvas: PrimitiveComponent<CanvasAttrs, CanvasEvents> = primitive<CanvasAttrs, CanvasEvents>();
-```
-
-Custom primitives need a render handler registered on the renderer to produce output. See [Renderers](./renderers.md) for details.
+The tag string is all a renderer sees (via `view.viewFn[$primitive]`), so a custom renderer can give non-HTML tags whatever meaning it likes. See [Renderers](#/renderers) for details.
 
 ## Passing children
 
@@ -185,21 +183,28 @@ A `() => void` function called at the call site. The engine collects child calls
 
 ```ts
 div({ class: "wrapper" }, () => {
-  p({}, () => { text("Hello"); });
-  span({}, () => { text("World"); });
+  p(_, "Hello");
+  span(_, "World");
 });
 ```
 
-### PendingView array (passthrough)
+### String slot
 
-When a view receives `ctx.children` from its parent, it can pass that array directly as the second argument:
+A string renders as a single text node:
 
 ```ts
-const Card = view((ctx) => ({
+li(_, "Item text");
+span({ class: "label" }, `Hello, ${name}`);
+```
+
+### Slot passthrough
+
+A view can forward the `slot` it received from its parent straight to a primitive:
+
+```ts
+const Card = view(({ slot }) => ({
   render() {
-    div({ class: "card" }, ctx.children);
+    div({ class: "card" }, slot);
   },
 }));
 ```
-
-This avoids re-collecting children and preserves the parent's pending views directly.

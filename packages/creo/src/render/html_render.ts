@@ -11,12 +11,7 @@ import type { Engine } from "@/internal/engine";
 // Render refs — stored on view.renderRef
 // ---------------------------------------------------------------------------
 
-/**
- * For primitives: { element, prevProps }
- * For composites: renderRef is set to `true` (just a non-null marker)
- *
- * Discriminated via view.flags & F_PRIMITIVE
- */
+// Composites use `true` as a mounted marker
 type PrimitiveDomRef = {
   element: Element | Text;
   prevProps: Maybe<Record<string, unknown>>;
@@ -27,8 +22,7 @@ type PrimitiveDomRef = {
 // ---------------------------------------------------------------------------
 
 const $EV = Symbol.for("creo.ev");
-// Marks a payload whose handler called stopPropagation(), so the delegation
-// walk knows to stop climbing without reading the deprecated `cancelBubble`.
+// Set by stopPropagation() so the walk stops without reading `cancelBubble`
 const $STOPPED = Symbol("creo.stopped");
 
 type EventPayload = Record<string, unknown> & { [$STOPPED]?: boolean };
@@ -62,9 +56,6 @@ function getState(container: HTMLElement) {
               if (data[$STOPPED]) return;
             }
           }
-          // For pointerenter/leave events the browser already dispatches
-          // one event per ancestor newly entered — walking up here would
-          // double-fire ancestor handlers.
           if (noWalk) return;
           dom = dom.parentElement as typeof dom;
         }
@@ -75,8 +66,7 @@ function getState(container: HTMLElement) {
   return state;
 }
 
-// Events that don't bubble — register in the capture phase so delegation
-// at the container still receives them.
+// Non-bubbling: listen in capture phase
 const CAPTURE_EVENTS = new Set([
   "focus",
   "blur",
@@ -105,13 +95,9 @@ const CAPTURE_EVENTS = new Set([
   "waiting",
 ]);
 
-// Events whose semantics are "this element specifically" — the browser
-// dispatches one event per ancestor newly entered, so walking up the tree
-// from target to container would double-fire ancestor handlers. For these,
-// only consult the actual target element.
+// Browser fires per ancestor already — walking up would double-fire
 const NO_WALK_EVENTS = new Set(["pointerenter", "pointerleave"]);
 
-// Events fired at high frequency where we want passive listeners by default.
 const PASSIVE_EVENTS = new Set(["scroll"]);
 
 function listenerOptions(domEvent: string): boolean | AddEventListenerOptions {
@@ -283,7 +269,7 @@ function mapEventData(
     const se = e as Event & { submitter?: Element | null };
     data = { submitter: (se.submitter as HTMLElement) ?? null };
   } else if (domEvent === "command") {
-    // CommandEvent is not in every TS lib version yet.
+    // CommandEvent missing from some TS libs
     const ce = e as Event & { command?: string; source?: Element | null };
     data = {
       command: ce.command ?? "",
@@ -313,9 +299,7 @@ const DOM_PROPERTIES = new Set([
   "muted",
 ]);
 
-// Only these elements expose the stateful DOM_PROPERTIES whose live value can
-// drift from props via user interaction. A plain div/span never does, so the
-// re-assert walk can be skipped for them.
+// Only these can drift from props via user input
 const STATEFUL_TAGS = new Set([
   "INPUT",
   "SELECT",
@@ -332,25 +316,76 @@ const STATEFUL_TAGS = new Set([
 export class HtmlRender implements IRender<HTMLElement | Text> {
   engine!: Engine;
 
+  #mountRoot: Maybe<ViewRecord> = null;
+  #mountParent: Node | null = null;
+  #mountAnchor: Node | null = null;
+  // ref / autofocus deferred until endMount
+  #mountPending: PrimitiveDomRef[] = [];
+
   constructor(private container: HTMLElement) {}
 
   // -- IRender ----------------------------------------------------------------
 
+  beginMount(root: ViewRecord, anchor?: unknown): unknown {
+    this.#mountRoot = root;
+    this.#mountParent = this.findParentDom(root);
+    this.#mountAnchor =
+      anchor !== undefined
+        ? (anchor as Node | null)
+        : this.findInsertionPoint(root);
+    return this.#mountAnchor;
+  }
+
+  // Post-order: append into detached parent; top-level nodes go before the anchor
+  attach(view: ViewRecord): void {
+    if (!(view.flags & F_PRIMITIVE) || view.flags & F_TEXT_CONTENT) return;
+    const el = (view.renderRef as PrimitiveDomRef).element;
+    const root = this.#mountRoot;
+    let p = view;
+    while (p !== root) {
+      p = p.parent!;
+      if (p.flags & F_PRIMITIVE) {
+        (p.renderRef as PrimitiveDomRef).element.appendChild(el);
+        return;
+      }
+    }
+    this.#mountParent!.insertBefore(el, this.#mountAnchor);
+  }
+
+  endMount(_root: ViewRecord): void {
+    this.#mountRoot = null;
+    this.#mountParent = null;
+    this.#mountAnchor = null;
+    const pending = this.#mountPending;
+    if (pending.length === 0) return;
+    this.#mountPending = [];
+    for (const ref of pending) {
+      const element = ref.element as Element;
+      const props = ref.prevProps!;
+      // Browsers ignore `autofocus` on inserted elements
+      if (
+        props.autofocus === true &&
+        typeof (element as HTMLElement).focus === "function"
+      ) {
+        (element as HTMLElement).focus();
+      }
+      applyRef((props as { ref?: Ref<Element> }).ref, element);
+    }
+  }
+
   render(view: ViewRecord): void {
     if (!view.renderRef) {
-      // --- Mount ---
+      // --- Mount (create only, attach() inserts) ---
       if (view.flags & F_PRIMITIVE) {
-        const parentNode = this.findParentDom(view);
-        const refNode = this.findInsertionPoint(view);
         const tag = view.viewFn[$primitive]!;
 
         if (tag === "text") {
           const textNode = document.createTextNode(String(view.props));
           view.renderRef = { element: textNode, prevProps: null };
-          parentNode.insertBefore(textNode, refNode);
         } else {
-          const parentIsSvg = (parentNode as Element).namespaceURI === SVG_NS;
-          const useSvg = tag === "svg" || parentIsSvg;
+          const useSvg =
+            tag === "svg" ||
+            (this.findParentDom(view) as Element).namespaceURI === SVG_NS;
           const element = useSvg
             ? document.createElementNS(SVG_NS, tag)
             : document.createElement(tag);
@@ -360,7 +395,7 @@ export class HtmlRender implements IRender<HTMLElement | Text> {
           this.setAttributes(element, props);
           domRef.prevProps = props;
 
-          // If single text child, use textContent directly
+          // Single text child → textContent
           if (view.children?.length === 1) {
             const child = view.children[0]!;
             if (
@@ -368,32 +403,16 @@ export class HtmlRender implements IRender<HTMLElement | Text> {
               child.viewFn[$primitive] === "text"
             ) {
               element.textContent = String(child.props);
-              child.renderRef = { element, prevProps: null };
+              child.renderRef = { element, prevProps: child.props };
               child.flags |= F_TEXT_CONTENT;
             }
           }
 
-          parentNode.insertBefore(element, refNode);
-
-          // The HTML `autofocus` attribute only fires during initial document
-          // parse — for dynamically inserted elements browsers ignore it.
-          // Match React's behaviour by calling .focus() once after mount.
-          if (
-            props != null &&
-            (props as Record<string, unknown>).autofocus === true &&
-            typeof (element as HTMLElement).focus === "function"
-          ) {
-            (element as HTMLElement).focus();
-          }
-
-          // Fire user ref after the element is in the DOM so ref(el) can
-          // call focus(), measure layout, attach observers, etc.
-          if (props != null) {
-            applyRef((props as { ref?: Ref<Element> }).ref, element);
+          if (props != null && (props.ref != null || props.autofocus === true)) {
+            this.#mountPending.push(domRef);
           }
         }
       } else {
-        // Composite: no DOM — just mark as mounted
         view.renderRef = true;
       }
       return;
@@ -416,10 +435,7 @@ export class HtmlRender implements IRender<HTMLElement | Text> {
 
     const ref = view.renderRef as PrimitiveDomRef;
 
-    // Text node in textContent mode — update parent's textContent
     if (view.flags & F_TEXT_CONTENT) {
-      // props is the text content (string | number) — referential equality
-      // means unchanged, so skip the String() + textContent read.
       if (ref.prevProps === (view.props as never)) return;
       ref.prevProps = view.props as never;
       const parentEl = ref.element as Element;
@@ -457,12 +473,7 @@ export class HtmlRender implements IRender<HTMLElement | Text> {
     view.renderRef = undefined;
   }
 
-  /**
-   * Re-render only when a stateful DOM property in `nextProps` actually
-   * differs from the live DOM. With this in place a 50-input form whose
-   * parent re-renders touches the DOM only for the input the user is
-   * actually editing.
-   */
+  /** True when a stateful DOM property differs from the live DOM. */
   shouldReassert(view: ViewRecord, nextProps: unknown): boolean {
     if (nextProps == null || typeof nextProps !== "object") return false;
     const ref = view.renderRef as Maybe<PrimitiveDomRef>;
@@ -474,7 +485,7 @@ export class HtmlRender implements IRender<HTMLElement | Text> {
       if (!(key in props)) continue;
       const live = el[key];
       const next = props[key];
-      // Browser coerces these properties — compare under matching coercion.
+      // Compare under the browser's coercion
       if (typeof next === "boolean" || typeof live === "boolean") {
         if (Boolean(live) !== Boolean(next)) return true;
       } else if (String(live) !== String(next)) {
@@ -504,13 +515,11 @@ export class HtmlRender implements IRender<HTMLElement | Text> {
 
     const children = parent.children;
 
-    // Fast path: last child
     if (children[children.length - 1] === view) {
       return this.#parentEndAnchor(parent);
     }
 
-    // view.pos is maintained by the reconciler — avoid the O(n) indexOf scan.
-    // Fall back to indexOf if pos is unset (-1) or stale (defensive).
+    // indexOf only if pos is unset or stale
     let idx = view.pos;
     if (idx < 0 || children[idx] !== view) idx = children.indexOf(view);
     for (let i = idx + 1; i < children.length; i++) {
@@ -523,7 +532,6 @@ export class HtmlRender implements IRender<HTMLElement | Text> {
 
   #parentEndAnchor(parent: ViewRecord): Node | null {
     if (parent.flags & F_PRIMITIVE) return null; // append to element
-    // Composite: walk up
     return this.findInsertionPoint(parent);
   }
 
@@ -533,8 +541,6 @@ export class HtmlRender implements IRender<HTMLElement | Text> {
     if (props == null) return;
     for (const key in props) {
       const value = props[key];
-      // `ref` is fired after insertion in render(); never written to DOM.
-      // `on` is the event-handler sub-object, handled separately below.
       if (key === "key" || key === "ref" || key === "on" || value == null)
         continue;
       this.setAttribute(element, key, value);
@@ -567,24 +573,18 @@ export class HtmlRender implements IRender<HTMLElement | Text> {
         const value = next[key];
         if (key === "key" || key === "ref" || key === "on" || value == null)
           continue;
-        // Re-assert DOM properties even if prevProps matches: the live DOM
-        // value can drift from prevProps via user input (typing in an input,
-        // toggling a checkbox) without our state ever changing.
+        // DOM properties are re-asserted: user input can drift them from prevProps
         if (prev && prev[key] === value && !DOM_PROPERTIES.has(key)) continue;
         this.setAttribute(element, key, value);
       }
     }
 
-    // Event handlers under `on`. Common case: the user keeps the `on` object
-    // referentially stable across renders — `prevOn === nextOn` short-circuits
-    // without touching individual handlers.
     const prevOn = prev?.on as Maybe<Record<string, Function>>;
     const nextOn = next?.on as Maybe<Record<string, Function>>;
     if (prevOn !== nextOn) {
       this.diffEvents(element, prevOn, nextOn);
     }
 
-    // ref reassignment: detach the old, attach the new. Same pattern as React.
     const prevRef = prev?.ref as Maybe<Ref<Element>>;
     const nextRef = next?.ref as Maybe<Ref<Element>>;
     if (prevRef !== nextRef) {
@@ -646,8 +646,7 @@ export class HtmlRender implements IRender<HTMLElement | Text> {
 
   private setAttribute(element: Element, key: string, value: unknown) {
     if (key === "class") {
-      // className is a settable string on HTMLElement but readonly (SVGAnimatedString)
-      // on SVG — use setAttribute which works for both.
+      // className is readonly on SVG
       element.setAttribute("class", String(value));
     } else if (key === "style") {
       (element as HTMLElement).style.cssText = String(value);
@@ -709,10 +708,7 @@ export class HtmlRender implements IRender<HTMLElement | Text> {
   private removeDomNodes(view: ViewRecord) {
     const ref = view.renderRef as Maybe<PrimitiveDomRef>;
     if (!ref || !(view.flags & F_PRIMITIVE)) return;
-    // F_TEXT_CONTENT: ref.element is the PARENT's element (optimization),
-    // not this text view's own node. Clear the parent's textContent so
-    // incoming siblings mount into an empty host, but never remove the
-    // parent — the parent owns its own lifecycle.
+    // ref.element is the parent's element: clear text, never remove it
     if (view.flags & F_TEXT_CONTENT) {
       (ref.element as Element).textContent = "";
       return;
@@ -726,8 +722,7 @@ export class HtmlRender implements IRender<HTMLElement | Text> {
       }
       delete (ref.element as any)[$EV];
     }
-    // Detach user ref before the element leaves the DOM so the callback
-    // still has a chance to read layout / disconnect observers if needed.
+    // Before removal so the callback can still read layout
     const prevProps = ref.prevProps as Maybe<{ ref?: Ref<Element> }>;
     if (prevProps) applyRef(prevProps.ref, null);
     ref.element.parentNode?.removeChild(ref.element);

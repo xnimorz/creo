@@ -244,7 +244,6 @@ describe("Benchmark", () => {
     app.list.set(buildData(1000));
     app.engine.render();
 
-    // Verify initial order
     const trs = app.container.getElementsByTagName("tr");
     const firstLabel = trs[1]?.textContent;
     const lastLabel = trs[998]?.textContent;
@@ -259,7 +258,6 @@ describe("Benchmark", () => {
       app.engine.render();
     });
 
-    // Verify swap happened in DOM
     const trsAfter = app.container.getElementsByTagName("tr");
     expect(trsAfter[1]?.textContent).toBe(lastLabel);
     expect(trsAfter[998]?.textContent).toBe(firstLabel);

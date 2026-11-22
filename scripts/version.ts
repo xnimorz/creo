@@ -35,7 +35,6 @@ async function main() {
 
   const packages: { name: string; dir: string; pkg: Record<string, unknown>; oldVersion: string; newVersion: string }[] = [];
 
-  // Read all package.json files
   for (const dir of packageDirs) {
     const pkgPath = resolve(packagesDir, dir, "package.json");
     const file = Bun.file(pkgPath);
@@ -54,14 +53,11 @@ async function main() {
     return;
   }
 
-  // Build a map of package names to new versions
   const versionMap = new Map(packages.map((p) => [p.name, p.newVersion]));
 
-  // Update versions and cross-references
   for (const p of packages) {
     p.pkg.version = p.newVersion;
 
-    // Update peerDependencies referencing sibling packages
     const peers = p.pkg.peerDependencies as Record<string, string> | undefined;
     if (peers) {
       for (const dep of Object.keys(peers)) {

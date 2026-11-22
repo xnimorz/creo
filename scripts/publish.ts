@@ -23,7 +23,6 @@ function parseOtp(argv: string[]): string | null {
 }
 
 function promptOtp(): string {
-  // Bun supports the synchronous Web `prompt()` global.
   const value = prompt("npm OTP (one-time password): ");
   return (value ?? "").trim();
 }
@@ -38,7 +37,6 @@ async function main() {
   const packages: PackageInfo[] = [];
   const nameSet = new Set<string>();
 
-  // Read all package.json files
   for (const dir of packageDirs) {
     const pkgPath = resolve(packagesDir, dir, "package.json");
     const file = Bun.file(pkgPath);
@@ -59,7 +57,7 @@ async function main() {
     });
   }
 
-  // Topological sort: packages with no sibling deps first
+  // Topological: sibling deps first
   const sorted: PackageInfo[] = [];
   const remaining = [...packages];
 
@@ -85,9 +83,7 @@ async function main() {
       : "\n📦 Publishing packages\n",
   );
 
-  // npm registry now requires an OTP for every `npm publish` of a public
-  // package on accounts with 2FA enabled. Prompt once and reuse for every
-  // package — the same code is valid for the whole 30s window.
+  // One 2FA OTP covers every publish within its 30s window
   if (!dryRun && !otp) {
     otp = promptOtp();
     if (!otp) {
@@ -101,7 +97,7 @@ async function main() {
   for (const pkg of sorted) {
     const pkgDir = resolve(packagesDir, pkg.dir);
 
-    // Publish (prepack builds a fresh dist as part of this)
+    // prepack rebuilds dist
     console.log(`Publishing ${pkg.name}@${pkg.version}...`);
     try {
       if (dryRun) {

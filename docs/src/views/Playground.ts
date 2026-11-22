@@ -5,8 +5,7 @@ import { oneDark } from "@codemirror/theme-one-dark";
 import { transform } from "sucrase";
 import { recipes, findRecipe } from "../recipes";
 import type { Recipe } from "../recipes";
-// The playground iframe loads the workspace build that ships with the docs
-// site — same code in dev and on gh-pages, no esm.sh / publish dependency.
+// Iframe loads the workspace build (no esm.sh / publish dependency)
 import creoUrl from "../../../packages/creo/dist/index.js?url";
 import creoRouterUrl from "../../../packages/creo-router/dist/index.js?url";
 

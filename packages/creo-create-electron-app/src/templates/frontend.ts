@@ -154,7 +154,7 @@ createApp(
 }
 
 export function appTs(): string {
-  return `import { view, div, h1, p, button, text, _ } from "creo";
+  return `import { view, div, h1, p, button, _ } from "creo";
 
 export const App = view(({ use }) => {
   const count = use(0);
